@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { Platform } from 'react-native';
 import { UserProfile } from '../../proto/auth';
-import { BYPASS_AUTH } from '../utils/config';
 
 interface AuthState {
     user: UserProfile | null;
@@ -56,7 +55,6 @@ export const useAuthStore = create<AuthState>((set) => ({
     },
     restoreSession: async () => {
         console.log('[AUTH] Starting session restore...');
-        console.log('[AUTH] BYPASS_AUTH =', BYPASS_AUTH);
         try {
             const token = await storage.getItem('auth_token');
             const userStr = await storage.getItem('user_profile');
@@ -66,22 +64,6 @@ export const useAuthStore = create<AuthState>((set) => ({
                 const user = JSON.parse(userStr) as UserProfile;
                 console.log('[AUTH] Restoring existing session for user:', user.email);
                 set({ user, token, isLoading: false });
-            } else if (BYPASS_AUTH) {
-                // Bypass authentication for testing
-                console.log('[BYPASS] No session found, auto-login with mock user');
-                const mockUser = {
-                    //id: '6abbacea-af8d-4005-a49e-465355240598',
-                    id: '6abbacea-af8d-4005-a49e-465355240598',
-                    email: 'aky001@zohomail.in',
-                    name: 'Amit K Yadav',
-                    picture: '',
-                };
-                const mockToken = 'mock-jwt-token';
-                await storage.setItem('auth_token', mockToken);
-                await storage.setItem('user_profile', JSON.stringify(mockUser));
-                console.log('[BYPASS] Mock user saved to storage, setting state...');
-                set({ user: mockUser, token: mockToken, isLoading: false });
-                console.log('[BYPASS] State updated, isLoading should be false now');
             } else {
                 console.log('[AUTH] No session found, no bypass, showing login');
                 set({ isLoading: false });

@@ -9,6 +9,7 @@ import (
 
 	"github.com/amityadav/landr/internal/ai"
 	"github.com/amityadav/landr/internal/core"
+	"github.com/amityadav/landr/internal/middleware"
 	"github.com/amityadav/landr/internal/scraper"
 	"github.com/amityadav/landr/internal/service"
 	"github.com/amityadav/landr/internal/store"
@@ -60,20 +61,25 @@ func main() {
 	learningCore := core.NewLearningCore(st, scr, aiClient)
 	learningSvc := service.NewLearningService(learningCore)
 
-	// 4. gRPC Server
+	// 4. Auth Interceptor
+	authInterceptor := middleware.NewAuthInterceptor(tm)
+
+	// 5. gRPC Server with Auth Interceptor
 	lis, err := net.Listen("tcp", ":50051")
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
 
-	s := grpc.NewServer()
+	s := grpc.NewServer(
+		grpc.UnaryInterceptor(authInterceptor.Unary()),
+	)
 	auth.RegisterAuthServiceServer(s, authSvc)
 	learning.RegisterLearningServiceServer(s, learningSvc)
 
 	// Enable reflection for debugging (e.g. with grpcurl)
 	reflection.Register(s)
 
-	// 5. gRPC-Web Wrapper
+	// 6. gRPC-Web Wrapper
 	wrappedServer := grpcweb.WrapServer(s,
 		grpcweb.WithOriginFunc(func(origin string) bool { return true }),
 		grpcweb.WithAllowedRequestHeaders([]string{"*"}),

@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/amityadav/landr/internal/core"
+	"github.com/amityadav/landr/internal/middleware"
 	"github.com/amityadav/landr/pkg/pb/learning"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -25,11 +26,12 @@ func NewLearningService(c *core.LearningCore) *LearningService {
 func (s *LearningService) AddMaterial(ctx context.Context, req *learning.AddMaterialRequest) (*learning.AddMaterialResponse, error) {
 	log.Printf("[AddMaterial] Received request - Type: %s, Content length: %d", req.Type, len(req.Content))
 
-	// We need the userID. In a real app, this comes from the context (via interceptor).
-	// For this MVP, we'll assume a hardcoded user or extract from metadata if we implemented auth interceptor.
-	// Let's assume a placeholder userID for now since we haven't built the interceptor yet.
-	// TODO: Extract userID from context.
-	userID := "6abbacea-af8d-4005-a49e-465355240598" // Test user UUID
+	// Extract user ID from context (set by auth interceptor)
+	userID, err := middleware.GetUserID(ctx)
+	if err != nil {
+		log.Printf("[AddMaterial] ERROR: Failed to get user ID: %v", err)
+		return nil, err
+	}
 	log.Printf("[AddMaterial] Using userID: %s", userID)
 
 	materialID, count, title, tags, err := s.core.AddMaterial(ctx, userID, req.Type, req.Content, req.ExistingTags)
@@ -48,7 +50,12 @@ func (s *LearningService) AddMaterial(ctx context.Context, req *learning.AddMate
 }
 
 func (s *LearningService) GetDueFlashcards(ctx context.Context, req *learning.GetDueFlashcardsRequest) (*learning.FlashcardList, error) {
-	userID := "6abbacea-af8d-4005-a49e-465355240598" // Test user UUID
+	// Extract user ID from context (set by auth interceptor)
+	userID, err := middleware.GetUserID(ctx)
+	if err != nil {
+		log.Printf("[GetDueFlashcards] ERROR: Failed to get user ID: %v", err)
+		return nil, err
+	}
 	log.Printf("[GetDueFlashcards] Fetching flashcards for userID: %s, materialID: %s", userID, req.MaterialId)
 
 	cards, err := s.core.GetDueFlashcards(ctx, userID, req.MaterialId)
@@ -64,7 +71,12 @@ func (s *LearningService) GetDueFlashcards(ctx context.Context, req *learning.Ge
 }
 
 func (s *LearningService) GetDueMaterials(ctx context.Context, _ *emptypb.Empty) (*learning.GetDueMaterialsResponse, error) {
-	userID := "6abbacea-af8d-4005-a49e-465355240598" // Test user UUID
+	// Extract user ID from context (set by auth interceptor)
+	userID, err := middleware.GetUserID(ctx)
+	if err != nil {
+		log.Printf("[GetDueMaterials] ERROR: Failed to get user ID: %v", err)
+		return nil, err
+	}
 	log.Printf("[GetDueMaterials] Fetching materials for userID: %s", userID)
 
 	materials, err := s.core.GetDueMaterials(ctx, userID)

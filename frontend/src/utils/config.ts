@@ -5,7 +5,7 @@ import { Platform } from 'react-native';
 const LOCALHOST = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
 
 // Set to true to bypass authentication for testing
-export const BYPASS_AUTH = true;
+export const BYPASS_AUTH = false;
 
 export const API_URL = `http://${LOCALHOST}:8080`;
 
@@ -15,6 +15,6 @@ export const API_URL = `http://${LOCALHOST}:8080`;
 // 3. Create OAuth 2.0 Client ID (Web application type)
 // 4. Add authorized redirect URI: http://localhost:8081
 // 5. Copy the Client ID and paste below
-export const GOOGLE_WEB_CLIENT_ID = "YOUR_GOOGLE_WEB_CLIENT_ID"; // Replace with your Web Client ID
+export const GOOGLE_WEB_CLIENT_ID = "330800561912-pf7pdbfsfjicv9fe4lkkf1q130gg2952.apps.googleusercontent.com"; // Replace with your Web Client ID
 export const GOOGLE_IOS_CLIENT_ID = "YOUR_GOOGLE_IOS_CLIENT_ID"; // Optional: for iOS
 export const GOOGLE_ANDROID_CLIENT_ID = "YOUR_GOOGLE_ANDROID_CLIENT_ID"; // Optional: for Android
