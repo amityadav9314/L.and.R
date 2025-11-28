@@ -1,0 +1,48 @@
+server {
+    listen 80;
+    listen [::]:80;
+    server_name 43.205.81.60.nip.io;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name 43.205.81.60.nip.io;
+
+    ssl_certificate /etc/letsencrypt/live/43.205.81.60.nip.io/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/43.205.81.60.nip.io/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+    # FRONTEND
+    location / {
+        proxy_pass http://localhost:8081;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # BACKEND - gRPC-Web (let Go handle CORS)
+    location ~ ^/(auth\.|learning\.) {
+        proxy_pass http://localhost:8080;
+        proxy_http_version 1.1;
+        
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Origin $http_origin;
+        
+        # Disable buffering for gRPC
+        proxy_buffering off;
+        proxy_request_buffering off;
+        
+        # Timeouts
+        proxy_connect_timeout 300s;
+        proxy_send_timeout 300s;
+        proxy_read_timeout 300s;
+    }
+}
+

@@ -79,17 +79,55 @@ func main() {
 	// Enable reflection for debugging (e.g. with grpcurl)
 	reflection.Register(s)
 
-	// 6. gRPC-Web Wrapper
+	// 6. gRPC-Web Wrapper with CORS
 	wrappedServer := grpcweb.WrapServer(s,
-		grpcweb.WithOriginFunc(func(origin string) bool { return true }),
-		grpcweb.WithAllowedRequestHeaders([]string{"*"}),
+		grpcweb.WithOriginFunc(func(origin string) bool {
+			// Allow all origins for development
+			// In production, you should restrict this to specific domains
+			return true
+		}),
+		grpcweb.WithAllowedRequestHeaders([]string{
+			"x-grpc-web",
+			"content-type",
+			"x-user-agent",
+			"grpc-timeout",
+			"authorization",
+			"x-requested-with",
+			"cache-control",
+			"range",
+		}),
 	)
+
+	// Custom HTTP handler with CORS
+	httpHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Set CORS headers
+		origin := r.Header.Get("Origin")
+		if origin == "" {
+			origin = "*"
+		}
+		
+		w.Header().Set("Access-Control-Allow-Origin", origin)
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization,x-grpc-web,x-user-agent,grpc-timeout")
+		w.Header().Set("Access-Control-Expose-Headers", "Content-Length,Content-Range,grpc-status,grpc-message,grpc-status-details-bin")
+
+		// Handle preflight OPTIONS request
+		if r.Method == "OPTIONS" {
+			w.Header().Set("Access-Control-Max-Age", "1728000")
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		// Pass to gRPC-Web handler
+		wrappedServer.ServeHTTP(w, r)
+	})
 
 	log.Printf("Server listening on :50051")
 	// Run gRPC-Web on separate port
 	go func() {
 		log.Printf("gRPC-Web listening on :8080")
-		if err := http.ListenAndServe(":8080", wrappedServer); err != nil {
+		if err := http.ListenAndServe(":8080", httpHandler); err != nil {
 			log.Fatalf("failed to serve grpc-web: %v", err)
 		}
 	}()

@@ -39,7 +39,7 @@ start-backend:
 
 start-frontend:
 	@echo "Starting frontend..."
-	cd $(FRONTEND_DIR) && npm start
+	cd $(FRONTEND_DIR) && npm start -- -w
 
 # Stop
 stop:
