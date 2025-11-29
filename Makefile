@@ -26,6 +26,8 @@ build-backend:
 build-frontend:
 	@echo "Installing frontend dependencies..."
 	cd $(FRONTEND_DIR) && npm install
+	@echo "Running type check..."
+	cd $(FRONTEND_DIR) && npm run tsc
 
 # Start
 start:

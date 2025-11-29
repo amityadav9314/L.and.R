@@ -8,6 +8,8 @@ Notifications.setNotificationHandler({
         shouldShowAlert: true,
         shouldPlaySound: true,
         shouldSetBadge: true,
+        shouldShowBanner: true,
+        shouldShowList: true,
     }),
 });
 
@@ -58,6 +60,7 @@ export class NotificationService {
                     data: { type: 'daily_reminder' },
                 },
                 trigger: {
+                    type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
                     hour: 9,
                     minute: 0,
                     repeats: true,
@@ -76,20 +79,20 @@ export class NotificationService {
     static async checkAndNotify(): Promise<void> {
         try {
             const response = await learningClient.getNotificationStatus({});
-            
+
             if (response.hasDueMaterials && response.dueFlashcardsCount > 0) {
                 await Notifications.scheduleNotificationAsync({
                     content: {
                         title: 'LandR - Flashcards Due! 🎯',
                         body: `You have ${response.dueFlashcardsCount} flashcard${response.dueFlashcardsCount > 1 ? 's' : ''} ready for review.`,
-                        data: { 
+                        data: {
                             type: 'due_flashcards',
                             count: response.dueFlashcardsCount,
                         },
                     },
                     trigger: null, // Send immediately
                 });
-                
+
                 console.log(`[Notifications] Sent notification for ${response.dueFlashcardsCount} due flashcards`);
             }
         } catch (error) {
@@ -128,7 +131,7 @@ export class NotificationService {
      */
     static async initialize(): Promise<void> {
         const hasPermission = await this.requestPermissions();
-        
+
         if (hasPermission) {
             await this.scheduleDailyNotification();
             await this.checkAndNotify();

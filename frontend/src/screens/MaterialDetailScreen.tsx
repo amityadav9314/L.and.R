@@ -19,6 +19,7 @@ export const MaterialDetailScreen = () => {
     const navigation = useNavigation<MaterialDetailScreenNavigationProp>();
     const route = useRoute<MaterialDetailScreenRouteProp>();
     const { materialId, title } = route.params;
+    const displayTitle = title || 'Material Details';
 
     const { data, isLoading, error, refetch } = useQuery({
         queryKey: ['dueFlashcards', materialId],
@@ -49,24 +50,24 @@ export const MaterialDetailScreen = () => {
         <View style={styles.container}>
             <AppHeader />
             <View style={styles.contentContainer}>
-                <Text style={styles.headerTitle}>{title}</Text>
+                <Text style={styles.headerTitle}>{displayTitle}</Text>
 
-            {error ? (
-                <Text style={styles.error}>Failed to load flashcards</Text>
-            ) : (
-                <FlatList
-                    data={data}
-                    renderItem={renderItem}
-                    keyExtractor={(item) => item.id}
-                    contentContainerStyle={styles.list}
-                    refreshControl={
-                        <RefreshControl refreshing={isLoading} onRefresh={refetch} />
-                    }
-                    ListEmptyComponent={
-                        <Text style={styles.empty}>No flashcards due for this material!</Text>
-                    }
-                />
-            )}
+                {error ? (
+                    <Text style={styles.error}>Failed to load flashcards</Text>
+                ) : (
+                    <FlatList
+                        data={data}
+                        renderItem={renderItem}
+                        keyExtractor={(item) => item.id}
+                        contentContainerStyle={styles.list}
+                        refreshControl={
+                            <RefreshControl refreshing={isLoading} onRefresh={refetch} />
+                        }
+                        ListEmptyComponent={
+                            <Text style={styles.empty}>No flashcards due for this material!</Text>
+                        }
+                    />
+                )}
             </View>
         </View>
     );

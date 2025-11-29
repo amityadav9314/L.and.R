@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
+import * as Linking from 'expo-linking';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { ActivityIndicator, View } from 'react-native';
 import { LoginScreen } from '../screens/LoginScreen';
@@ -26,8 +27,21 @@ export const AppNavigator = () => {
         );
     }
 
+    const linking = {
+        prefixes: [Linking.createURL('/')],
+        config: {
+            screens: {
+                Login: 'login',
+                Home: '',
+                AddMaterial: 'add-material',
+                MaterialDetail: 'material/:materialId',
+                Review: 'review/:flashcardId',
+            },
+        },
+    };
+
     return (
-        <NavigationContainer>
+        <NavigationContainer linking={linking}>
             <Stack.Navigator screenOptions={{ headerShown: false }}>
                 {token ? (
                     <>
