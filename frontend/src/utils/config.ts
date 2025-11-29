@@ -18,4 +18,5 @@ export const API_URL = `https://43.205.81.60.nip.io`;
 // 5. Copy the Client ID and paste below
 export const GOOGLE_WEB_CLIENT_ID = "330800561912-pf7pdbfsfjicv9fe4lkkf1q130gg2952.apps.googleusercontent.com"; // Replace with your Web Client ID
 export const GOOGLE_IOS_CLIENT_ID = "YOUR_GOOGLE_IOS_CLIENT_ID"; // Optional: for iOS
-export const GOOGLE_ANDROID_CLIENT_ID = "330800561912-2rfarfrd78kf9dfcqfjobefi14m252pf.apps.googleusercontent.com"; // Using Web Client ID temporarily as placeholder, user needs to replace this.
+// export const GOOGLE_ANDROID_CLIENT_ID = "330800561912-2rfarfrd78kf9dfcqfjobefi14m252pf.apps.googleusercontent.com"; // Using Web Client ID temporarily as placeholder, user needs to replace this.
+export const GOOGLE_ANDROID_CLIENT_ID = "330800561912-6bnk7qkdpdhfsfa4ngnhrrpbv097e49d.apps.googleusercontent.com"; // Using Web Client ID temporarily as placeholder, user needs to replace this.

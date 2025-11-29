@@ -16,7 +16,18 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { NavigationProvider, useNavigation } from './src/navigation/ManualRouter';
 
-const queryClient = new QueryClient();
+export const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // Data stays fresh for 5 minutes
+      gcTime: 10 * 60 * 1000, // Cache for 10 minutes (formerly cacheTime)
+      refetchOnWindowFocus: false, // Don't refetch when window regains focus
+      refetchOnMount: false, // Don't refetch when component mounts if data exists
+      refetchOnReconnect: false, // Don't refetch on reconnect
+      retry: 1, // Only retry failed requests once
+    },
+  },
+});
 
 const ScreenRenderer = () => {
   const { currentScreen } = useNavigation();

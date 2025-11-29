@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { Platform } from 'react-native';
 import { UserProfile } from '../../proto/backend/proto/auth/auth';
+import { queryClient } from '../../App';
 
 interface AuthState {
     user: UserProfile | null;
@@ -44,11 +45,17 @@ export const useAuthStore = create<AuthState>((set) => ({
     token: null,
     isLoading: true,
     login: async (user, token) => {
+        console.log('[AUTH] Login - clearing cache and setting new user');
+        // Clear all cached data when logging in with a new account
+        queryClient.clear();
         await storage.setItem('auth_token', token);
         await storage.setItem('user_profile', JSON.stringify(user));
         set({ user, token, isLoading: false });
     },
     logout: async () => {
+        console.log('[AUTH] Logout - clearing cache and storage');
+        // Clear all cached data when logging out
+        queryClient.clear();
         await storage.deleteItem('auth_token');
         await storage.deleteItem('user_profile');
         set({ user: null, token: null, isLoading: false });

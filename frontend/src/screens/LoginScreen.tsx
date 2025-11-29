@@ -38,17 +38,28 @@ export const LoginScreen = () => {
                 redirectUri = hostUri ? `https://${hostUri}` : makeRedirectUri();
                 console.log('[LOGIN] Expo Go detected. Using Tunnel URL.');
             } else {
-                // Production (APK): Use Custom Scheme
-                // We hardcode this so you know EXACTLY what to add to Google Console.
-                // Add 'landr://redirect' to Google Cloud Console -> Web Client -> Authorized redirect URIs
-                redirectUri = 'landr://redirect';
-                console.log('[LOGIN] Standalone App detected. Using Custom Scheme.');
+                // Production/EAS Build: Use Expo's Auth Proxy
+                // This works with Web Client ID and doesn't require custom scheme registration
+                redirectUri = makeRedirectUri({
+                    scheme: 'landr',
+                    path: 'redirect'
+                });
+                console.log('[LOGIN] Standalone/EAS Build detected. Using Expo Auth Proxy.');
             }
 
             console.log('[LOGIN] Redirect URI:', redirectUri);
 
-            // Use Web Client ID for both (since we are using WebBrowser flow)
-            clientId = GOOGLE_WEB_CLIENT_ID;
+            // Use appropriate Client ID based on platform
+            if (Platform.OS === 'android') {
+                clientId = GOOGLE_ANDROID_CLIENT_ID;
+                console.log('[LOGIN] Using Android Client ID');
+            } else if (Platform.OS === 'ios') {
+                clientId = GOOGLE_IOS_CLIENT_ID;
+                console.log('[LOGIN] Using iOS Client ID');
+            } else {
+                clientId = GOOGLE_WEB_CLIENT_ID;
+                console.log('[LOGIN] Using Web Client ID');
+            }
             const scope = encodeURIComponent('openid profile email');
             const responseType = 'id_token';
             const nonce = Math.random().toString(36).substring(7);

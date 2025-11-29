@@ -22,11 +22,12 @@ import { AppHeader } from '../components/AppHeader';
 export const HomeScreen = () => {
     const navigation = useNavigation();
     const { user } = useAuthStore();
-
+    
     // Filter states
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedTags, setSelectedTags] = useState<string[]>([]);
     const [currentPage, setCurrentPage] = useState(1);
+    const [refreshing, setRefreshing] = useState(false);
 
     const { data: paginatedData, isLoading, error, refetch } = useQuery({
         queryKey: ['dueMaterials', currentPage],
@@ -128,6 +129,49 @@ export const HomeScreen = () => {
         setCurrentPage(1);
     };
 
+    const handleRefresh = React.useCallback(async () => {
+        setRefreshing(true);
+        try {
+            await refetch();
+        } catch (error) {
+            console.error('[HOME] Refresh error:', error);
+        } finally {
+            setRefreshing(false);
+        }
+    }, [refetch, refreshing]);
+
+    // Web-compatible pull-to-refresh
+    const scrollViewRef = React.useRef<any>(null);
+    const [pullDistance, setPullDistance] = React.useState(0);
+    const touchStartY = React.useRef(0);
+    const scrollY = React.useRef(0);
+
+    const handleTouchStart = (e: any) => {
+        const y = e.nativeEvent.pageY || e.nativeEvent.clientY || (e.nativeEvent.touches && e.nativeEvent.touches[0]?.pageY) || 0;
+        touchStartY.current = y;
+    };
+
+    const handleTouchMove = (e: any) => {
+        if (scrollY.current <= 0) {
+            const currentY = e.nativeEvent.pageY || e.nativeEvent.clientY || (e.nativeEvent.touches && e.nativeEvent.touches[0]?.pageY) || 0;
+            const distance = currentY - touchStartY.current;
+            if (distance > 0) {
+                setPullDistance(distance);
+            }
+        }
+    };
+
+    const handleTouchEnd = () => {
+        if (pullDistance > 80 && !refreshing) {
+            handleRefresh();
+        }
+        setPullDistance(0);
+    };
+
+    const handleScroll = (e: any) => {
+        scrollY.current = e.nativeEvent.contentOffset.y;
+    };
+
     const renderItem = ({ item }: { item: MaterialSummary }) => (
         <TouchableOpacity
             style={styles.card}
@@ -189,12 +233,39 @@ export const HomeScreen = () => {
             <AppHeader />
 
             <ScrollView
+                ref={scrollViewRef}
                 style={styles.scrollView}
                 contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={true}
+                scrollEventThrottle={16}
+                onScroll={handleScroll}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
                 refreshControl={
-                    <RefreshControl refreshing={isLoading} onRefresh={refetch} />
+                    <RefreshControl 
+                        refreshing={refreshing} 
+                        onRefresh={handleRefresh}
+                        colors={['#4285F4']}
+                        tintColor="#4285F4"
+                        progressBackgroundColor="#ffffff"
+                    />
                 }
             >
+                {/* Pull indicator */}
+                {pullDistance > 0 && (
+                    <View style={{
+                        height: Math.min(pullDistance, 80),
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        backgroundColor: '#f0f0f0'
+                    }}>
+                        <Text style={{color: '#4285F4', fontSize: 14}}>
+                            {pullDistance > 80 ? '↓ Release to refresh' : '↓ Pull to refresh'}
+                        </Text>
+                    </View>
+                )}
+
                 <View style={styles.header}>
                     <Text style={styles.title}>Welcome, {user?.name}</Text>
                 </View>
@@ -326,7 +397,9 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         paddingHorizontal: 20,
+        paddingTop: 20,
         paddingBottom: 20,
+        flexGrow: 1,
     },
     header: {
         marginBottom: 20,
