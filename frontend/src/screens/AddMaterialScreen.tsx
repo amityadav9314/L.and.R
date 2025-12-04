@@ -26,10 +26,11 @@ export const AddMaterialScreen = () => {
 
             Alert.alert('Success', `Created ${data.flashcardsCreated} flashcards for "${data.title}"!`);
 
-            // Invalidate all queries to refresh the UI
-            queryClient.invalidateQueries({ queryKey: ['dueMaterials'] });
-            queryClient.invalidateQueries({ queryKey: ['dueFlashcards'] });
-            queryClient.invalidateQueries({ queryKey: ['allTags'] }); // Refresh tags list
+            // Invalidate and refetch all queries to refresh the UI
+            queryClient.invalidateQueries({ queryKey: ['dueMaterials'], refetchType: 'all' });
+            queryClient.invalidateQueries({ queryKey: ['dueFlashcards'], refetchType: 'all' });
+            queryClient.invalidateQueries({ queryKey: ['allTags'], refetchType: 'all' });
+            queryClient.invalidateQueries({ queryKey: ['notificationStatus'], refetchType: 'all' });
 
             navigation.goBack();
         },

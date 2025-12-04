@@ -22,7 +22,7 @@ import { AppHeader } from '../components/AppHeader';
 export const HomeScreen = () => {
     const navigation = useNavigation();
     const { user } = useAuthStore();
-    
+
     // Filter states
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -90,7 +90,7 @@ export const HomeScreen = () => {
     const filteredMaterials = useMemo(() => {
         if (!data) return [];
 
-        return data.filter(material => {
+        return data.filter((material: MaterialSummary) => {
             // Filter by search query (title contains)
             const matchesSearch = searchQuery.trim() === '' ||
                 material.title.toLowerCase().includes(searchQuery.toLowerCase());
@@ -243,8 +243,8 @@ export const HomeScreen = () => {
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
                 refreshControl={
-                    <RefreshControl 
-                        refreshing={refreshing} 
+                    <RefreshControl
+                        refreshing={refreshing}
                         onRefresh={handleRefresh}
                         colors={['#4285F4']}
                         tintColor="#4285F4"
@@ -260,7 +260,7 @@ export const HomeScreen = () => {
                         alignItems: 'center',
                         backgroundColor: '#f0f0f0'
                     }}>
-                        <Text style={{color: '#4285F4', fontSize: 14}}>
+                        <Text style={{ color: '#4285F4', fontSize: 14 }}>
                             {pullDistance > 80 ? '↓ Release to refresh' : '↓ Pull to refresh'}
                         </Text>
                     </View>
@@ -357,7 +357,7 @@ export const HomeScreen = () => {
                     </Text>
                 ) : (
                     <>
-                        {filteredMaterials.map((item) => (
+                        {filteredMaterials.map((item: MaterialSummary) => (
                             <TouchableOpacity
                                 key={item.id}
                                 style={styles.card}
@@ -371,7 +371,7 @@ export const HomeScreen = () => {
                                 </View>
 
                                 <View style={styles.tagsContainer}>
-                                    {item.tags.map((tag, index) => (
+                                    {item.tags.map((tag: string, index: number) => (
                                         <View key={index} style={styles.tagBadge}>
                                             <Text style={styles.tagText}>{tag}</Text>
                                         </View>

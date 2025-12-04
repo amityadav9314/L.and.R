@@ -1,4 +1,4 @@
-.PHONY: help build build-backend build-frontend start start-backend start-frontend stop clean clean-backend clean-frontend
+.PHONY: help build build-backend build-frontend start start-backend start-frontend stop clean clean-backend clean-frontend verify-frontend run-android
 
 # Variables
 BACKEND_DIR := backend
@@ -79,3 +79,12 @@ proto:
 migrate-up:
 	migrate -path backend/db/migrations -database "postgres://amityadav9314:amit8780@localhost:5432/inkgrid?sslmode=disable" up
 
+# Verify frontend TypeScript
+verify-frontend:
+	@echo "Type checking frontend..."
+	cd $(FRONTEND_DIR) && npm run tsc
+	@echo "Frontend type check complete!"
+
+# Run Android app
+run-android:
+	cd $(FRONTEND_DIR) && npm run android

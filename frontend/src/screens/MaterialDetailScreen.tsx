@@ -34,7 +34,7 @@ export const MaterialDetailScreen = () => {
     // Animation values
     const position = useRef(new Animated.Value(0)).current;
     const flipAnimation = useRef(new Animated.Value(0)).current;
-    
+
     // Touch tracking for swipe
     const touchStartX = useRef(0);
     const touchStartY = useRef(0);
@@ -110,9 +110,9 @@ export const MaterialDetailScreen = () => {
 
     const goToCard = useCallback((index: number) => {
         if (index < 0 || index >= flashcards.length) return;
-        
+
         const direction = index > currentIndex ? -1 : 1;
-        
+
         Animated.timing(position, {
             toValue: direction * SCREEN_WIDTH,
             duration: 200,
@@ -122,7 +122,7 @@ export const MaterialDetailScreen = () => {
             setIsFlipped(false);
             flipAnimation.setValue(0);
             position.setValue(-direction * SCREEN_WIDTH);
-            
+
             Animated.spring(position, {
                 toValue: 0,
                 friction: 8,
@@ -146,7 +146,7 @@ export const MaterialDetailScreen = () => {
     // Touch event handlers for swipe (works on both web and native)
     const handleTouchStart = useCallback((e: GestureResponderEvent | React.TouchEvent | React.MouseEvent) => {
         let clientX: number, clientY: number;
-        
+
         if ('nativeEvent' in e && 'pageX' in e.nativeEvent) {
             // React Native touch event
             clientX = e.nativeEvent.pageX;
@@ -162,7 +162,7 @@ export const MaterialDetailScreen = () => {
         } else {
             return;
         }
-        
+
         touchStartX.current = clientX;
         touchStartY.current = clientY;
         touchCurrentX.current = clientX;
@@ -171,7 +171,7 @@ export const MaterialDetailScreen = () => {
 
     const handleTouchMove = useCallback((e: GestureResponderEvent | React.TouchEvent | React.MouseEvent) => {
         let clientX: number, clientY: number;
-        
+
         if ('nativeEvent' in e && 'pageX' in e.nativeEvent) {
             clientX = e.nativeEvent.pageX;
             clientY = e.nativeEvent.pageY;
@@ -184,19 +184,19 @@ export const MaterialDetailScreen = () => {
         } else {
             return;
         }
-        
+
         const deltaX = clientX - touchStartX.current;
         const deltaY = clientY - touchStartY.current;
-        
+
         // Only start swiping if horizontal movement is greater than vertical
         if (!isSwiping.current && Math.abs(deltaX) > 10 && Math.abs(deltaX) > Math.abs(deltaY)) {
             isSwiping.current = true;
         }
-        
+
         if (isSwiping.current) {
             touchCurrentX.current = clientX;
             position.setValue(deltaX);
-            
+
             // Prevent default to stop scrolling while swiping
             if ('preventDefault' in e) {
                 e.preventDefault();
@@ -206,7 +206,7 @@ export const MaterialDetailScreen = () => {
 
     const handleTouchEnd = useCallback(() => {
         const deltaX = touchCurrentX.current - touchStartX.current;
-        
+
         if (isSwiping.current) {
             if (deltaX > SWIPE_THRESHOLD && currentIndex > 0) {
                 // Swipe right - go to previous
@@ -223,7 +223,7 @@ export const MaterialDetailScreen = () => {
                 }).start();
             }
         }
-        
+
         isSwiping.current = false;
     }, [currentIndex, flashcards.length, goNext, goPrev, position]);
 
@@ -241,7 +241,7 @@ export const MaterialDetailScreen = () => {
         try {
             // Complete review for current flashcard only
             await completeReviewMutation.mutateAsync(currentCard.id);
-            
+
             // Check if there are more cards
             if (currentIndex < flashcards.length - 1) {
                 // Move to next card
@@ -272,14 +272,14 @@ export const MaterialDetailScreen = () => {
     // Progress dots renderer
     const renderProgressDots = () => {
         if (flashcards.length === 0) return null;
-        
+
         const maxDots = 7;
         const showDots = flashcards.length <= maxDots;
-        
+
         if (showDots) {
             return (
                 <View style={styles.progressContainer}>
-                    {flashcards.map((_, index) => (
+                    {flashcards.map((_: unknown, index: number) => (
                         <TouchableOpacity
                             key={index}
                             onPress={() => goToCard(index)}
@@ -292,7 +292,7 @@ export const MaterialDetailScreen = () => {
                 </View>
             );
         }
-        
+
         return (
             <View style={styles.progressTextContainer}>
                 <Text style={styles.progressText}>
@@ -350,14 +350,14 @@ export const MaterialDetailScreen = () => {
     return (
         <View style={styles.container}>
             <AppHeader />
-            
+
             <View style={styles.contentContainer}>
                 {/* Title */}
                 <Text style={styles.headerTitle} numberOfLines={2}>{displayTitle}</Text>
-                
+
                 {/* Progress Indicator */}
                 {renderProgressDots()}
-                
+
                 {/* Card Stack Container */}
                 <View style={styles.cardStackContainer}>
                     {/* Background cards for stack effect */}
@@ -367,7 +367,7 @@ export const MaterialDetailScreen = () => {
                     {currentIndex < flashcards.length - 2 && (
                         <View style={[styles.stackCard, styles.stackCard3]} />
                     )}
-                    
+
                     {/* Main Card */}
                     <Animated.View
                         style={[
@@ -400,16 +400,16 @@ export const MaterialDetailScreen = () => {
                                         <Text style={styles.stageText}>Stage {currentCard?.stage || 0}</Text>
                                     </View>
                                 </View>
-                                
+
                                 <View style={styles.cardContent}>
                                     <Text style={styles.questionText}>{currentCard?.question}</Text>
                                 </View>
-                                
+
                                 <View style={styles.cardFooter}>
                                     <Text style={styles.tapHint}>👆 Tap to reveal answer</Text>
                                 </View>
                             </Animated.View>
-                            
+
                             {/* Back of card (Answer) */}
                             <Animated.View
                                 style={[styles.card, styles.cardBack, backAnimatedStyle]}
@@ -422,11 +422,11 @@ export const MaterialDetailScreen = () => {
                                         <Text style={styles.stageText}>Stage {currentCard?.stage || 0}</Text>
                                     </View>
                                 </View>
-                                
+
                                 <View style={styles.cardContent}>
                                     <Text style={styles.answerText}>{currentCard?.answer}</Text>
                                 </View>
-                                
+
                                 <View style={styles.cardFooter}>
                                     <Text style={styles.tapHint}>👆 Tap for question</Text>
                                 </View>
@@ -434,7 +434,7 @@ export const MaterialDetailScreen = () => {
                         </TouchableOpacity>
                     </Animated.View>
                 </View>
-                
+
                 {/* Swipe Hint */}
                 <View style={styles.swipeHintContainer}>
                     <Text style={styles.swipeHint}>
@@ -443,7 +443,7 @@ export const MaterialDetailScreen = () => {
                         {currentIndex < flashcards.length - 1 && 'Swipe left for next →'}
                     </Text>
                 </View>
-                
+
                 {/* Navigation Arrows */}
                 <View style={styles.navigationContainer}>
                     <TouchableOpacity
@@ -455,7 +455,7 @@ export const MaterialDetailScreen = () => {
                             ←
                         </Text>
                     </TouchableOpacity>
-                    
+
                     <TouchableOpacity
                         style={[styles.navButton, currentIndex === flashcards.length - 1 && styles.navButtonDisabled]}
                         onPress={goNext}
@@ -466,7 +466,7 @@ export const MaterialDetailScreen = () => {
                         </Text>
                     </TouchableOpacity>
                 </View>
-                
+
                 {/* Complete Review Button */}
                 <TouchableOpacity
                     style={[styles.completeButton, isReviewing && styles.completeButtonDisabled]}
@@ -501,7 +501,7 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         marginBottom: 16,
     },
-    
+
     // Progress indicators
     progressContainer: {
         flexDirection: 'row',
@@ -531,7 +531,7 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: '#4285F4',
     },
-    
+
     // Card stack
     cardStackContainer: {
         flex: 1,
@@ -561,7 +561,7 @@ const styles = StyleSheet.create({
         transform: [{ scale: 0.92 }],
         opacity: 0.4,
     },
-    
+
     // Card
     cardContainer: {
         width: CARD_WIDTH,
@@ -652,7 +652,7 @@ const styles = StyleSheet.create({
         color: '#98a2b3',
         fontStyle: 'italic',
     },
-    
+
     // Swipe hint
     swipeHintContainer: {
         alignItems: 'center',
@@ -663,7 +663,7 @@ const styles = StyleSheet.create({
         fontSize: 13,
         color: '#98a2b3',
     },
-    
+
     // Navigation
     navigationContainer: {
         flexDirection: 'row',
@@ -697,7 +697,7 @@ const styles = StyleSheet.create({
     navButtonTextDisabled: {
         color: '#d0d5dd',
     },
-    
+
     // Complete button
     completeButton: {
         backgroundColor: '#34A853',
@@ -719,7 +719,7 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: '700',
     },
-    
+
     // Loading state
     loadingContainer: {
         flex: 1,
@@ -731,7 +731,7 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: '#667085',
     },
-    
+
     // Error state
     errorContainer: {
         flex: 1,
@@ -755,7 +755,7 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
     },
-    
+
     // Empty state
     emptyContainer: {
         flex: 1,

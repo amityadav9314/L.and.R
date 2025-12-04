@@ -1,51 +1,46 @@
-import { createChannel, createClientFactory, ClientError, Status, Metadata } from 'nice-grpc-web';
+/**
+ * Platform-aware gRPC API client
+ * 
+ * - Web: Uses nice-grpc-web (works fine in browsers)
+ * - Native (Android/iOS): Uses direct XMLHttpRequest client (bypasses nice-grpc-web bugs)
+ */
 import { Platform } from 'react-native';
-import { AuthServiceClient } from '../../proto/backend/proto/auth/auth';
-import { LearningServiceClient } from '../../proto/backend/proto/learning/learning';
-import { AuthServiceDefinition, LearningServiceDefinition } from './definitions';
-import { API_URL } from '../utils/config';
 
-// Platform-aware storage helper
-const getToken = async (): Promise<string | null> => {
-    if (Platform.OS === 'web') {
-        return localStorage.getItem('auth_token');
-    } else {
-        const SecureStore = await import('expo-secure-store');
-        return await SecureStore.getItemAsync('auth_token');
-    }
-};
+// Conditional export based on platform
+let authClient: any;
+let learningClient: any;
 
-// Create the gRPC-Web channel
-const channel = createChannel(API_URL);
+if (Platform.OS === 'web') {
+    // Web: Use nice-grpc-web
+    const { createChannel, createClientFactory, ClientError, Status, Metadata, FetchTransport } = require('nice-grpc-web');
+    const { AuthServiceDefinition, LearningServiceDefinition } = require('./definitions');
+    const { API_URL } = require('../utils/config');
 
-// Create a client factory
-const clientFactory = createClientFactory().use(async function* (call, options) {
-    // Auth Interceptor
-    const token = await getToken();
+    const channel = createChannel(API_URL, FetchTransport());
 
-    const metadata = new Metadata(options.metadata);
-    if (token) {
-        metadata.set('authorization', `Bearer ${token}`);
-    }
-
-    try {
-        return yield* call.next(call.request, { ...options, metadata });
-    } catch (error) {
-        if (error instanceof ClientError && error.code === Status.UNAUTHENTICATED) {
-            // Handle unauthenticated error (e.g., logout user)
-            console.log("User unauthenticated");
+    const clientFactory = createClientFactory().use(async function* (call: any, options: any) {
+        const token = localStorage.getItem('auth_token');
+        const metadata = new Metadata(options.metadata);
+        if (token) {
+            metadata.set('authorization', `Bearer ${token}`);
         }
-        throw error;
-    }
-});
+        try {
+            return yield* call.next(call.request, { ...options, metadata });
+        } catch (error: any) {
+            if (error instanceof ClientError && error.code === Status.UNAUTHENTICATED) {
+                console.log("User unauthenticated");
+            }
+            throw error;
+        }
+    });
 
-// Export initialized clients
-export const authClient: AuthServiceClient = clientFactory.create(
-    AuthServiceDefinition,
-    channel
-);
+    authClient = clientFactory.create(AuthServiceDefinition, channel);
+    learningClient = clientFactory.create(LearningServiceDefinition, channel);
+} else {
+    // Native: Use direct API client (bypasses nice-grpc-web)
+    const directApi = require('./directApi');
+    authClient = directApi.authClient;
+    learningClient = directApi.learningClient;
+}
 
-export const learningClient: LearningServiceClient = clientFactory.create(
-    LearningServiceDefinition,
-    channel
-);
+export { authClient, learningClient };
