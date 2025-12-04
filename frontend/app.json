@@ -40,7 +40,9 @@
       "androidMode": "default",
       "androidCollapsedTitle": "LandR Notifications"
     },
-    "plugins": [],
+    "plugins": [
+      "@react-native-google-signin/google-signin"
+    ],
     "web": {
       "favicon": "./assets/favicon.png"
     },

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
-import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
+import { GoogleSignin, statusCodes, GoogleSigninButton } from '@react-native-google-signin/google-signin';
 import * as WebBrowser from 'expo-web-browser';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { makeRedirectUri } from 'expo-auth-session';
@@ -160,17 +160,13 @@ export const LoginScreen = () => {
                 </View>
             )}
 
-            <TouchableOpacity
-                style={[styles.button, isLoggingIn && styles.buttonDisabled]}
+            <GoogleSigninButton
+                style={{ width: 192, height: 48 }}
+                size={GoogleSigninButton.Size.Wide}
+                color={GoogleSigninButton.Color.Dark}
                 onPress={handleSignIn}
                 disabled={isLoggingIn}
-            >
-                {isLoggingIn ? (
-                    <ActivityIndicator color="#fff" />
-                ) : (
-                    <Text style={styles.buttonText}>Sign in with Google</Text>
-                )}
-            </TouchableOpacity>
+            />
         </View>
     );
 };
