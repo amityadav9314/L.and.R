@@ -15,6 +15,7 @@ type Store interface {
 
 	// Material
 	CreateMaterial(ctx context.Context, userID, matType, content, title string) (string, error)
+	SoftDeleteMaterial(ctx context.Context, userID, materialID string) error
 
 	// Tags
 	CreateTag(ctx context.Context, userID, name string) (string, error)
@@ -29,6 +30,7 @@ type Store interface {
 	GetDueMaterials(ctx context.Context, userID string, page, pageSize int32) ([]*learning.MaterialSummary, int32, error)
 	GetDueFlashcardsCount(ctx context.Context, userID string) (int32, error)
 	UpdateFlashcard(ctx context.Context, id string, stage int32, nextReviewAt time.Time) error
+	UpdateFlashcardContent(ctx context.Context, id, question, answer string) error
 
 	// Material Summary
 	GetMaterialContent(ctx context.Context, userID, materialID string) (content string, summary string, title string, err error)

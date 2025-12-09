@@ -9,12 +9,15 @@ import "google/protobuf/empty.proto";
 
 service LearningService {
   rpc AddMaterial(AddMaterialRequest) returns (AddMaterialResponse);
+  rpc DeleteMaterial(DeleteMaterialRequest) returns (google.protobuf.Empty);
   rpc GetDueMaterials(GetDueMaterialsRequest) returns (GetDueMaterialsResponse);
   rpc GetDueFlashcards(GetDueFlashcardsRequest) returns (FlashcardList);
   rpc CompleteReview(CompleteReviewRequest) returns (google.protobuf.Empty);
+  rpc FailReview(FailReviewRequest) returns (google.protobuf.Empty);
   rpc GetAllTags(google.protobuf.Empty) returns (GetAllTagsResponse);
   rpc GetNotificationStatus(google.protobuf.Empty) returns (NotificationStatusResponse);
   rpc GetMaterialSummary(GetMaterialSummaryRequest) returns (GetMaterialSummaryResponse);
+  rpc UpdateFlashcard(UpdateFlashcardRequest) returns (google.protobuf.Empty);
 }
 
 message AddMaterialRequest {
@@ -28,6 +31,10 @@ message AddMaterialResponse {
   int32 flashcards_created = 2;
   string title = 3;
   repeated string tags = 4;
+}
+
+message DeleteMaterialRequest {
+  string material_id = 1;
 }
 
 message MaterialSummary {
@@ -72,6 +79,10 @@ message CompleteReviewRequest {
   string flashcard_id = 1;
 }
 
+message FailReviewRequest {
+  string flashcard_id = 1;
+}
+
 message GetAllTagsResponse {
   repeated string tags = 1;
 }
@@ -88,4 +99,10 @@ message GetMaterialSummaryRequest {
 message GetMaterialSummaryResponse {
   string summary = 1;
   string title = 2;
+}
+
+message UpdateFlashcardRequest {
+  string flashcard_id = 1;
+  string question = 2;
+  string answer = 3;
 }

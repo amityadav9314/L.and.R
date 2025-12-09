@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/amityadav/landr/internal/ai"
@@ -42,25 +43,59 @@ func (c *LearningCore) AddMaterial(ctx context.Context, userID, matType, content
 		log.Printf("[Core.AddMaterial] Scraped content length: %d", len(finalContent))
 	}
 
-	// 2. Fetch existing tags if not provided (or merge?)
-	// For now, we use what's passed from frontend or fetch from DB if empty?
-	// The prompt says "Existing tags you might reuse".
-	// Let's fetch all user tags to give context to AI.
+	// 2. Fetch existing tags for AI context
 	userTags, err := c.store.GetTags(ctx, userID)
 	if err != nil {
 		log.Printf("[Core.AddMaterial] Failed to fetch tags: %v", err)
-		// Continue without tags
 	}
 
-	// Combine provided tags and user tags? For now just use userTags for AI context.
+	// 3. Generate Flashcards + Summary in PARALLEL using goroutines
+	log.Printf("[Core.AddMaterial] Starting parallel AI generation...")
 
-	// 3. Generate Flashcards + Title + Tags
-	log.Printf("[Core.AddMaterial] Generating flashcards with AI...")
-	title, tags, cards, err := c.ai.GenerateFlashcards(finalContent, userTags)
-	if err != nil {
-		log.Printf("[Core.AddMaterial] AI generation failed: %v", err)
-		return "", 0, "", nil, fmt.Errorf("failed to generate flashcards: %w", err)
+	var title string
+	var tags []string
+	var cards []*learning.Flashcard
+	var summary string
+	var flashcardErr, summaryErr error
+
+	// Use WaitGroup to wait for both goroutines
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	// Goroutine 1: Generate flashcards
+	go func() {
+		defer wg.Done()
+		log.Printf("[Core.AddMaterial] Goroutine 1: Generating flashcards...")
+		title, tags, cards, flashcardErr = c.ai.GenerateFlashcards(finalContent, userTags)
+		if flashcardErr != nil {
+			log.Printf("[Core.AddMaterial] Flashcard generation failed: %v", flashcardErr)
+		} else {
+			log.Printf("[Core.AddMaterial] Flashcards generated: %d cards", len(cards))
+		}
+	}()
+
+	// Goroutine 2: Generate summary
+	go func() {
+		defer wg.Done()
+		log.Printf("[Core.AddMaterial] Goroutine 2: Generating summary...")
+		summary, summaryErr = c.ai.GenerateSummary(finalContent)
+		if summaryErr != nil {
+			log.Printf("[Core.AddMaterial] Summary generation failed: %v", summaryErr)
+		} else {
+			log.Printf("[Core.AddMaterial] Summary generated, length: %d", len(summary))
+		}
+	}()
+
+	// Wait for both to complete
+	wg.Wait()
+	log.Printf("[Core.AddMaterial] Parallel AI generation complete")
+
+	// Check for flashcard error (critical)
+	if flashcardErr != nil {
+		return "", 0, "", nil, fmt.Errorf("failed to generate flashcards: %w", flashcardErr)
 	}
+	// Summary error is non-critical - we can continue without it
+
 	log.Printf("[Core.AddMaterial] AI generated Title: %s, Tags: %v, Cards: %d", title, tags, len(cards))
 
 	// 4. Save Material with Title
@@ -72,7 +107,17 @@ func (c *LearningCore) AddMaterial(ctx context.Context, userID, matType, content
 	}
 	log.Printf("[Core.AddMaterial] Material saved with ID: %s", materialID)
 
-	// 5. Save Tags and Link to Material
+	// 5. Save Summary if generated
+	if summary != "" && summaryErr == nil {
+		if err := c.store.UpdateMaterialSummary(ctx, materialID, summary); err != nil {
+			log.Printf("[Core.AddMaterial] Failed to save summary: %v", err)
+			// Non-critical, continue
+		} else {
+			log.Printf("[Core.AddMaterial] Summary saved successfully")
+		}
+	}
+
+	// 6. Save Tags and Link to Material
 	var tagIDs []string
 	for _, tagName := range tags {
 		tagID, err := c.store.CreateTag(ctx, userID, tagName)
@@ -89,7 +134,7 @@ func (c *LearningCore) AddMaterial(ctx context.Context, userID, matType, content
 		}
 	}
 
-	// 6. Save Flashcards
+	// 7. Save Flashcards
 	if len(cards) > 0 {
 		log.Printf("[Core.AddMaterial] Saving %d flashcards to database...", len(cards))
 		if err := c.store.CreateFlashcards(ctx, materialID, cards); err != nil {
@@ -101,6 +146,16 @@ func (c *LearningCore) AddMaterial(ctx context.Context, userID, matType, content
 
 	log.Printf("[Core.AddMaterial] Complete - MaterialID: %s, Cards: %d", materialID, len(cards))
 	return materialID, int32(len(cards)), title, tags, nil
+}
+
+func (c *LearningCore) DeleteMaterial(ctx context.Context, userID, materialID string) error {
+	log.Printf("[Core.DeleteMaterial] Deleting material: %s for user: %s", materialID, userID)
+	if err := c.store.SoftDeleteMaterial(ctx, userID, materialID); err != nil {
+		log.Printf("[Core.DeleteMaterial] Failed: %v", err)
+		return err
+	}
+	log.Printf("[Core.DeleteMaterial] Successfully deleted")
+	return nil
 }
 
 func (c *LearningCore) GetDueFlashcards(ctx context.Context, userID, materialID string) ([]*learning.Flashcard, error) {
@@ -177,6 +232,49 @@ func (c *LearningCore) CompleteReview(ctx context.Context, flashcardID string) e
 	}
 
 	log.Printf("[Core.CompleteReview] Updated successfully to stage %d", nextStage)
+	return nil
+}
+
+func (c *LearningCore) FailReview(ctx context.Context, flashcardID string) error {
+	log.Printf("[Core.FailReview] Failing flashcard: %s", flashcardID)
+
+	// Fetch the current flashcard to get its stage
+	card, err := c.store.GetFlashcard(ctx, flashcardID)
+	if err != nil {
+		log.Printf("[Core.FailReview] Failed to get flashcard: %v", err)
+		return fmt.Errorf("failed to get flashcard: %w", err)
+	}
+
+	// Decrease stage by 1, minimum 0
+	currentStage := card.Stage
+	nextStage := currentStage - 1
+	if nextStage < 0 {
+		nextStage = 0
+	}
+
+	// Reset to review in 1 day (back to basics)
+	nextReviewAt := time.Now().Add(24 * time.Hour)
+
+	log.Printf("[Core.FailReview] Decreasing from stage %d to %d (next review in 1 day)",
+		currentStage, nextStage)
+
+	err = c.store.UpdateFlashcard(ctx, flashcardID, nextStage, nextReviewAt)
+	if err != nil {
+		log.Printf("[Core.FailReview] Update failed: %v", err)
+		return err
+	}
+
+	log.Printf("[Core.FailReview] Updated successfully to stage %d", nextStage)
+	return nil
+}
+
+func (c *LearningCore) UpdateFlashcard(ctx context.Context, flashcardID, question, answer string) error {
+	log.Printf("[Core.UpdateFlashcard] Updating flashcard: %s", flashcardID)
+	if err := c.store.UpdateFlashcardContent(ctx, flashcardID, question, answer); err != nil {
+		log.Printf("[Core.UpdateFlashcard] Failed: %v", err)
+		return err
+	}
+	log.Printf("[Core.UpdateFlashcard] Successfully updated")
 	return nil
 }
 

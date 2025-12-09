@@ -10,6 +10,9 @@ import {
     Alert,
     Platform,
     GestureResponderEvent,
+    Modal,
+    TextInput,
+    KeyboardAvoidingView,
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigation, useRoute } from '../navigation/ManualRouter';
@@ -32,6 +35,9 @@ export const MaterialDetailScreen = () => {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isFlipped, setIsFlipped] = useState(false);
     const [isReviewing, setIsReviewing] = useState(false);
+    const [isEditing, setIsEditing] = useState(false);
+    const [editQuestion, setEditQuestion] = useState('');
+    const [editAnswer, setEditAnswer] = useState('');
 
     const position = useRef(new Animated.Value(0)).current;
     const flipAnimation = useRef(new Animated.Value(0)).current;
@@ -64,6 +70,31 @@ export const MaterialDetailScreen = () => {
             queryClient.invalidateQueries({ queryKey: ['dueFlashcards', materialId] });
             queryClient.invalidateQueries({ queryKey: ['dueMaterials'] });
             queryClient.invalidateQueries({ queryKey: ['notificationStatus'] });
+        },
+    });
+
+    const failReviewMutation = useMutation({
+        mutationFn: async (flashcardId: string) => {
+            return await learningClient.failReview({ flashcardId });
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['dueFlashcards', materialId] });
+            queryClient.invalidateQueries({ queryKey: ['dueMaterials'] });
+        },
+    });
+
+    const updateFlashcardMutation = useMutation({
+        mutationFn: async (data: { flashcardId: string; question: string; answer: string }) => {
+            return await learningClient.updateFlashcard(data);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['dueFlashcards', materialId] });
+            setIsEditing(false);
+            Alert.alert('Success', 'Flashcard updated successfully');
+        },
+        onError: (err) => {
+            console.error('[MaterialDetail] Failed to update flashcard:', err);
+            Alert.alert('Error', 'Failed to update flashcard');
         },
     });
 
@@ -179,6 +210,40 @@ export const MaterialDetailScreen = () => {
         }
     };
 
+    const handleFailReview = async () => {
+        if (!currentCard) return;
+        setIsReviewing(true);
+        try {
+            await failReviewMutation.mutateAsync(currentCard.id);
+            if (currentIndex < flashcards.length - 1) {
+                goNext();
+            } else {
+                Alert.alert('Keep Learning!', 'Card will be reviewed again tomorrow.', [{ text: 'OK' }]);
+            }
+        } catch (err) {
+            console.error('[MaterialDetail] Failed to fail review:', err);
+            Alert.alert('Error', 'Failed to update card. Please try again.');
+        } finally {
+            setIsReviewing(false);
+        }
+    };
+
+    const handleEdit = () => {
+        if (!currentCard) return;
+        setEditQuestion(currentCard.question);
+        setEditAnswer(currentCard.answer);
+        setIsEditing(true);
+    };
+
+    const handleSaveEdit = () => {
+        if (!currentCard) return;
+        updateFlashcardMutation.mutate({
+            flashcardId: currentCard.id,
+            question: editQuestion,
+            answer: editAnswer,
+        });
+    };
+
     const renderProgressDots = () => {
         if (flashcards.length === 0) return null;
         const maxDots = 7;
@@ -250,8 +315,60 @@ export const MaterialDetailScreen = () => {
         <View style={styles.container}>
             <AppHeader />
             <View style={styles.contentContainer}>
-                <Text style={styles.headerTitle} numberOfLines={2}>{displayTitle}</Text>
+                <View style={styles.headerRow}>
+                    <Text style={styles.headerTitle} numberOfLines={1}>{displayTitle}</Text>
+                    <TouchableOpacity onPress={handleEdit} style={styles.editButton}>
+                        <Text style={styles.editButtonText}>✎</Text>
+                    </TouchableOpacity>
+                </View>
                 {renderProgressDots()}
+
+                <Modal
+                    visible={isEditing}
+                    animationType="slide"
+                    transparent={true}
+                    onRequestClose={() => setIsEditing(false)}
+                >
+                    <KeyboardAvoidingView
+                        behavior={Platform.OS === "ios" ? "padding" : "height"}
+                        style={styles.modalContainer}
+                    >
+                        <View style={styles.modalContent}>
+                            <Text style={styles.modalTitle}>Edit Flashcard</Text>
+
+                            <Text style={styles.inputLabel}>Question</Text>
+                            <TextInput
+                                style={styles.input}
+                                value={editQuestion}
+                                onChangeText={setEditQuestion}
+                                multiline
+                            />
+
+                            <Text style={styles.inputLabel}>Answer</Text>
+                            <TextInput
+                                style={styles.input}
+                                value={editAnswer}
+                                onChangeText={setEditAnswer}
+                                multiline
+                            />
+
+                            <View style={styles.modalButtons}>
+                                <TouchableOpacity
+                                    style={[styles.modalButton, styles.cancelButton]}
+                                    onPress={() => setIsEditing(false)}
+                                >
+                                    <Text style={styles.modalButtonText}>Cancel</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[styles.modalButton, styles.saveButton]}
+                                    onPress={handleSaveEdit}
+                                >
+                                    <Text style={styles.modalButtonText}>Save</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </KeyboardAvoidingView>
+                </Modal>
 
                 <View style={styles.cardStackContainer}>
                     {currentIndex < flashcards.length - 1 && <View style={[styles.stackCard, styles.stackCard2]} />}
@@ -307,9 +424,14 @@ export const MaterialDetailScreen = () => {
                     </TouchableOpacity>
                 </View>
 
-                <TouchableOpacity style={[styles.completeButton, isReviewing && styles.completeButtonDisabled]} onPress={handleCompleteReview} disabled={isReviewing}>
-                    {isReviewing ? <ActivityIndicator size="small" color={colors.textInverse} /> : <Text style={styles.completeButtonText}>✓ Mark as Reviewed</Text>}
-                </TouchableOpacity>
+                <View style={styles.actionButtonsContainer}>
+                    <TouchableOpacity style={[styles.wrongButton, isReviewing && styles.buttonDisabled]} onPress={handleFailReview} disabled={isReviewing}>
+                        <Text style={styles.wrongButtonText}>✗ Wrong</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.correctButton, isReviewing && styles.buttonDisabled]} onPress={handleCompleteReview} disabled={isReviewing}>
+                        {isReviewing ? <ActivityIndicator size="small" color={colors.textInverse} /> : <Text style={styles.correctButtonText}>✓ Got It</Text>}
+                    </TouchableOpacity>
+                </View>
             </View>
         </View>
     );
@@ -366,4 +488,23 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     emptyText: { fontSize: 16, color: colors.textSecondary, textAlign: 'center', marginBottom: 24 },
     backButton: { backgroundColor: colors.primary, paddingHorizontal: 24, paddingVertical: 14, borderRadius: 12 },
     backButtonText: { color: colors.textInverse, fontSize: 16, fontWeight: '600' },
+    actionButtonsContainer: { flexDirection: 'row', gap: 12 },
+    wrongButton: { flex: 1, backgroundColor: colors.error, paddingVertical: 16, borderRadius: 14, alignItems: 'center', shadowColor: colors.error, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
+    wrongButtonText: { color: colors.textInverse, fontSize: 18, fontWeight: '700' },
+    correctButton: { flex: 2, backgroundColor: colors.success, paddingVertical: 16, borderRadius: 14, alignItems: 'center', shadowColor: colors.success, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
+    correctButtonText: { color: colors.textInverse, fontSize: 18, fontWeight: '700' },
+    buttonDisabled: { opacity: 0.6, shadowOpacity: 0 },
+    headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
+    editButton: { position: 'absolute', right: 0, padding: 8 },
+    editButtonText: { fontSize: 24, color: colors.primary },
+    modalContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' },
+    modalContent: { width: '90%', backgroundColor: colors.card, borderRadius: 20, padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 5 },
+    modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 20, color: colors.textPrimary, textAlign: 'center' },
+    inputLabel: { fontSize: 16, fontWeight: '600', marginBottom: 8, color: colors.textSecondary },
+    input: { backgroundColor: colors.background, borderRadius: 12, padding: 12, marginBottom: 16, color: colors.textPrimary, minHeight: 80, textAlignVertical: 'top' },
+    modalButtons: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
+    modalButton: { flex: 1, padding: 14, borderRadius: 12, alignItems: 'center' },
+    cancelButton: { backgroundColor: colors.error },
+    saveButton: { backgroundColor: colors.primary },
+    modalButtonText: { color: colors.textInverse, fontWeight: 'bold', fontSize: 16 },
 });

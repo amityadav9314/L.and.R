@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, RefreshControl, TextInput, ScrollView, ActivityIndicator } from 'react-native';
-import { useQuery } from '@tanstack/react-query';
+import { View, Text, StyleSheet, TouchableOpacity, RefreshControl, TextInput, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigation } from '../navigation/ManualRouter';
 import { learningClient } from '../services/api';
 import { useAuthStore } from '../store/authStore';
@@ -13,6 +13,41 @@ export const HomeScreen = () => {
     const navigation = useNavigation();
     const { user } = useAuthStore();
     const { colors } = useTheme();
+    const queryClient = useQueryClient();
+
+    const deleteMutation = useMutation({
+        mutationFn: async (materialId: string) => {
+            return await learningClient.deleteMaterial({ materialId });
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['dueMaterials'] });
+            queryClient.invalidateQueries({ queryKey: ['allTags'] });
+            queryClient.invalidateQueries({ queryKey: ['notificationStatus'] });
+        },
+    });
+
+    const handleDelete = (materialId: string, title: string) => {
+        Alert.alert(
+            'Delete Material',
+            `Are you sure you want to delete "${title}"?`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await deleteMutation.mutateAsync(materialId);
+                        } catch (err) {
+                            console.error('[HOME] Failed to delete material:', err);
+                            Alert.alert('Error', 'Failed to delete material. Please try again.');
+                        }
+                    },
+                },
+            ]
+        );
+    };
+
 
     // Filter states
     const [searchQuery, setSearchQuery] = useState('');
@@ -284,9 +319,20 @@ export const HomeScreen = () => {
                                 onPress={() => navigation.navigate('Summary', { materialId: item.id, title: item.title })}
                             >
                                 <View style={styles.cardHeader}>
-                                    <Text style={styles.materialTitle}>{item.title}</Text>
-                                    <View style={styles.badge}>
-                                        <Text style={styles.badgeText}>{item.dueCount}</Text>
+                                    <Text style={styles.materialTitle} numberOfLines={2}>{item.title}</Text>
+                                    <View style={styles.cardActions}>
+                                        <View style={styles.badge}>
+                                            <Text style={styles.badgeText}>{item.dueCount}</Text>
+                                        </View>
+                                        <TouchableOpacity
+                                            style={styles.deleteButton}
+                                            onPress={(e) => {
+                                                e.stopPropagation();
+                                                handleDelete(item.id, item.title);
+                                            }}
+                                        >
+                                            <Text style={styles.deleteButtonText}>🗑</Text>
+                                        </TouchableOpacity>
                                     </View>
                                 </View>
 
@@ -490,6 +536,19 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         color: colors.badgeText,
         fontWeight: 'bold',
         fontSize: 12,
+    },
+    cardActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    deleteButton: {
+        padding: 8,
+        borderRadius: 8,
+        backgroundColor: colors.cardAlt,
+    },
+    deleteButtonText: {
+        fontSize: 16,
     },
     tagsContainer: {
         flexDirection: 'row',

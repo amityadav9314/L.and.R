@@ -1,80 +1,54 @@
-# Implementation Checklist: Learn and Revise SaaS
+# LandR - Implementation Checklist
 
-## Phase 1: Backend Core (Go + gRPC + Postgres)
+## ✅ Completed
+- [x] Backend Core (Go + gRPC + Postgres)
+- [x] Frontend (Expo + React Native)
+- [x] Authentication (Google OAuth)
+- [x] Add Material + AI Flashcard Generation
+- [x] Spaced Repetition System
+- [x] Material Summary Feature
 
-### 1.1. Project Initialization
-- [x] Initialize Go module (`go mod init github.com/youruser/landr`)
-- [x] Set up project structure (`cmd`, `internal`, `pkg`, `proto`)
-- [x] Configure `Makefile` for common tasks (build, run, proto-gen)
+---
 
-### 1.2. Protocol Buffers (gRPC)
-- [x] Define `auth.proto` (Login)
-- [x] Define `learning.proto` (AddMaterial, GetDueFlashcards, CompleteReview)
-- [x] Generate Go code from protos (`protoc`)
+## 🚀 Improvements (Priority Order)
 
-### 1.3. Database Setup
-- [x] Set up PostgreSQL locally or via Docker
-- [x] Define schema migration files (`users`, `materials`, `flashcards`)
-- [x] Implement DB connection and migration runner (using `golang-migrate` or `pgx`)
-- [x] Create `Store` interface and implementation for CRUD operations
+### 1. Parallel AI Generation ✅
+- [x] Generate Q&A and Summary in parallel using goroutines
+- [x] Update `AddMaterial` in core layer
+- [x] Save summary immediately on material creation
 
-### 1.4. Authentication
-- [x] Implement `AuthService.Login`
-- [x] Verify Google ID Token
-- [x] Create/Update User in DB
-- [x] Issue JWT Session Token
+### 2. "Wrong" Button for Spaced Repetition ✅
+- [x] Add `FailReview` RPC - resets card to earlier stage
+- [x] Update `MaterialDetailScreen` UI with "Wrong" button
+- [x] Adjust stage logic (wrong = go back 1 stage, min 0)
 
-### 1.5. Core Logic: Learning Materials
-- [x] Implement `LearningService.AddMaterial`
-- [x] **Scraper Module**: Implement `goquery` logic to fetch and extract text from URLs
-- [x] **AI Module**: Implement Groq API client
-    - [x] Prompt engineering for Q/A generation
-    - [x] JSON parsing of Groq response
-- [x] Save Material and Flashcards to DB
+### 3. Delete Material ✅
+- [x] Add `DeleteMaterial` RPC
+- [x] Implement soft delete in DB (`deleted_at` column)
+- [x] Add delete button to `HomeScreen` list items
+- [x] Filter out deleted items in queries
 
-### 1.6. Core Logic: Spaced Repetition & Review
-- [x] Implement `LearningService.GetDueFlashcards` (Query `next_review_at <= NOW()`)
-- [x] Implement `LearningService.CompleteReview`
-    - [x] Logic to calculate next interval based on fixed schedule: `[1, 3, 7, 15, 30]` (MVP: Fixed 24h for now)
-    - [x] Update `stage` and `next_review_at`
+### 4. Edit Flashcard ✅
+- [x] Add `UpdateFlashcard` RPC
+- [x] Add edit UI in MaterialDetailScreen
 
-## Phase 2: Frontend (Expo + React Native)
+### 5. Search & Filter
+- [ ] Add search by title on HomeScreen
+- [ ] Filter by tags
 
-### 2.1. Project Initialization
-- [ ] Initialize Expo project (TypeScript)
-- [ ] Setup directory structure (`src/components`, `src/screens`, `src/services`)
-- [ ] Install dependencies (`@react-navigation/native`, `protobufjs`, etc.)
+### 6. DB Transactions
+- [ ] Wrap AddMaterial operations in transaction
 
-### 2.2. gRPC Client Setup
-- [ ] Generate TypeScript gRPC client from protos
-- [ ] Configure API client with base URL and Auth interceptor
+### 7. Statistics Dashboard
+- [ ] Track reviews completed
+- [ ] Show learning streak
+- [ ] Add stats screen
 
-### 2.3. Authentication UI
-- [ ] Implement "Sign in with Google" button
-- [ ] Handle Google OAuth flow on device
-- [ ] Call `AuthService.Login` and store JWT
+---
 
-### 2.4. Main UI: Home & Add Material
-- [ ] **Home Screen**: Display "Due Today" count and list of cards
-- [ ] **Add Material Screen**:
-    - [ ] Text Input for raw notes
-    - [ ] URL Input for links
-    - [ ] "Add" button triggering `AddMaterial` API
+## 🔧 Technical Debt
+- [ ] Add unit tests for core logic
+- [ ] Error retry logic for AI calls
+- [ ] Rate limiting on backend
+- [ ] Remove hardcoded DB credentials
 
-### 2.5. Review Interface (Flashcards)
-- [ ] **Flashcard Screen**:
-    - [ ] Show Question
-    - [ ] "Reveal Answer" button
-    - [ ] Show Answer
-    - [ ] "Done" button triggering `CompleteReview` API
-- [ ] Implement simple animation for card flip (optional but nice)
-
-### 2.6. Notifications
-- [ ] Configure `expo-notifications`
-- [ ] Request permissions
-- [ ] Schedule local notifications based on due dates
-
-## Phase 3: Polish & Deployment
-- [ ] **Testing**: Verify end-to-end flow (Add -> AI Gen -> Review -> Next Schedule)
-- [ ] **Docker**: Create `Dockerfile` for Backend
-- [ ] **Readme**: Document how to run the stack locally

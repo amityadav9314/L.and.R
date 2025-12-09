@@ -1,128 +1,99 @@
-.PHONY: help build build-backend build-frontend start start-backend start-frontend stop clean clean-backend clean-frontend verify-frontend run-android apk apk-debug
+.PHONY: help start-backend start-frontend apk stop db-start db-stop migrate-up proto
 
 # Variables
 BACKEND_DIR := backend
 FRONTEND_DIR := frontend
-APP_NAME := server.exe
 
 # Default target
 help:
-	@echo "Learn and Revise - Development Commands"
+	@echo "LandR - Development Commands"
 	@echo ""
-	@echo "Usage:"
-	@echo "  make build          - Build backend and install frontend dependencies"
-	@echo "  make start          - Start both backend and frontend servers in new windows"
-	@echo "  make stop           - Stop all running servers"
-	@echo "  make clean          - Clean build artifacts"
-	@echo "  make proto          - Generate proto files for Go and TypeScript"
-	@echo "  make apk            - Build release APK locally"
-	@echo "  make apk-debug      - Build debug APK locally (faster)"
+	@echo "  make start-backend   - Stop, build, and start backend"
+	@echo "  make start-frontend  - Stop, clear cache, and start frontend"
+	@echo "  make apk             - Build release APK"
+	@echo "  make stop            - Stop all servers"
+	@echo "  make db-start        - Start PostgreSQL (Docker)"
+	@echo "  make proto           - Generate proto files"
 	@echo ""
 
-# Build
-build: build-backend build-frontend
-
-build-backend:
-	@echo "Building backend..."
-	cd $(BACKEND_DIR) && go build -o bin/$(APP_NAME) cmd/server/main.go
-
-build-frontend:
-	@echo "Installing frontend dependencies..."
-	cd $(FRONTEND_DIR) && npm install
-	@echo "Running type check..."
-	cd $(FRONTEND_DIR) && npm run tsc
-
-# Start
-start:
-	@echo "Starting servers in separate windows..."
-	start "LandR Backend" cmd /c "cd $(BACKEND_DIR) && go run cmd/server/main.go"
-	start "LandR Frontend" cmd /c "cd $(FRONTEND_DIR) && npm start"
-
+# ============================================
+# BACKEND
+# ============================================
 start-backend:
-	@echo "Starting backend..."
-	cd $(BACKEND_DIR) && go run cmd/server/main.go
+	@echo "🛑 Stopping previous backend..."
+	@lsof -ti:8080 | xargs -r kill -9 2>/dev/null || true
+	@lsof -ti:50051 | xargs -r kill -9 2>/dev/null || true
+	@echo "🔨 Building backend..."
+	@cd $(BACKEND_DIR) && go build -o bin/server cmd/server/main.go
+	@echo "🚀 Starting backend..."
+	@cd $(BACKEND_DIR) && ./bin/server
 
+# ============================================
+# FRONTEND
+# ============================================
 start-frontend:
-	@echo "Starting frontend..."
-	cd $(FRONTEND_DIR) && npm start -- -w
+	@echo "🛑 Stopping previous frontend..."
+	@lsof -ti:8081 | xargs -r kill -9 2>/dev/null || true
+	@echo "🧹 Clearing Metro cache..."
+	@rm -rf $(FRONTEND_DIR)/.expo 2>/dev/null || true
+	@rm -rf $(FRONTEND_DIR)/node_modules/.cache 2>/dev/null || true
+	@echo "🚀 Starting frontend..."
+	@cd $(FRONTEND_DIR) && npx expo start --clear
 
-# Stop
+# ============================================
+# APK BUILD
+# ============================================
+apk:
+	@echo "🔨 Building Android APK..."
+	@echo "Step 1: Cleaning previous build..."
+	@rm -rf $(FRONTEND_DIR)/android 2>/dev/null || true
+	@echo "Step 2: Running expo prebuild..."
+	@cd $(FRONTEND_DIR) && npx expo prebuild --platform android --clean
+	@echo "Step 3: Building release APK..."
+	@cd $(FRONTEND_DIR)/android && ./gradlew assembleRelease
+	@echo ""
+	@echo "✅ APK built successfully!"
+	@echo "📦 Location: $(FRONTEND_DIR)/android/app/build/outputs/apk/release/app-release.apk"
+
+# ============================================
+# STOP
+# ============================================
 stop:
-	@echo "Stopping servers..."
-	@taskkill /F /IM $(APP_NAME) 2>nul || echo Backend not running
-	@taskkill /F /IM node.exe 2>nul || echo Node processes not running (Warning: This might kill other Node processes)
-	@echo "Note: You might need to manually close the opened terminal windows."
+	@echo "Stopping all servers..."
+	@lsof -ti:8080 | xargs -r kill -9 2>/dev/null || true
+	@lsof -ti:50051 | xargs -r kill -9 2>/dev/null || true
+	@lsof -ti:8081 | xargs -r kill -9 2>/dev/null || true
+	@echo "All servers stopped."
 
-# Clean
-clean: clean-backend clean-frontend
+# ============================================
+# DATABASE
+# ============================================
+db-start:
+	@echo "Starting Docker and PostgreSQL..."
+	@sudo systemctl start docker 2>/dev/null || sudo service docker start 2>/dev/null || true
+	@sleep 2
+	@docker start postgres_db 2>/dev/null || docker run -d --name postgres_db -e POSTGRES_USER=amityadav9314 -e POSTGRES_PASSWORD=amit8780 -e POSTGRES_DB=inkgrid -p 5432:5432 postgres:latest
+	@echo "PostgreSQL started on port 5432"
 
-clean-backend:
-	@echo "Cleaning backend..."
-	cd $(BACKEND_DIR) && del /Q bin\$(APP_NAME) 2>nul || echo No backend artifacts
+db-stop:
+	@docker stop postgres_db 2>/dev/null || true
+	@echo "PostgreSQL stopped."
 
-clean-frontend:
-	@echo "Cleaning frontend..."
-	cd $(FRONTEND_DIR) && rmdir /S /Q node_modules 2>nul || echo No frontend modules
+migrate-up:
+	@migrate -path backend/db/migrations -database "postgres://amityadav9314:amit8780@localhost:5432/inkgrid?sslmode=disable" up
 
-# Proto
+# ============================================
+# PROTO
+# ============================================
 proto:
 	@echo "Generating Go proto files..."
-	protoc --go_out=backend --go_opt=module=github.com/amityadav/landr \
+	@protoc --go_out=backend --go_opt=module=github.com/amityadav/landr \
 	--go-grpc_out=backend --go-grpc_opt=module=github.com/amityadav/landr \
 	backend/proto/auth/*.proto backend/proto/learning/*.proto
 	@echo "Generating TypeScript proto files..."
-	protoc --plugin=./frontend/node_modules/.bin/protoc-gen-ts_proto \
+	@protoc --plugin=./frontend/node_modules/.bin/protoc-gen-ts_proto \
 	--ts_proto_out=./frontend/proto/backend \
 	--ts_proto_opt=esModuleInterop=true,outputServices=nice-grpc,env=browser,useExactTypes=false \
 	--proto_path=./backend \
 	backend/proto/auth/auth.proto backend/proto/learning/learning.proto
 	@echo "Proto generation complete!"
-
-# Database
-migrate-up:
-	migrate -path backend/db/migrations -database "postgres://amityadav9314:amit8780@localhost:5432/inkgrid?sslmode=disable" up
-
-# Verify frontend TypeScript
-verify-frontend:
-	@echo "Type checking frontend..."
-	cd $(FRONTEND_DIR) && npm run tsc
-	@echo "Frontend type check complete!"
-
-# Run Android app
-run-android:
-	cd $(FRONTEND_DIR) && npm run android
-
-# Build Android APK locally
-apk:
-	@echo "Building Android APK..."
-	@echo "Step 1: Running expo prebuild..."
-	cd $(FRONTEND_DIR) && npx expo prebuild --platform android --clean
-	@echo "Step 2: Building release APK with Gradle..."
-	cd $(FRONTEND_DIR)/android && ./gradlew assembleRelease
-	@echo ""
-	@echo "✅ APK built successfully!"
-	@echo "📦 Location: $(FRONTEND_DIR)/android/app/build/outputs/apk/release/app-release.apk"
-
-# Build debug APK (faster, for testing)
-apk-debug:
-	@echo "Building debug APK..."
-	cd $(FRONTEND_DIR) && npx expo prebuild --platform android --clean
-	cd $(FRONTEND_DIR)/android && ./gradlew assembleDebug
-	@echo ""
-	@echo "✅ Debug APK built!"
-	@echo "📦 Location: $(FRONTEND_DIR)/android/app/build/outputs/apk/debug/app-debug.apk"
-
-# Stop servers (Linux)
-stop-backend:
-	@echo "Stopping backend..."
-	@pkill -f "go run cmd/server/main.go" 2>/dev/null || echo "Backend not running"
-	@pkill -f "bin/server" 2>/dev/null || true
-
-stop-frontend:
-	@echo "Stopping frontend..."
-	@pkill -f "expo start" 2>/dev/null || echo "Frontend not running"
-	@pkill -f "react-native" 2>/dev/null || true
-	@pkill -f "metro" 2>/dev/null || true
-
-stop: stop-backend stop-frontend
-	@echo "All servers stopped."

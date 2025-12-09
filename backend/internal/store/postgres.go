@@ -73,6 +73,25 @@ func (s *PostgresStore) CreateMaterial(ctx context.Context, userID, matType, con
 	return materialID, nil
 }
 
+func (s *PostgresStore) SoftDeleteMaterial(ctx context.Context, userID, materialID string) error {
+	log.Printf("[Store.SoftDeleteMaterial] Soft deleting material: %s for user: %s", materialID, userID)
+	query := `
+		UPDATE materials 
+		SET is_deleted = TRUE, deleted_at = NOW(), updated_at = NOW()
+		WHERE id = $1 AND user_id = $2 AND is_deleted = FALSE;
+	`
+	result, err := s.db.Exec(ctx, query, materialID, userID)
+	if err != nil {
+		log.Printf("[Store.SoftDeleteMaterial] Delete failed: %v", err)
+		return fmt.Errorf("failed to delete material: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("material not found or already deleted")
+	}
+	log.Printf("[Store.SoftDeleteMaterial] Material soft deleted successfully")
+	return nil
+}
+
 func (s *PostgresStore) CreateTag(ctx context.Context, userID, name string) (string, error) {
 	query := `
 		INSERT INTO tags (user_id, name) VALUES ($1, $2)
@@ -194,7 +213,7 @@ func (s *PostgresStore) GetDueFlashcards(ctx context.Context, userID, materialID
         SELECT f.id, f.question, f.answer, f.stage, m.title, m.id
         FROM flashcards f
         JOIN materials m ON f.material_id = m.id
-        WHERE m.user_id = $1 AND m.id = $2
+        WHERE m.user_id = $1 AND m.id = $2 AND (m.is_deleted = FALSE OR m.is_deleted IS NULL)
         ORDER BY f.id ASC;
     `
 	rows, err := s.db.Query(ctx, query, userID, materialID)
@@ -228,6 +247,25 @@ func (s *PostgresStore) GetDueFlashcards(ctx context.Context, userID, materialID
 	return flashcards, nil
 }
 
+func (s *PostgresStore) UpdateFlashcardContent(ctx context.Context, id, question, answer string) error {
+	log.Printf("[Store.UpdateFlashcardContent] Updating flashcard: %s", id)
+	query := `
+		UPDATE flashcards
+		SET question = $1, answer = $2, updated_at = NOW()
+		WHERE id = $3;
+	`
+	result, err := s.db.Exec(ctx, query, question, answer, id)
+	if err != nil {
+		log.Printf("[Store.UpdateFlashcardContent] Update failed: %v", err)
+		return fmt.Errorf("failed to update flashcard content: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("flashcard not found")
+	}
+	log.Printf("[Store.UpdateFlashcardContent] Flashcard content updated successfully")
+	return nil
+}
+
 func (s *PostgresStore) GetDueMaterials(ctx context.Context, userID string, page, pageSize int32) ([]*learning.MaterialSummary, int32, error) {
 	log.Printf("[Store.GetDueMaterials] Querying materials for userID: %s, page: %d, pageSize: %d", userID, page, pageSize)
 
@@ -236,7 +274,7 @@ func (s *PostgresStore) GetDueMaterials(ctx context.Context, userID string, page
 		SELECT COUNT(DISTINCT m.id)
 		FROM materials m
 		JOIN flashcards f ON m.id = f.material_id
-		WHERE m.user_id = $1
+		WHERE m.user_id = $1 AND (m.is_deleted = FALSE OR m.is_deleted IS NULL)
 	`
 	var totalCount int32
 	if err := s.db.QueryRow(ctx, countQuery, userID).Scan(&totalCount); err != nil {
@@ -251,7 +289,7 @@ func (s *PostgresStore) GetDueMaterials(ctx context.Context, userID string, page
 		SELECT m.id, m.title, COUNT(f.id) as due_count
 		FROM materials m
 		JOIN flashcards f ON m.id = f.material_id
-		WHERE m.user_id = $1
+		WHERE m.user_id = $1 AND (m.is_deleted = FALSE OR m.is_deleted IS NULL)
 		GROUP BY m.id, m.title
 		ORDER BY m.created_at DESC
 		LIMIT $2 OFFSET $3;
@@ -289,7 +327,7 @@ func (s *PostgresStore) GetDueFlashcardsCount(ctx context.Context, userID string
 		SELECT COUNT(f.id)
 		FROM flashcards f
 		JOIN materials m ON f.material_id = m.id
-		WHERE m.user_id = $1 AND f.next_review_at <= NOW();
+		WHERE m.user_id = $1 AND f.next_review_at <= NOW() AND (m.is_deleted = FALSE OR m.is_deleted IS NULL);
 	`
 	var count int32
 	if err := s.db.QueryRow(ctx, query, userID).Scan(&count); err != nil {

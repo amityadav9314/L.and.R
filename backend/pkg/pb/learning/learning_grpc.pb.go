@@ -21,12 +21,15 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	LearningService_AddMaterial_FullMethodName           = "/learning.LearningService/AddMaterial"
+	LearningService_DeleteMaterial_FullMethodName        = "/learning.LearningService/DeleteMaterial"
 	LearningService_GetDueMaterials_FullMethodName       = "/learning.LearningService/GetDueMaterials"
 	LearningService_GetDueFlashcards_FullMethodName      = "/learning.LearningService/GetDueFlashcards"
 	LearningService_CompleteReview_FullMethodName        = "/learning.LearningService/CompleteReview"
+	LearningService_FailReview_FullMethodName            = "/learning.LearningService/FailReview"
 	LearningService_GetAllTags_FullMethodName            = "/learning.LearningService/GetAllTags"
 	LearningService_GetNotificationStatus_FullMethodName = "/learning.LearningService/GetNotificationStatus"
 	LearningService_GetMaterialSummary_FullMethodName    = "/learning.LearningService/GetMaterialSummary"
+	LearningService_UpdateFlashcard_FullMethodName       = "/learning.LearningService/UpdateFlashcard"
 )
 
 // LearningServiceClient is the client API for LearningService service.
@@ -34,12 +37,15 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type LearningServiceClient interface {
 	AddMaterial(ctx context.Context, in *AddMaterialRequest, opts ...grpc.CallOption) (*AddMaterialResponse, error)
+	DeleteMaterial(ctx context.Context, in *DeleteMaterialRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	GetDueMaterials(ctx context.Context, in *GetDueMaterialsRequest, opts ...grpc.CallOption) (*GetDueMaterialsResponse, error)
 	GetDueFlashcards(ctx context.Context, in *GetDueFlashcardsRequest, opts ...grpc.CallOption) (*FlashcardList, error)
 	CompleteReview(ctx context.Context, in *CompleteReviewRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	FailReview(ctx context.Context, in *FailReviewRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	GetAllTags(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetAllTagsResponse, error)
 	GetNotificationStatus(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*NotificationStatusResponse, error)
 	GetMaterialSummary(ctx context.Context, in *GetMaterialSummaryRequest, opts ...grpc.CallOption) (*GetMaterialSummaryResponse, error)
+	UpdateFlashcard(ctx context.Context, in *UpdateFlashcardRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type learningServiceClient struct {
@@ -54,6 +60,16 @@ func (c *learningServiceClient) AddMaterial(ctx context.Context, in *AddMaterial
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(AddMaterialResponse)
 	err := c.cc.Invoke(ctx, LearningService_AddMaterial_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *learningServiceClient) DeleteMaterial(ctx context.Context, in *DeleteMaterialRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, LearningService_DeleteMaterial_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -90,6 +106,16 @@ func (c *learningServiceClient) CompleteReview(ctx context.Context, in *Complete
 	return out, nil
 }
 
+func (c *learningServiceClient) FailReview(ctx context.Context, in *FailReviewRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, LearningService_FailReview_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *learningServiceClient) GetAllTags(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetAllTagsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetAllTagsResponse)
@@ -120,17 +146,30 @@ func (c *learningServiceClient) GetMaterialSummary(ctx context.Context, in *GetM
 	return out, nil
 }
 
+func (c *learningServiceClient) UpdateFlashcard(ctx context.Context, in *UpdateFlashcardRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, LearningService_UpdateFlashcard_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // LearningServiceServer is the server API for LearningService service.
 // All implementations must embed UnimplementedLearningServiceServer
 // for forward compatibility.
 type LearningServiceServer interface {
 	AddMaterial(context.Context, *AddMaterialRequest) (*AddMaterialResponse, error)
+	DeleteMaterial(context.Context, *DeleteMaterialRequest) (*emptypb.Empty, error)
 	GetDueMaterials(context.Context, *GetDueMaterialsRequest) (*GetDueMaterialsResponse, error)
 	GetDueFlashcards(context.Context, *GetDueFlashcardsRequest) (*FlashcardList, error)
 	CompleteReview(context.Context, *CompleteReviewRequest) (*emptypb.Empty, error)
+	FailReview(context.Context, *FailReviewRequest) (*emptypb.Empty, error)
 	GetAllTags(context.Context, *emptypb.Empty) (*GetAllTagsResponse, error)
 	GetNotificationStatus(context.Context, *emptypb.Empty) (*NotificationStatusResponse, error)
 	GetMaterialSummary(context.Context, *GetMaterialSummaryRequest) (*GetMaterialSummaryResponse, error)
+	UpdateFlashcard(context.Context, *UpdateFlashcardRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedLearningServiceServer()
 }
 
@@ -144,6 +183,9 @@ type UnimplementedLearningServiceServer struct{}
 func (UnimplementedLearningServiceServer) AddMaterial(context.Context, *AddMaterialRequest) (*AddMaterialResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method AddMaterial not implemented")
 }
+func (UnimplementedLearningServiceServer) DeleteMaterial(context.Context, *DeleteMaterialRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteMaterial not implemented")
+}
 func (UnimplementedLearningServiceServer) GetDueMaterials(context.Context, *GetDueMaterialsRequest) (*GetDueMaterialsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetDueMaterials not implemented")
 }
@@ -153,6 +195,9 @@ func (UnimplementedLearningServiceServer) GetDueFlashcards(context.Context, *Get
 func (UnimplementedLearningServiceServer) CompleteReview(context.Context, *CompleteReviewRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method CompleteReview not implemented")
 }
+func (UnimplementedLearningServiceServer) FailReview(context.Context, *FailReviewRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method FailReview not implemented")
+}
 func (UnimplementedLearningServiceServer) GetAllTags(context.Context, *emptypb.Empty) (*GetAllTagsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetAllTags not implemented")
 }
@@ -161,6 +206,9 @@ func (UnimplementedLearningServiceServer) GetNotificationStatus(context.Context,
 }
 func (UnimplementedLearningServiceServer) GetMaterialSummary(context.Context, *GetMaterialSummaryRequest) (*GetMaterialSummaryResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetMaterialSummary not implemented")
+}
+func (UnimplementedLearningServiceServer) UpdateFlashcard(context.Context, *UpdateFlashcardRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateFlashcard not implemented")
 }
 func (UnimplementedLearningServiceServer) mustEmbedUnimplementedLearningServiceServer() {}
 func (UnimplementedLearningServiceServer) testEmbeddedByValue()                         {}
@@ -197,6 +245,24 @@ func _LearningService_AddMaterial_Handler(srv interface{}, ctx context.Context, 
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(LearningServiceServer).AddMaterial(ctx, req.(*AddMaterialRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _LearningService_DeleteMaterial_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteMaterialRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(LearningServiceServer).DeleteMaterial(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: LearningService_DeleteMaterial_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(LearningServiceServer).DeleteMaterial(ctx, req.(*DeleteMaterialRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -255,6 +321,24 @@ func _LearningService_CompleteReview_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _LearningService_FailReview_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FailReviewRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(LearningServiceServer).FailReview(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: LearningService_FailReview_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(LearningServiceServer).FailReview(ctx, req.(*FailReviewRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _LearningService_GetAllTags_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
@@ -309,6 +393,24 @@ func _LearningService_GetMaterialSummary_Handler(srv interface{}, ctx context.Co
 	return interceptor(ctx, in, info, handler)
 }
 
+func _LearningService_UpdateFlashcard_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateFlashcardRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(LearningServiceServer).UpdateFlashcard(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: LearningService_UpdateFlashcard_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(LearningServiceServer).UpdateFlashcard(ctx, req.(*UpdateFlashcardRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // LearningService_ServiceDesc is the grpc.ServiceDesc for LearningService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -319,6 +421,10 @@ var LearningService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "AddMaterial",
 			Handler:    _LearningService_AddMaterial_Handler,
+		},
+		{
+			MethodName: "DeleteMaterial",
+			Handler:    _LearningService_DeleteMaterial_Handler,
 		},
 		{
 			MethodName: "GetDueMaterials",
@@ -333,6 +439,10 @@ var LearningService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _LearningService_CompleteReview_Handler,
 		},
 		{
+			MethodName: "FailReview",
+			Handler:    _LearningService_FailReview_Handler,
+		},
+		{
 			MethodName: "GetAllTags",
 			Handler:    _LearningService_GetAllTags_Handler,
 		},
@@ -343,6 +453,10 @@ var LearningService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetMaterialSummary",
 			Handler:    _LearningService_GetMaterialSummary_Handler,
+		},
+		{
+			MethodName: "UpdateFlashcard",
+			Handler:    _LearningService_UpdateFlashcard_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

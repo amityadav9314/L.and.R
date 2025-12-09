@@ -49,6 +49,23 @@ func (s *LearningService) AddMaterial(ctx context.Context, req *learning.AddMate
 	}, nil
 }
 
+func (s *LearningService) DeleteMaterial(ctx context.Context, req *learning.DeleteMaterialRequest) (*emptypb.Empty, error) {
+	userID, err := middleware.GetUserID(ctx)
+	if err != nil {
+		log.Printf("[DeleteMaterial] ERROR: Failed to get user ID: %v", err)
+		return nil, err
+	}
+	log.Printf("[DeleteMaterial] Deleting material: %s for user: %s", req.MaterialId, userID)
+
+	if err := s.core.DeleteMaterial(ctx, userID, req.MaterialId); err != nil {
+		log.Printf("[DeleteMaterial] ERROR: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to delete material: %v", err)
+	}
+
+	log.Printf("[DeleteMaterial] SUCCESS")
+	return &emptypb.Empty{}, nil
+}
+
 func (s *LearningService) GetDueFlashcards(ctx context.Context, req *learning.GetDueFlashcardsRequest) (*learning.FlashcardList, error) {
 	// Extract user ID from context (set by auth interceptor)
 	userID, err := middleware.GetUserID(ctx)
@@ -118,6 +135,30 @@ func (s *LearningService) CompleteReview(ctx context.Context, req *learning.Comp
 	}
 
 	log.Printf("[CompleteReview] SUCCESS")
+	return &emptypb.Empty{}, nil
+}
+
+func (s *LearningService) FailReview(ctx context.Context, req *learning.FailReviewRequest) (*emptypb.Empty, error) {
+	log.Printf("[FailReview] Failing review for flashcardID: %s", req.FlashcardId)
+
+	if err := s.core.FailReview(ctx, req.FlashcardId); err != nil {
+		log.Printf("[FailReview] ERROR: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to fail review: %v", err)
+	}
+
+	log.Printf("[FailReview] SUCCESS")
+	return &emptypb.Empty{}, nil
+}
+
+func (s *LearningService) UpdateFlashcard(ctx context.Context, req *learning.UpdateFlashcardRequest) (*emptypb.Empty, error) {
+	log.Printf("[UpdateFlashcard] Updating flashcardID: %s", req.FlashcardId)
+
+	if err := s.core.UpdateFlashcard(ctx, req.FlashcardId, req.Question, req.Answer); err != nil {
+		log.Printf("[UpdateFlashcard] ERROR: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to update flashcard: %v", err)
+	}
+
+	log.Printf("[UpdateFlashcard] SUCCESS")
 	return &emptypb.Empty{}, nil
 }
 

@@ -26,6 +26,10 @@ export interface AddMaterialResponse {
   tags: string[];
 }
 
+export interface DeleteMaterialRequest {
+  materialId: string;
+}
+
 export interface MaterialSummary {
   id: string;
   title: string;
@@ -68,6 +72,10 @@ export interface CompleteReviewRequest {
   flashcardId: string;
 }
 
+export interface FailReviewRequest {
+  flashcardId: string;
+}
+
 export interface GetAllTagsResponse {
   tags: string[];
 }
@@ -84,6 +92,12 @@ export interface GetMaterialSummaryRequest {
 export interface GetMaterialSummaryResponse {
   summary: string;
   title: string;
+}
+
+export interface UpdateFlashcardRequest {
+  flashcardId: string;
+  question: string;
+  answer: string;
 }
 
 function createBaseAddMaterialRequest(): AddMaterialRequest {
@@ -284,6 +298,64 @@ export const AddMaterialResponse: MessageFns<AddMaterialResponse> = {
     message.flashcardsCreated = object.flashcardsCreated ?? 0;
     message.title = object.title ?? "";
     message.tags = object.tags?.map((e) => e) || [];
+    return message;
+  },
+};
+
+function createBaseDeleteMaterialRequest(): DeleteMaterialRequest {
+  return { materialId: "" };
+}
+
+export const DeleteMaterialRequest: MessageFns<DeleteMaterialRequest> = {
+  encode(message: DeleteMaterialRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.materialId !== "") {
+      writer.uint32(10).string(message.materialId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): DeleteMaterialRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDeleteMaterialRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.materialId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): DeleteMaterialRequest {
+    return { materialId: isSet(object.materialId) ? globalThis.String(object.materialId) : "" };
+  },
+
+  toJSON(message: DeleteMaterialRequest): unknown {
+    const obj: any = {};
+    if (message.materialId !== "") {
+      obj.materialId = message.materialId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<DeleteMaterialRequest>): DeleteMaterialRequest {
+    return DeleteMaterialRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<DeleteMaterialRequest>): DeleteMaterialRequest {
+    const message = createBaseDeleteMaterialRequest();
+    message.materialId = object.materialId ?? "";
     return message;
   },
 };
@@ -932,6 +1004,64 @@ export const CompleteReviewRequest: MessageFns<CompleteReviewRequest> = {
   },
 };
 
+function createBaseFailReviewRequest(): FailReviewRequest {
+  return { flashcardId: "" };
+}
+
+export const FailReviewRequest: MessageFns<FailReviewRequest> = {
+  encode(message: FailReviewRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.flashcardId !== "") {
+      writer.uint32(10).string(message.flashcardId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): FailReviewRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseFailReviewRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.flashcardId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): FailReviewRequest {
+    return { flashcardId: isSet(object.flashcardId) ? globalThis.String(object.flashcardId) : "" };
+  },
+
+  toJSON(message: FailReviewRequest): unknown {
+    const obj: any = {};
+    if (message.flashcardId !== "") {
+      obj.flashcardId = message.flashcardId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<FailReviewRequest>): FailReviewRequest {
+    return FailReviewRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<FailReviewRequest>): FailReviewRequest {
+    const message = createBaseFailReviewRequest();
+    message.flashcardId = object.flashcardId ?? "";
+    return message;
+  },
+};
+
 function createBaseGetAllTagsResponse(): GetAllTagsResponse {
   return { tags: [] };
 }
@@ -1200,11 +1330,104 @@ export const GetMaterialSummaryResponse: MessageFns<GetMaterialSummaryResponse> 
   },
 };
 
+function createBaseUpdateFlashcardRequest(): UpdateFlashcardRequest {
+  return { flashcardId: "", question: "", answer: "" };
+}
+
+export const UpdateFlashcardRequest: MessageFns<UpdateFlashcardRequest> = {
+  encode(message: UpdateFlashcardRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.flashcardId !== "") {
+      writer.uint32(10).string(message.flashcardId);
+    }
+    if (message.question !== "") {
+      writer.uint32(18).string(message.question);
+    }
+    if (message.answer !== "") {
+      writer.uint32(26).string(message.answer);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): UpdateFlashcardRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseUpdateFlashcardRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.flashcardId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.question = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.answer = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): UpdateFlashcardRequest {
+    return {
+      flashcardId: isSet(object.flashcardId) ? globalThis.String(object.flashcardId) : "",
+      question: isSet(object.question) ? globalThis.String(object.question) : "",
+      answer: isSet(object.answer) ? globalThis.String(object.answer) : "",
+    };
+  },
+
+  toJSON(message: UpdateFlashcardRequest): unknown {
+    const obj: any = {};
+    if (message.flashcardId !== "") {
+      obj.flashcardId = message.flashcardId;
+    }
+    if (message.question !== "") {
+      obj.question = message.question;
+    }
+    if (message.answer !== "") {
+      obj.answer = message.answer;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<UpdateFlashcardRequest>): UpdateFlashcardRequest {
+    return UpdateFlashcardRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<UpdateFlashcardRequest>): UpdateFlashcardRequest {
+    const message = createBaseUpdateFlashcardRequest();
+    message.flashcardId = object.flashcardId ?? "";
+    message.question = object.question ?? "";
+    message.answer = object.answer ?? "";
+    return message;
+  },
+};
+
 export interface LearningServiceImplementation<CallContextExt = {}> {
   addMaterial(
     request: AddMaterialRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<AddMaterialResponse>>;
+  deleteMaterial(request: DeleteMaterialRequest, context: CallContext & CallContextExt): Promise<DeepPartial<Empty>>;
   getDueMaterials(
     request: GetDueMaterialsRequest,
     context: CallContext & CallContextExt,
@@ -1214,6 +1437,7 @@ export interface LearningServiceImplementation<CallContextExt = {}> {
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<FlashcardList>>;
   completeReview(request: CompleteReviewRequest, context: CallContext & CallContextExt): Promise<DeepPartial<Empty>>;
+  failReview(request: FailReviewRequest, context: CallContext & CallContextExt): Promise<DeepPartial<Empty>>;
   getAllTags(request: Empty, context: CallContext & CallContextExt): Promise<DeepPartial<GetAllTagsResponse>>;
   getNotificationStatus(
     request: Empty,
@@ -1223,6 +1447,7 @@ export interface LearningServiceImplementation<CallContextExt = {}> {
     request: GetMaterialSummaryRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<GetMaterialSummaryResponse>>;
+  updateFlashcard(request: UpdateFlashcardRequest, context: CallContext & CallContextExt): Promise<DeepPartial<Empty>>;
 }
 
 export interface LearningServiceClient<CallOptionsExt = {}> {
@@ -1230,6 +1455,7 @@ export interface LearningServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<AddMaterialRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<AddMaterialResponse>;
+  deleteMaterial(request: DeepPartial<DeleteMaterialRequest>, options?: CallOptions & CallOptionsExt): Promise<Empty>;
   getDueMaterials(
     request: DeepPartial<GetDueMaterialsRequest>,
     options?: CallOptions & CallOptionsExt,
@@ -1239,6 +1465,7 @@ export interface LearningServiceClient<CallOptionsExt = {}> {
     options?: CallOptions & CallOptionsExt,
   ): Promise<FlashcardList>;
   completeReview(request: DeepPartial<CompleteReviewRequest>, options?: CallOptions & CallOptionsExt): Promise<Empty>;
+  failReview(request: DeepPartial<FailReviewRequest>, options?: CallOptions & CallOptionsExt): Promise<Empty>;
   getAllTags(request: DeepPartial<Empty>, options?: CallOptions & CallOptionsExt): Promise<GetAllTagsResponse>;
   getNotificationStatus(
     request: DeepPartial<Empty>,
@@ -1248,6 +1475,7 @@ export interface LearningServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<GetMaterialSummaryRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<GetMaterialSummaryResponse>;
+  updateFlashcard(request: DeepPartial<UpdateFlashcardRequest>, options?: CallOptions & CallOptionsExt): Promise<Empty>;
 }
 
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;

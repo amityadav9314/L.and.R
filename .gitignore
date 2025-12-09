@@ -1,2 +1,5 @@
 backend/.env
 .idea
+backend/bin/
+*.log
+.DS_Store

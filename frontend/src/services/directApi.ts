@@ -9,9 +9,10 @@ import { Platform } from 'react-native';
 import { LoginRequest, LoginResponse } from '../../proto/backend/proto/auth/auth';
 import {
     AddMaterialRequest, AddMaterialResponse,
+    DeleteMaterialRequest,
     GetDueMaterialsRequest, GetDueMaterialsResponse,
     GetDueFlashcardsRequest, FlashcardList,
-    CompleteReviewRequest, GetAllTagsResponse, NotificationStatusResponse,
+    CompleteReviewRequest, FailReviewRequest, UpdateFlashcardRequest, GetAllTagsResponse, NotificationStatusResponse,
     GetMaterialSummaryRequest, GetMaterialSummaryResponse
 } from '../../proto/backend/proto/learning/learning';
 import { Empty } from '../../proto/backend/google/protobuf/empty';
@@ -189,6 +190,16 @@ export const learningClient = {
         );
     },
 
+    async deleteMaterial(request: Partial<DeleteMaterialRequest>): Promise<Empty> {
+        const req = DeleteMaterialRequest.fromPartial(request);
+        return grpcRequest(
+            '/learning.LearningService/DeleteMaterial',
+            req,
+            (r) => DeleteMaterialRequest.encode(r).finish(),
+            (data) => Empty.decode(data),
+        );
+    },
+
     async getDueFlashcards(request: Partial<GetDueFlashcardsRequest>): Promise<FlashcardList> {
         const req = GetDueFlashcardsRequest.fromPartial(request);
         return grpcRequest(
@@ -205,6 +216,26 @@ export const learningClient = {
             '/learning.LearningService/CompleteReview',
             req,
             (r) => CompleteReviewRequest.encode(r).finish(),
+            (data) => Empty.decode(data),
+        );
+    },
+
+    async failReview(request: Partial<FailReviewRequest>): Promise<Empty> {
+        const req = FailReviewRequest.fromPartial(request);
+        return grpcRequest(
+            '/learning.LearningService/FailReview',
+            req,
+            (r) => FailReviewRequest.encode(r).finish(),
+            (data) => Empty.decode(data),
+        );
+    },
+
+    async updateFlashcard(request: Partial<UpdateFlashcardRequest>): Promise<Empty> {
+        const req = UpdateFlashcardRequest.fromPartial(request);
+        return grpcRequest(
+            '/learning.LearningService/UpdateFlashcard',
+            req,
+            (r) => UpdateFlashcardRequest.encode(r).finish(),
             (data) => Empty.decode(data),
         );
     },
