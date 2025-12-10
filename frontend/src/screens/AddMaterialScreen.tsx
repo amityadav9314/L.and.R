@@ -5,12 +5,7 @@ import { useNavigation } from '../navigation/ManualRouter';
 import { learningClient } from '../services/api';
 import { AppHeader } from '../components/AppHeader';
 import { useTheme, ThemeColors } from '../utils/theme';
-
-// Conditionally import ImagePicker (only works on native)
-let ImagePicker: any = null;
-if (Platform.OS !== 'web') {
-    ImagePicker = require('expo-image-picker');
-}
+import * as ImagePickerUtil from '../utils/imagePicker';
 
 type MaterialType = 'TEXT' | 'LINK' | 'IMAGE' | 'YOUTUBE';
 
@@ -47,58 +42,27 @@ export const AddMaterialScreen = () => {
         },
     });
 
-    const pickImage = async () => {
-        if (!ImagePicker) {
+    const handlePickImage = async () => {
+        if (!ImagePickerUtil.isAvailable) {
             Alert.alert('Not Available', 'Image picker is only available on mobile devices.');
             return;
         }
-        console.log('[ADD_MATERIAL] Opening image picker...');
-
-        // Request permission
-        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (status !== 'granted') {
-            Alert.alert('Permission Required', 'Please allow access to your photo library.');
-            return;
-        }
-
-        const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsEditing: true,
-            quality: 0.8,
-            base64: true,
-        });
-
-        if (!result.canceled && result.assets[0]) {
-            console.log('[ADD_MATERIAL] Image selected, base64 length:', result.assets[0].base64?.length);
-            setImageData(result.assets[0].base64 || null);
-            setImagePreview(result.assets[0].uri);
+        const result = await ImagePickerUtil.pickImage();
+        if (result) {
+            setImageData(result.base64);
+            setImagePreview(result.uri);
         }
     };
 
-    const takePhoto = async () => {
-        if (!ImagePicker) {
+    const handleTakePhoto = async () => {
+        if (!ImagePickerUtil.isAvailable) {
             Alert.alert('Not Available', 'Camera is only available on mobile devices.');
             return;
         }
-        console.log('[ADD_MATERIAL] Opening camera...');
-
-        // Request permission
-        const { status } = await ImagePicker.requestCameraPermissionsAsync();
-        if (status !== 'granted') {
-            Alert.alert('Permission Required', 'Please allow access to your camera.');
-            return;
-        }
-
-        const result = await ImagePicker.launchCameraAsync({
-            allowsEditing: true,
-            quality: 0.8,
-            base64: true,
-        });
-
-        if (!result.canceled && result.assets[0]) {
-            console.log('[ADD_MATERIAL] Photo taken, base64 length:', result.assets[0].base64?.length);
-            setImageData(result.assets[0].base64 || null);
-            setImagePreview(result.assets[0].uri);
+        const result = await ImagePickerUtil.takePhoto();
+        if (result) {
+            setImageData(result.base64);
+            setImagePreview(result.uri);
         }
     };
 
@@ -163,12 +127,12 @@ export const AddMaterialScreen = () => {
                             </View>
                         ) : (
                             <View style={styles.imagePickerButtons}>
-                                <TouchableOpacity style={styles.imagePickerButton} onPress={pickImage}>
+                                <TouchableOpacity style={styles.imagePickerButton} onPress={handlePickImage}>
                                     <Text style={styles.imagePickerIcon}>🖼️</Text>
                                     <Text style={styles.imagePickerText}>Gallery</Text>
                                 </TouchableOpacity>
                                 {Platform.OS !== 'web' && (
-                                    <TouchableOpacity style={styles.imagePickerButton} onPress={takePhoto}>
+                                    <TouchableOpacity style={styles.imagePickerButton} onPress={handleTakePhoto}>
                                         <Text style={styles.imagePickerIcon}>📷</Text>
                                         <Text style={styles.imagePickerText}>Camera</Text>
                                     </TouchableOpacity>
