@@ -6,5 +6,9 @@
     "jsx": "react-native",
     "skipLibCheck": true,
     "moduleResolution": "bundler"
-  }
+  },
+  "exclude": [
+    "**/*.native.ts",
+    "**/*.native.tsx"
+  ]
 }
