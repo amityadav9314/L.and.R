@@ -1,10 +1,13 @@
 package scraper
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -34,8 +37,15 @@ func (s *Scraper) Scrape(url string) (string, error) {
 	}
 	log.Printf("[Scraper] Direct scrape failed or insufficient content, trying Jina Reader...")
 
-	// Fallback: Use Jina AI Reader for JS-rendered sites
+	// Fallback 1: Use Jina AI Reader for JS-rendered sites
 	content, err = s.jinaReaderScrape(url)
+	if err == nil && len(content) > 100 {
+		return content, nil
+	}
+	log.Printf("[Scraper] Jina Reader failed, trying Supadata...")
+
+	// Fallback 2: Use Supadata web scraper
+	content, err = s.supadataScrape(url)
 	if err == nil && len(content) > 100 {
 		return content, nil
 	}
@@ -50,8 +60,22 @@ func (s *Scraper) directScrape(url string) (string, error) {
 		return "", fmt.Errorf("failed to create request: %w", err)
 	}
 
+	// Set comprehensive browser-like headers to avoid 403 blocks
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8")
+	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
+	req.Header.Set("Accept-Encoding", "gzip, deflate")
+	req.Header.Set("Cache-Control", "no-cache")
+	req.Header.Set("Pragma", "no-cache")
+	req.Header.Set("Connection", "keep-alive")
+	req.Header.Set("Upgrade-Insecure-Requests", "1")
+	req.Header.Set("Sec-Fetch-Dest", "document")
+	req.Header.Set("Sec-Fetch-Mode", "navigate")
+	req.Header.Set("Sec-Fetch-Site", "none")
+	req.Header.Set("Sec-Fetch-User", "?1")
+	req.Header.Set("Sec-Ch-Ua", `"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"`)
+	req.Header.Set("Sec-Ch-Ua-Mobile", "?0")
+	req.Header.Set("Sec-Ch-Ua-Platform", `"Windows"`)
 
 	resp, err := s.client.Do(req)
 	if err != nil {
@@ -137,7 +161,7 @@ func (s *Scraper) jinaReaderScrape(url string) (string, error) {
 	content := string(body)
 
 	// Truncate if too long
-	maxLen := 15000
+	maxLen := 50000
 	if len(content) > maxLen {
 		log.Printf("[Scraper.Jina] Truncating from %d to %d chars", len(content), maxLen)
 		content = content[:maxLen]
@@ -145,4 +169,65 @@ func (s *Scraper) jinaReaderScrape(url string) (string, error) {
 
 	log.Printf("[Scraper.Jina] Successfully extracted %d characters", len(content))
 	return content, nil
+}
+
+// supadataScrape uses Supadata's web scraping API
+func (s *Scraper) supadataScrape(targetUrl string) (string, error) {
+	apiKey := os.Getenv("SUPADATA_API_KEY")
+	if apiKey == "" {
+		return "", fmt.Errorf("SUPADATA_API_KEY not set")
+	}
+
+	encodedURL := url.QueryEscape(targetUrl)
+	apiURL := fmt.Sprintf("https://api.supadata.ai/v1/web/scrape?url=%s", encodedURL)
+	log.Printf("[Scraper.Supadata] Fetching: %s", apiURL)
+
+	req, err := http.NewRequest("GET", apiURL, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create supadata request: %w", err)
+	}
+
+	req.Header.Set("x-api-key", apiKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		log.Printf("[Scraper.Supadata] Request failed: %v", err)
+		return "", fmt.Errorf("supadata request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	log.Printf("[Scraper.Supadata] Response status: %d", resp.StatusCode)
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("supadata error: %d - %s", resp.StatusCode, string(body))
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read supadata response: %w", err)
+	}
+
+	// Supadata returns JSON with content field
+	var result struct {
+		Name    string `json:"name"`
+		Content string `json:"content"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return "", fmt.Errorf("failed to parse supadata response: %w", err)
+	}
+
+	if result.Content == "" {
+		return "", fmt.Errorf("no content in supadata response")
+	}
+
+	// Truncate if too long
+	maxLen := 50000
+	if len(result.Content) > maxLen {
+		log.Printf("[Scraper.Supadata] Truncating from %d to %d chars", len(result.Content), maxLen)
+		result.Content = result.Content[:maxLen]
+	}
+
+	log.Printf("[Scraper.Supadata] Successfully extracted %d characters from '%s'", len(result.Content), result.Name)
+	return result.Content, nil
 }

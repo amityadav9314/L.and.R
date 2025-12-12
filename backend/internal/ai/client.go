@@ -166,7 +166,7 @@ func (c *Client) GenerateFlashcards(content string, existingTags []string) (stri
 Analyze the following text and create:
 1. A short, descriptive Title for the material.
 2. A list of 3-5 relevant Tags (categories).
-3. 5 to 10 high-quality flashcards (Question and Answer pairs).
+3. 6 to 40 high-quality flashcards (Question and Answer pairs).
 
 Existing tags you might reuse if relevant: %s
 
@@ -224,7 +224,7 @@ func (c *Client) GenerateSummary(content string) (string, error) {
 	log.Printf("[AI.Summary] Starting generation, content length: %d", len(content))
 
 	// Truncate content if too long to stay within token limits
-	maxLen := 8000
+	maxLen := 25000
 	if len(content) > maxLen {
 		log.Printf("[AI.Summary] Truncating content from %d to %d", len(content), maxLen)
 		content = content[:maxLen]
@@ -233,7 +233,7 @@ func (c *Client) GenerateSummary(content string) (string, error) {
 	prompt := fmt.Sprintf(`You are a helpful assistant that creates concise summaries for learning materials.
 Create a clear, well-structured summary of the following text that helps a student review the key concepts.
 The summary should:
-- Be 3-5 paragraphs
+- Be 5-8 paragraphs
 - Highlight the main concepts and key points
 - Be easy to scan and review quickly
 - Use bullet points where appropriate

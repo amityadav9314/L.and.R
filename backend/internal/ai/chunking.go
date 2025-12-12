@@ -7,15 +7,14 @@ import (
 	"math"
 	"math/rand"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/amityadav/landr/pkg/pb/learning"
 )
 
 const (
-	ChunkSize      = 3000 // ~750 tokens
-	ChunkOverlap   = 200  // Overlap between chunks
+	ChunkSize      = 6000 // ~1500 tokens - larger chunks to reduce parallel API calls
+	ChunkOverlap   = 300  // Overlap between chunks
 	MaxRetries     = 3
 	BaseRetryDelay = 2 * time.Second
 )
@@ -42,8 +41,9 @@ func SplitIntoChunks(text string, chunkSize, overlap int) []string {
 
 	var chunks []string
 	start := 0
+	maxChunks := 20 // Safety limit to prevent runaway
 
-	for start < len(text) {
+	for start < len(text) && len(chunks) < maxChunks {
 		end := start + chunkSize
 		if end > len(text) {
 			end = len(text)
@@ -66,7 +66,13 @@ func SplitIntoChunks(text string, chunkSize, overlap int) []string {
 		}
 
 		chunks = append(chunks, strings.TrimSpace(text[start:end]))
-		start = end - overlap
+
+		// Ensure we always advance to prevent infinite loop
+		newStart := end - overlap
+		if newStart <= start {
+			newStart = start + chunkSize/2 // Force advancement
+		}
+		start = newStart
 	}
 
 	log.Printf("[Chunker] Split text into %d chunks", len(chunks))
@@ -119,7 +125,7 @@ func RetryWithBackoff(ctx context.Context, operation string, fn func() error) er
 	return fmt.Errorf("max retries exceeded: %w", lastErr)
 }
 
-// ProcessChunksParallel processes multiple chunks in parallel using goroutines
+// ProcessChunksSequential processes chunks one at a time to respect rate limits
 func (c *Client) ProcessChunksParallel(ctx context.Context, chunks []string, existingTags []string) (string, []string, []*learning.Flashcard, error) {
 	if len(chunks) == 0 {
 		return "", nil, nil, fmt.Errorf("no chunks to process")
@@ -130,76 +136,55 @@ func (c *Client) ProcessChunksParallel(ctx context.Context, chunks []string, exi
 		return c.GenerateFlashcards(chunks[0], existingTags)
 	}
 
-	log.Printf("[AI.Parallel] Processing %d chunks in parallel", len(chunks))
+	log.Printf("[AI.Sequential] Processing %d chunks sequentially (rate limit: 8000 TPM)", len(chunks))
 
-	// Channel to collect results
-	resultsChan := make(chan ChunkResult, len(chunks))
-
-	// Use semaphore to limit concurrent requests (avoid rate limits)
-	maxConcurrent := 3
-	sem := make(chan struct{}, maxConcurrent)
-
-	var wg sync.WaitGroup
-
-	// Process each chunk in a goroutine
-	for i, chunk := range chunks {
-		wg.Add(1)
-		go func(idx int, chunkText string) {
-			defer wg.Done()
-
-			// Acquire semaphore
-			sem <- struct{}{}
-			defer func() { <-sem }()
-
-			result := ChunkResult{ChunkIndex: idx}
-
-			// Retry with backoff
-			err := RetryWithBackoff(ctx, fmt.Sprintf("Chunk_%d", idx), func() error {
-				title, tags, cards, err := c.GenerateFlashcards(chunkText, existingTags)
-				if err != nil {
-					return err
-				}
-				result.Title = title
-				result.Tags = tags
-				result.Flashcards = cards
-				return nil
-			})
-
-			if err != nil {
-				result.Error = err
-			}
-
-			resultsChan <- result
-		}(i, chunk)
-	}
-
-	// Close channel when all goroutines complete
-	go func() {
-		wg.Wait()
-		close(resultsChan)
-	}()
-
-	// Collect results
 	var allFlashcards []*learning.Flashcard
 	allTags := make(map[string]bool)
 	var firstTitle string
 	var errors []error
 
-	for result := range resultsChan {
-		if result.Error != nil {
-			errors = append(errors, result.Error)
-			continue
+	// Process chunks one at a time with delay
+	for i, chunk := range chunks {
+		if ctx.Err() != nil {
+			break
 		}
 
-		if firstTitle == "" && result.Title != "" {
-			firstTitle = result.Title
+		log.Printf("[AI.Sequential] Processing chunk %d/%d", i+1, len(chunks))
+
+		var title string
+		var tags []string
+		var cards []*learning.Flashcard
+		var err error
+
+		// Retry with backoff for this chunk
+		err = RetryWithBackoff(ctx, fmt.Sprintf("Chunk_%d", i), func() error {
+			title, tags, cards, err = c.GenerateFlashcards(chunk, existingTags)
+			return err
+		})
+
+		if err != nil {
+			log.Printf("[AI.Sequential] Chunk %d failed: %v", i+1, err)
+			errors = append(errors, err)
+		} else {
+			if firstTitle == "" && title != "" {
+				firstTitle = title
+			}
+			for _, tag := range tags {
+				allTags[tag] = true
+			}
+			allFlashcards = append(allFlashcards, cards...)
+			log.Printf("[AI.Sequential] Chunk %d completed: %d flashcards", i+1, len(cards))
 		}
 
-		for _, tag := range result.Tags {
-			allTags[tag] = true
+		// Wait 10 seconds between chunks to respect rate limit (8000 TPM)
+		if i < len(chunks)-1 {
+			log.Printf("[AI.Sequential] Waiting 10s for rate limit...")
+			select {
+			case <-ctx.Done():
+				break
+			case <-time.After(10 * time.Second):
+			}
 		}
-
-		allFlashcards = append(allFlashcards, result.Flashcards...)
 	}
 
 	// If all chunks failed, return error
@@ -216,7 +201,7 @@ func (c *Client) ProcessChunksParallel(ctx context.Context, chunks []string, exi
 	// Deduplicate flashcards
 	dedupedCards := deduplicateFlashcards(allFlashcards)
 
-	log.Printf("[AI.Parallel] Completed: %d unique flashcards from %d chunks", len(dedupedCards), len(chunks))
+	log.Printf("[AI.Sequential] Completed: %d unique flashcards from %d chunks", len(dedupedCards), len(chunks))
 	return firstTitle, tags, dedupedCards, nil
 }
 

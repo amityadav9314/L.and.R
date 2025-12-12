@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -222,15 +223,26 @@ func (t *TranscriptExtractor) fetchViaFallback(ctx context.Context, videoID stri
 	return text, nil
 }
 
-// fetchViaSupadata uses the Supadata transcript API
+// fetchViaSupadata uses the Supadata transcript API with authentication
 func (t *TranscriptExtractor) fetchViaSupadata(ctx context.Context, videoID string) (string, error) {
-	apiURL := fmt.Sprintf("https://api.supadata.ai/v1/youtube/transcript?videoId=%s&text=true", videoID)
+	apiKey := os.Getenv("SUPADATA_API_KEY")
+	if apiKey == "" {
+		return "", fmt.Errorf("SUPADATA_API_KEY not set")
+	}
+
+	// Use the universal transcript endpoint
+	videoURL := url.QueryEscape(fmt.Sprintf("https://www.youtube.com/watch?v=%s", videoID))
+	apiURL := fmt.Sprintf("https://api.supadata.ai/v1/transcript?url=%s&text=true&mode=native", videoURL)
 	log.Printf("[YouTube.Supadata] Fetching: %s", apiURL)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", apiURL, nil)
 	if err != nil {
 		return "", err
 	}
+
+	// Add required authentication header
+	req.Header.Set("x-api-key", apiKey)
+	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := t.client.Do(req)
 	if err != nil {
@@ -253,6 +265,7 @@ func (t *TranscriptExtractor) fetchViaSupadata(ctx context.Context, videoID stri
 	// Supadata returns JSON with content field when text=true
 	var result struct {
 		Content string `json:"content"`
+		Lang    string `json:"lang"`
 	}
 	if err := json.Unmarshal(body, &result); err != nil {
 		// Try treating response as plain text
@@ -263,6 +276,6 @@ func (t *TranscriptExtractor) fetchViaSupadata(ctx context.Context, videoID stri
 		return "", fmt.Errorf("no transcript in response")
 	}
 
-	log.Printf("[YouTube.Supadata] Got transcript, length: %d", len(result.Content))
+	log.Printf("[YouTube.Supadata] Got transcript in %s, length: %d", result.Lang, len(result.Content))
 	return result.Content, nil
 }
