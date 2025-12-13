@@ -43,6 +43,8 @@ message MaterialSummary {
   string title = 2;
   int32 due_count = 3;
   repeated string tags = 4;
+  string status = 5;
+  string error_message = 6;
 }
 
 message GetDueMaterialsRequest {

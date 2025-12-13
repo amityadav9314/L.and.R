@@ -101,7 +101,9 @@ db-stop:
 	@echo "PostgreSQL stopped."
 
 migrate-up:
-	@migrate -path backend/db/migrations -database "postgres://amityadav9314:amit8780@localhost:5432/inkgrid?sslmode=disable" up
+migrate-up:
+	@echo "Running migrations via Docker..."
+	@docker run --rm -v $(PWD)/backend/db/migrations:/migrations migrate/migrate -path=/migrations/ -database "postgres://amityadav9314:amit8780@host.docker.internal:5432/inkgrid?sslmode=disable" up
 
 # ============================================
 # PROTO

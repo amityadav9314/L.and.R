@@ -15,6 +15,7 @@ type Store interface {
 
 	// Material
 	CreateMaterial(ctx context.Context, userID, matType, content, title string) (string, error)
+	UpdateMaterialStatus(ctx context.Context, materialID, status, errorMessage string) error
 	SoftDeleteMaterial(ctx context.Context, userID, materialID string) error
 
 	// Tags

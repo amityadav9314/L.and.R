@@ -55,8 +55,15 @@ func (c *AuthCore) LoginUser(ctx context.Context, googleToken string) (*auth.Use
 }
 
 func (c *AuthCore) verifyGoogleToken(ctx context.Context, token string) (*idtoken.Payload, error) {
+	fmt.Printf("[DEBUG] Verifying token with ClientID: %s\n", c.clientID)
+
 	payload, err := idtoken.Validate(ctx, token, c.clientID)
 	if err != nil {
+		fmt.Printf("[DEBUG] Validation failed: %v\n", err)
+
+		// Attempt to inspect the token without validation (if possible) or just try blindly
+		// We can try to use a dummy validator or just print the token for manual inspection (careful with PII in prod, but ok for dev)
+		// fmt.Printf("[DEBUG] Token: %s\n", token)
 		return nil, err
 	}
 	return payload, nil

@@ -1,0 +1,2 @@
+ALTER TABLE materials ADD COLUMN status VARCHAR(20) DEFAULT 'PENDING';
+ALTER TABLE materials ADD COLUMN error_message TEXT;

@@ -59,8 +59,8 @@ func (s *PostgresStore) GetUserByGoogleID(ctx context.Context, googleID string) 
 func (s *PostgresStore) CreateMaterial(ctx context.Context, userID, matType, content, title string) (string, error) {
 	log.Printf("[Store.CreateMaterial] Inserting material - UserID: %s, Type: %s, Title: %s", userID, matType, title)
 	query := `
-        INSERT INTO materials (user_id, type, content, title)
-        VALUES ($1, $2, $3, $4)
+        INSERT INTO materials (user_id, type, content, title, status)
+        VALUES ($1, $2, $3, $4, 'PENDING')
         RETURNING id;
     `
 	var materialID string
@@ -89,6 +89,22 @@ func (s *PostgresStore) SoftDeleteMaterial(ctx context.Context, userID, material
 		return fmt.Errorf("material not found or already deleted")
 	}
 	log.Printf("[Store.SoftDeleteMaterial] Material soft deleted successfully")
+	return nil
+}
+
+func (s *PostgresStore) UpdateMaterialStatus(ctx context.Context, materialID, status, errorMessage string) error {
+	log.Printf("[Store.UpdateMaterialStatus] Updating material: %s, Status: %s", materialID, status)
+	query := `
+		UPDATE materials 
+		SET status = $1, error_message = $2, updated_at = NOW()
+		WHERE id = $3;
+	`
+	_, err := s.db.Exec(ctx, query, status, errorMessage, materialID)
+	if err != nil {
+		log.Printf("[Store.UpdateMaterialStatus] Update failed: %v", err)
+		return fmt.Errorf("failed to update material status: %w", err)
+	}
+	log.Printf("[Store.UpdateMaterialStatus] Status updated successfully")
 	return nil
 }
 
@@ -273,7 +289,7 @@ func (s *PostgresStore) GetDueMaterials(ctx context.Context, userID string, page
 	countQuery := `
 		SELECT COUNT(DISTINCT m.id)
 		FROM materials m
-		JOIN flashcards f ON m.id = f.material_id
+		LEFT JOIN flashcards f ON m.id = f.material_id
 		WHERE m.user_id = $1 AND (m.is_deleted = FALSE OR m.is_deleted IS NULL)
 	`
 	var totalCount int32
@@ -286,11 +302,11 @@ func (s *PostgresStore) GetDueMaterials(ctx context.Context, userID string, page
 
 	// Get paginated results
 	query := `
-		SELECT m.id, m.title, COUNT(f.id) as due_count
+		SELECT m.id, m.title, COUNT(f.id) as due_count, COALESCE(m.status, 'COMPLETED') as status, COALESCE(m.error_message, '') as error
 		FROM materials m
-		JOIN flashcards f ON m.id = f.material_id
+		LEFT JOIN flashcards f ON m.id = f.material_id
 		WHERE m.user_id = $1 AND (m.is_deleted = FALSE OR m.is_deleted IS NULL)
-		GROUP BY m.id, m.title
+		GROUP BY m.id, m.title, m.status, m.error_message
 		ORDER BY m.created_at DESC
 		LIMIT $2 OFFSET $3;
 	`
@@ -303,7 +319,7 @@ func (s *PostgresStore) GetDueMaterials(ctx context.Context, userID string, page
 	var materials []*learning.MaterialSummary
 	for rows.Next() {
 		var m learning.MaterialSummary
-		if err := rows.Scan(&m.Id, &m.Title, &m.DueCount); err != nil {
+		if err := rows.Scan(&m.Id, &m.Title, &m.DueCount, &m.Status, &m.ErrorMessage); err != nil {
 			return nil, 0, fmt.Errorf("failed to scan material: %w", err)
 		}
 
