@@ -2,7 +2,6 @@ package ai
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -220,10 +219,11 @@ Return ONLY the extracted text, no commentary or additional formatting.`
 	return p.sendRequest(reqBody, "OCR")
 }
 
-// MultiProvider runs multiple providers in parallel and returns the first successful result
+// MultiProvider distributes work across providers to avoid rate limits
+// Flashcards -> provider[0], Summary -> provider[1] (or wraps around)
 type MultiProvider struct {
 	providers []Provider
-	primary   Provider // Used for operations that can't be parallelized (OCR)
+	primary   Provider // Used for OCR (only Groq has vision)
 }
 
 // NewMultiProvider creates a new multi-provider orchestrator
@@ -245,97 +245,45 @@ func (m *MultiProvider) Name() string {
 	return "Multi[" + strings.Join(names, "+") + "]"
 }
 
-// Result holds the result from a provider goroutine
-type providerResult struct {
-	provider   string
-	title      string
-	tags       []string
-	flashcards []*learning.Flashcard
-	summary    string
-	err        error
-}
-
-// GenerateFlashcards runs all providers in parallel, returns first success
+// GenerateFlashcards uses provider[0] with fallback to others
 func (m *MultiProvider) GenerateFlashcards(content string, existingTags []string) (string, []string, []*learning.Flashcard, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
-	defer cancel()
-
-	results := make(chan providerResult, len(m.providers))
-
-	// Launch all providers in parallel
-	for _, p := range m.providers {
-		go func(provider Provider) {
-			log.Printf("[MultiProvider] Starting %s for flashcards...", provider.Name())
-			title, tags, cards, err := provider.GenerateFlashcards(content, existingTags)
-			results <- providerResult{
-				provider:   provider.Name(),
-				title:      title,
-				tags:       tags,
-				flashcards: cards,
-				err:        err,
-			}
-		}(p)
-	}
-
-	// Collect results - return first success
-	var lastErr error
-	for i := 0; i < len(m.providers); i++ {
-		select {
-		case result := <-results:
-			if result.err == nil {
-				log.Printf("[MultiProvider] %s won the race with %d flashcards!", result.provider, len(result.flashcards))
-				return result.title, result.tags, result.flashcards, nil
-			}
-			log.Printf("[MultiProvider] %s failed: %v", result.provider, result.err)
-			lastErr = result.err
-		case <-ctx.Done():
-			return "", nil, nil, fmt.Errorf("all providers timed out")
+	// Try provider 0 first (Groq), then fall back to others
+	for i, provider := range m.providers {
+		log.Printf("[MultiProvider] Trying %s for flashcards (attempt %d/%d)...", provider.Name(), i+1, len(m.providers))
+		title, tags, cards, err := provider.GenerateFlashcards(content, existingTags)
+		if err == nil {
+			log.Printf("[MultiProvider] %s generated %d flashcards", provider.Name(), len(cards))
+			return title, tags, cards, nil
 		}
+		log.Printf("[MultiProvider] %s failed: %v", provider.Name(), err)
 	}
-
-	return "", nil, nil, fmt.Errorf("all providers failed: %w", lastErr)
+	return "", nil, nil, fmt.Errorf("all providers failed for flashcards")
 }
 
-// GenerateSummary runs all providers in parallel, returns first success
+// GenerateSummary uses provider[1] with fallback (distributes load)
 func (m *MultiProvider) GenerateSummary(content string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
-	defer cancel()
-
-	results := make(chan providerResult, len(m.providers))
-
-	// Launch all providers in parallel
-	for _, p := range m.providers {
-		go func(provider Provider) {
-			log.Printf("[MultiProvider] Starting %s for summary...", provider.Name())
-			summary, err := provider.GenerateSummary(content)
-			results <- providerResult{
-				provider: provider.Name(),
-				summary:  summary,
-				err:      err,
-			}
-		}(p)
+	// Start with provider 1 if available (Cerebras), else use 0
+	startIdx := 0
+	if len(m.providers) > 1 {
+		startIdx = 1 // Use second provider (Cerebras) for summary
 	}
 
-	// Collect results - return first success
-	var lastErr error
+	// Try starting from startIdx, then wrap around
 	for i := 0; i < len(m.providers); i++ {
-		select {
-		case result := <-results:
-			if result.err == nil {
-				log.Printf("[MultiProvider] %s won the race for summary!", result.provider)
-				return result.summary, nil
-			}
-			log.Printf("[MultiProvider] %s failed: %v", result.provider, result.err)
-			lastErr = result.err
-		case <-ctx.Done():
-			return "", fmt.Errorf("all providers timed out")
+		idx := (startIdx + i) % len(m.providers)
+		provider := m.providers[idx]
+		log.Printf("[MultiProvider] Trying %s for summary...", provider.Name())
+		summary, err := provider.GenerateSummary(content)
+		if err == nil {
+			log.Printf("[MultiProvider] %s generated summary (length: %d)", provider.Name(), len(summary))
+			return summary, nil
 		}
+		log.Printf("[MultiProvider] %s failed: %v", provider.Name(), err)
 	}
-
-	return "", fmt.Errorf("all providers failed: %w", lastErr)
+	return "", fmt.Errorf("all providers failed for summary")
 }
 
-// ExtractTextFromImage uses primary provider (not parallelized - usually only one has vision)
+// ExtractTextFromImage uses primary provider (only Groq has vision)
 func (m *MultiProvider) ExtractTextFromImage(base64Image string) (string, error) {
 	return m.primary.ExtractTextFromImage(base64Image)
 }
