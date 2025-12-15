@@ -162,6 +162,14 @@ Return ONLY the extracted text, no commentary or additional formatting.`
 func (c *Client) GenerateFlashcards(content string, existingTags []string) (string, []string, []*learning.Flashcard, error) {
 	log.Printf("[AI.Flashcards] Starting generation, content length: %d", len(content))
 
+	// Truncate content if too long to stay within 8k TPM limit
+	// 24000 chars ≈ 6000 tokens, leaving headroom for prompt (~800 tokens)
+	maxLen := 24000
+	if len(content) > maxLen {
+		log.Printf("[AI.Flashcards] Truncating content from %d to %d chars", len(content), maxLen)
+		content = content[:maxLen]
+	}
+
 	prompt := fmt.Sprintf(`You are a helpful assistant that creates flashcards from text.
 Analyze the following text and create:
 1. A short, descriptive Title for the material.

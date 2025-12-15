@@ -39,6 +39,7 @@ func main() {
 	}
 	googleClientID := os.Getenv("GOOGLE_CLIENT_ID")
 	groqAPIKey := os.Getenv("GROQ_API_KEY")
+	cerebrasAPIKey := os.Getenv("CEREBRAS_API_KEY")
 
 	// 2. Database
 	ctx := context.Background()
@@ -55,10 +56,25 @@ func main() {
 	authCore := core.NewAuthCore(st, tm, googleClientID)
 	authSvc := service.NewAuthService(authCore)
 
-	// Learning
+	// Learning - Multi-provider AI (Groq + Cerebras racing in parallel)
 	scr := scraper.NewScraper()
-	aiClient := ai.NewClient(groqAPIKey)
-	learningCore := core.NewLearningCore(st, scr, aiClient)
+	var aiProvider ai.Provider
+	if groqAPIKey != "" && cerebrasAPIKey != "" {
+		// Both keys available - use multi-provider (parallel race)
+		log.Printf("Using multi-provider AI: Groq + Cerebras (parallel)")
+		groq := ai.NewGroqProvider(groqAPIKey)
+		cerebras := ai.NewCerebrasProvider(cerebrasAPIKey)
+		aiProvider = ai.NewMultiProvider(groq, cerebras)
+	} else if groqAPIKey != "" {
+		log.Printf("Using single provider: Groq")
+		aiProvider = ai.NewGroqProvider(groqAPIKey)
+	} else if cerebrasAPIKey != "" {
+		log.Printf("Using single provider: Cerebras")
+		aiProvider = ai.NewCerebrasProvider(cerebrasAPIKey)
+	} else {
+		log.Fatal("No AI provider configured. Set GROQ_API_KEY or CEREBRAS_API_KEY")
+	}
+	learningCore := core.NewLearningCore(st, scr, aiProvider)
 	learningSvc := service.NewLearningService(learningCore)
 
 	// 4. Auth Interceptor
@@ -105,7 +121,7 @@ func main() {
 		if origin == "" {
 			origin = "*"
 		}
-		
+
 		w.Header().Set("Access-Control-Allow-Origin", origin)
 		w.Header().Set("Access-Control-Allow-Credentials", "true")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"sync"
 	"time"
 
 	"github.com/amityadav/landr/internal/ai"
@@ -17,15 +16,15 @@ import (
 type LearningCore struct {
 	store   store.Store
 	scraper *scraper.Scraper
-	ai      *ai.Client
+	ai      ai.Provider
 	youtube *youtube.TranscriptExtractor
 }
 
-func NewLearningCore(s store.Store, scraper *scraper.Scraper, ai *ai.Client) *LearningCore {
+func NewLearningCore(s store.Store, scraper *scraper.Scraper, aiProvider ai.Provider) *LearningCore {
 	return &LearningCore{
 		store:   s,
 		scraper: scraper,
-		ai:      ai,
+		ai:      aiProvider,
 		youtube: youtube.NewTranscriptExtractor(),
 	}
 }
@@ -83,8 +82,8 @@ func (c *LearningCore) AddMaterial(ctx context.Context, userID, matType, content
 		log.Printf("[Core.AddMaterial] Failed to fetch tags: %v", err)
 	}
 
-	// 3. Generate Flashcards + Summary in PARALLEL using goroutines
-	log.Printf("[Core.AddMaterial] Starting parallel AI generation...")
+	// 3. Generate Flashcards + Summary in PARALLEL (MultiProvider races Groq vs Cerebras)
+	log.Printf("[Core.AddMaterial] Starting AI generation with %s...", c.ai.Name())
 
 	var title string
 	var tags []string
@@ -92,33 +91,13 @@ func (c *LearningCore) AddMaterial(ctx context.Context, userID, matType, content
 	var summary string
 	var flashcardErr, summaryErr error
 
-	// Use WaitGroup to wait for both goroutines
-	var wg sync.WaitGroup
-	wg.Add(2)
+	// Run flashcards and summary in parallel - different providers won't conflict
+	done := make(chan struct{}, 2)
 
-	// Goroutine 1: Generate flashcards (with chunking for large content)
 	go func() {
-		defer wg.Done()
-		log.Printf("[Core.AddMaterial] Goroutine 1: Generating flashcards...")
-
-		// Check if content is large enough to need chunking
-		tokenEstimate := ai.EstimateTokens(finalContent)
-		log.Printf("[Core.AddMaterial] Estimated tokens: %d", tokenEstimate)
-
-		if tokenEstimate > 8000 {
-			// Large content - use chunking with parallel processing
-			log.Printf("[Core.AddMaterial] Large content detected, using chunking...")
-			chunks := ai.SplitIntoChunks(finalContent, ai.ChunkSize, ai.ChunkOverlap)
-			title, tags, cards, flashcardErr = c.ai.ProcessChunksParallel(ctx, chunks, userTags)
-		} else {
-			// Normal content - process directly with retry
-			flashcardErr = ai.RetryWithBackoff(ctx, "Flashcards", func() error {
-				var err error
-				title, tags, cards, err = c.ai.GenerateFlashcards(finalContent, userTags)
-				return err
-			})
-		}
-
+		defer func() { done <- struct{}{} }()
+		log.Printf("[Core.AddMaterial] Generating flashcards...")
+		title, tags, cards, flashcardErr = c.ai.GenerateFlashcards(finalContent, userTags)
 		if flashcardErr != nil {
 			log.Printf("[Core.AddMaterial] Flashcard generation failed: %v", flashcardErr)
 		} else {
@@ -126,10 +105,9 @@ func (c *LearningCore) AddMaterial(ctx context.Context, userID, matType, content
 		}
 	}()
 
-	// Goroutine 2: Generate summary
 	go func() {
-		defer wg.Done()
-		log.Printf("[Core.AddMaterial] Goroutine 2: Generating summary...")
+		defer func() { done <- struct{}{} }()
+		log.Printf("[Core.AddMaterial] Generating summary...")
 		summary, summaryErr = c.ai.GenerateSummary(finalContent)
 		if summaryErr != nil {
 			log.Printf("[Core.AddMaterial] Summary generation failed: %v", summaryErr)
@@ -138,9 +116,10 @@ func (c *LearningCore) AddMaterial(ctx context.Context, userID, matType, content
 		}
 	}()
 
-	// Wait for both to complete
-	wg.Wait()
-	log.Printf("[Core.AddMaterial] Parallel AI generation complete")
+	// Wait for both
+	<-done
+	<-done
+	log.Printf("[Core.AddMaterial] AI generation complete")
 
 	// Check for flashcard error (critical)
 	if flashcardErr != nil {
