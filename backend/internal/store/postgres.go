@@ -266,35 +266,79 @@ func (s *PostgresStore) UpdateFlashcardContent(ctx context.Context, id, question
 	return nil
 }
 
-func (s *PostgresStore) GetDueMaterials(ctx context.Context, userID string, page, pageSize int32) ([]*learning.MaterialSummary, int32, error) {
-	log.Printf("[Store.GetDueMaterials] Querying materials for userID: %s, page: %d, pageSize: %d", userID, page, pageSize)
+func (s *PostgresStore) GetDueMaterials(ctx context.Context, userID string, page, pageSize int32, searchQuery string, filterTags []string) ([]*learning.MaterialSummary, int32, error) {
+	log.Printf("[Store.GetDueMaterials] Querying materials for userID: %s, page: %d, pageSize: %d, search: %s, tags: %v", userID, page, pageSize, searchQuery, filterTags)
 
-	// First, get the total count
-	countQuery := `
+	// Base conditions
+	whereClause := "m.user_id = $1 AND (m.is_deleted = FALSE OR m.is_deleted IS NULL)"
+	args := []interface{}{userID}
+	paramCount := 1
+
+	// Add search query filter
+	if searchQuery != "" {
+		paramCount++
+		whereClause += fmt.Sprintf(" AND m.title ILIKE $%d", paramCount)
+		args = append(args, "%"+searchQuery+"%")
+	}
+
+	// Add tag filter
+	if len(filterTags) > 0 {
+		// Subquery to find material IDs that have ALL the specified tags (AND logic)
+		// Or ANY tags (OR logic) - usually user expects OR or AND.
+		// Let's implement OR logic for now as it's common filter behavior, or check user requirement.
+		// User requirement "matchesSearch && matchesTags" in frontend implies AND logic implementation on frontend currently.
+		// Detailed view of frontend filter: "selectedTags.every(tag => material.tags.includes(tag))" -> This is AND logic.
+		// So we must implement AND logic.
+
+		paramCount++
+		whereClause += fmt.Sprintf(` AND m.id IN (
+			SELECT mt.material_id 
+			FROM material_tags mt 
+			JOIN tags t ON mt.tag_id = t.id 
+			WHERE t.name = ANY($%d)
+			GROUP BY mt.material_id 
+			HAVING COUNT(DISTINCT t.name) = $%d
+		)`, paramCount, paramCount+1)
+		args = append(args, filterTags, len(filterTags))
+		paramCount++
+	}
+
+	// 1. Get total count
+	countQuery := fmt.Sprintf(`
 		SELECT COUNT(DISTINCT m.id)
 		FROM materials m
-		JOIN flashcards f ON m.id = f.material_id
-		WHERE m.user_id = $1 AND (m.is_deleted = FALSE OR m.is_deleted IS NULL)
-	`
+		WHERE %s
+	`, whereClause)
+
 	var totalCount int32
-	if err := s.db.QueryRow(ctx, countQuery, userID).Scan(&totalCount); err != nil {
+	if err := s.db.QueryRow(ctx, countQuery, args...).Scan(&totalCount); err != nil {
 		return nil, 0, fmt.Errorf("failed to count materials: %w", err)
 	}
 
+	// 2. Get paginated results
 	// Calculate offset
 	offset := (page - 1) * pageSize
 
-	// Get paginated results
-	query := `
+	// Add ordering and pagination limits
+	paramCount++
+	limitArgIdx := paramCount
+	args = append(args, pageSize)
+
+	paramCount++
+	offsetArgIdx := paramCount
+	args = append(args, offset)
+
+	query := fmt.Sprintf(`
 		SELECT m.id, m.title, COUNT(f.id) as due_count
 		FROM materials m
-		JOIN flashcards f ON m.id = f.material_id
-		WHERE m.user_id = $1 AND (m.is_deleted = FALSE OR m.is_deleted IS NULL)
+		LEFT JOIN flashcards f ON m.id = f.material_id
+		WHERE %s
 		GROUP BY m.id, m.title
 		ORDER BY m.created_at DESC
-		LIMIT $2 OFFSET $3;
-	`
-	rows, err := s.db.Query(ctx, query, userID, pageSize, offset)
+		LIMIT $%d OFFSET $%d;
+	`, whereClause, limitArgIdx, offsetArgIdx)
+
+	rows, err := s.db.Query(ctx, query, args...)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to query materials: %w", err)
 	}

@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, RefreshControl, TextInput, FlatList, ActivityIndicator, Alert } from 'react-native';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, RefreshControl, TextInput, FlatList, ActivityIndicator, Alert, NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigation } from '../navigation/ManualRouter';
 import { learningClient } from '../services/api';
@@ -9,12 +9,23 @@ import { MATERIALS_PER_PAGE } from '../utils/constants';
 import { AppHeader } from '../components/AppHeader';
 import { useTheme, ThemeColors } from '../utils/theme';
 import { ScrollView } from 'react-native';
+import { SearchHeader } from '../components/SearchHeader';
 
 export const HomeScreen = () => {
     const navigation = useNavigation();
     const { user } = useAuthStore();
     const { colors } = useTheme();
     const queryClient = useQueryClient();
+
+    // Filter states
+    const [inputValue, setInputValue] = useState(''); // Local input state
+    const [searchQuery, setSearchQuery] = useState(''); // API query state
+    const [selectedTags, setSelectedTags] = useState<string[]>([]);
+
+    const handleSearch = useCallback(() => {
+        setSearchQuery(inputValue); // Trigger API search
+        // Optionally dismiss keyboard here
+    }, [inputValue]);
 
     const deleteMutation = useMutation({
         mutationFn: async (materialId: string) => {
@@ -49,28 +60,29 @@ export const HomeScreen = () => {
         );
     };
 
-    // Filter states
-    const [searchQuery, setSearchQuery] = useState('');
-    const [selectedTags, setSelectedTags] = useState<string[]>([]);
-
-    // Infinite scroll query
+    // Backend-driven infinite scroll query
     const {
         data,
         fetchNextPage,
+        fetchPreviousPage,
         hasNextPage,
+        hasPreviousPage,
         isFetchingNextPage,
+        isFetchingPreviousPage,
         isLoading,
         error,
         refetch,
         isRefetching,
     } = useInfiniteQuery({
-        queryKey: ['dueMaterials'],
+        queryKey: ['dueMaterials', searchQuery, selectedTags], // Re-fetch when filters change
         queryFn: async ({ pageParam = 1 }) => {
-            console.log('[HOME] Fetching due materials page:', pageParam);
+            console.log('[HOME] Fetching due materials page:', pageParam, 'query:', searchQuery, 'tags:', selectedTags);
             try {
                 const response = await learningClient.getDueMaterials({
                     page: pageParam,
                     pageSize: MATERIALS_PER_PAGE,
+                    searchQuery: searchQuery,
+                    tags: selectedTags,
                 });
                 console.log('[HOME] Got materials:', response.materials?.length || 0, 'of', response.totalCount);
                 return response;
@@ -85,25 +97,31 @@ export const HomeScreen = () => {
             }
             return undefined;
         },
+        getPreviousPageParam: (firstPage) => {
+            if (firstPage.page > 1) {
+                return firstPage.page - 1;
+            }
+            return undefined;
+        },
         initialPageParam: 1,
+        maxPages: 4,
     });
 
-    // Flatten all pages into a single array
     const allMaterials = useMemo(() => {
-        return data?.pages.flatMap(page => page.materials || []) || [];
+        if (!data?.pages) return [];
+        const sortedPages = [...data.pages].sort((a, b) => a - b);
+        return sortedPages.flatMap(page => page.materials || []);
     }, [data]);
 
     const totalCount = data?.pages[0]?.totalCount || 0;
 
-    // Fetch notification status (due flashcards count)
+    // Fetch notification status
     const { data: notificationData } = useQuery({
         queryKey: ['notificationStatus'],
         queryFn: async () => {
             try {
-                const response = await learningClient.getNotificationStatus({});
-                return response;
+                return await learningClient.getNotificationStatus({});
             } catch (err) {
-                console.error('[HOME] Failed to fetch notification status:', err);
                 return { dueFlashcardsCount: 0, hasDueMaterials: false };
             }
         },
@@ -112,17 +130,14 @@ export const HomeScreen = () => {
 
     const dueFlashcardsCount = notificationData?.dueFlashcardsCount || 0;
 
-    // Fetch all tags from backend
+    // Fetch all tags
     const { data: tagsData } = useQuery({
         queryKey: ['allTags'],
         queryFn: async () => {
-            console.log('[HOME] Fetching all tags...');
             try {
                 const response = await learningClient.getAllTags({});
-                console.log('[HOME] Got tags:', response.tags?.length || 0);
                 return response.tags || [];
             } catch (err) {
-                console.error('[HOME] Failed to fetch tags:', err);
                 return [];
             }
         },
@@ -130,51 +145,73 @@ export const HomeScreen = () => {
 
     const allTags = tagsData || [];
 
-    // Filter materials based on search and selected tags
-    const filteredMaterials = useMemo(() => {
-        return allMaterials.filter((material: MaterialSummary) => {
-            const matchesSearch = searchQuery.trim() === '' ||
-                material.title.toLowerCase().includes(searchQuery.toLowerCase());
-            const matchesTags = selectedTags.length === 0 ||
-                selectedTags.every(tag => material.tags.includes(tag));
-            return matchesSearch && matchesTags;
-        });
-    }, [allMaterials, searchQuery, selectedTags]);
-
-    const toggleTag = (tag: string) => {
+    const toggleTag = useCallback((tag: string) => {
         setSelectedTags(prev =>
             prev.includes(tag)
                 ? prev.filter(t => t !== tag)
                 : [...prev, tag]
         );
-    };
+    }, []);
 
-    const clearFilters = () => {
+    const clearFilters = useCallback(() => {
+        setInputValue('');
         setSearchQuery('');
         setSelectedTags([]);
-    };
+    }, []);
 
     const handleRefresh = useCallback(async () => {
-        await refetch();
-    }, [refetch]);
+        await queryClient.resetQueries({ queryKey: ['dueMaterials'] });
+    }, [queryClient]);
 
+    // Load more/scroll handlers
     const handleLoadMore = useCallback(() => {
         if (hasNextPage && !isFetchingNextPage) {
-            console.log('[HOME] Loading more materials...');
+            console.log('[HOME] Loading more materials (forward)...');
             fetchNextPage();
         }
     }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
+    const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+        const { contentOffset } = event.nativeEvent;
+        if (contentOffset.y < 100 && hasPreviousPage && !isFetchingPreviousPage) {
+            console.log('[HOME] Loading more materials (backward)...');
+            fetchPreviousPage();
+        }
+    }, [hasPreviousPage, isFetchingPreviousPage, fetchPreviousPage]);
+
     const hasActiveFilters = searchQuery.trim() !== '' || selectedTags.length > 0;
     const styles = createStyles(colors);
+
+    // Results text logic
+    const resultsText = useMemo(() => {
+        if (!data?.pages?.length) return hasActiveFilters ? 'No matches found' : 'No materials due';
+        const pages = data.pages.map(p => p.page).sort((a, b) => a - b);
+        const minPage = pages[0];
+        const maxPage = pages[pages.length - 1];
+
+        if (hasActiveFilters) {
+            return `${totalCount} found matching your filters`;
+        }
+        return `Pages ${minPage}-${maxPage} (${allMaterials.length} of ${totalCount} materials)`;
+
+    }, [data, hasActiveFilters, totalCount, allMaterials.length]);
 
     const renderMaterialCard = useCallback(({ item }: { item: MaterialSummary }) => (
         <TouchableOpacity
             style={styles.card}
             onPress={() => navigation.navigate('Summary', { materialId: item.id, title: item.title })}
         >
-            <View style={styles.cardHeader}>
-                <Text style={styles.materialTitle} numberOfLines={2}>{item.title}</Text>
+            <View style={styles.cardRow}>
+                <View style={styles.cardContent}>
+                    <Text style={styles.materialTitle}>{item.title}</Text>
+                    <View style={styles.tagsContainer}>
+                        {item.tags.map((tag: string, index: number) => (
+                            <View key={index} style={styles.tagBadge}>
+                                <Text style={styles.tagText}>{tag}</Text>
+                            </View>
+                        ))}
+                    </View>
+                </View>
                 <View style={styles.cardActions}>
                     <View style={styles.badge}>
                         <Text style={styles.badgeText}>{item.dueCount}</Text>
@@ -190,18 +227,10 @@ export const HomeScreen = () => {
                     </TouchableOpacity>
                 </View>
             </View>
-
-            <View style={styles.tagsContainer}>
-                {item.tags.map((tag: string, index: number) => (
-                    <View key={index} style={styles.tagBadge}>
-                        <Text style={styles.tagText}>{tag}</Text>
-                    </View>
-                ))}
-            </View>
         </TouchableOpacity>
     ), [styles, navigation, handleDelete]);
 
-    const renderFooter = () => {
+    const renderFooter = useCallback(() => {
         if (!isFetchingNextPage) return null;
         return (
             <View style={styles.footerLoader}>
@@ -209,89 +238,43 @@ export const HomeScreen = () => {
                 <Text style={styles.footerLoaderText}>Loading more...</Text>
             </View>
         );
-    };
+    }, [isFetchingNextPage, colors, styles]);
 
-    const renderHeader = () => (
-        <>
-            <View style={styles.header}>
-                <Text style={styles.title}>Welcome, {user?.name}</Text>
-            </View>
+    // Use renderHeader but pass stable props to SearchHeader inside it, or extract entirely to separate component in FlatList
+    // The key is that ListHeaderComponent should not be an inline function if possible, OR it should be memoized.
+    // Better strategy: make SearchHeader a real component and pass it directly to ListHeaderComponent
 
-            <View style={styles.titleRow}>
-                <View style={styles.titleWithBadge}>
-                    <Text style={styles.mainTitle}>Due for Review</Text>
-                    {dueFlashcardsCount > 0 && (
-                        <View style={styles.notificationBadge}>
-                            <Text style={styles.notificationBadgeText}>{dueFlashcardsCount}</Text>
-                        </View>
-                    )}
-                </View>
-                <TouchableOpacity
-                    style={styles.addButton}
-                    onPress={() => navigation.navigate('AddMaterial')}
-                >
-                    <Text style={styles.addButtonText}>+ Add Material</Text>
-                </TouchableOpacity>
-            </View>
+    // We need a wrapper to inject props since ListHeaderComponent only takes the component class/func, not an element
+    // Actually, passing an Element to ListHeaderComponent is fine, but it re-renders if the element is recreated.
 
-            {/* Search Bar */}
-            <View style={styles.searchContainer}>
-                <TextInput
-                    style={styles.searchInput}
-                    placeholder="Search by title..."
-                    placeholderTextColor={colors.textPlaceholder}
-                    value={searchQuery}
-                    onChangeText={setSearchQuery}
-                    clearButtonMode="while-editing"
-                />
-                {hasActiveFilters && (
-                    <TouchableOpacity onPress={clearFilters} style={styles.clearButton}>
-                        <Text style={styles.clearButtonText}>Clear</Text>
-                    </TouchableOpacity>
-                )}
-            </View>
-
-            {/* Tag Filter Chips */}
-            {allTags.length > 0 && (
-                <View style={styles.tagFilterSection}>
-                    <Text style={styles.tagFilterLabel}>Filter by tags:</Text>
-                    <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.tagFilterContainer}
-                        nestedScrollEnabled={true}
-                    >
-                        {allTags.map((tag: string) => (
-                            <TouchableOpacity
-                                key={tag}
-                                style={[
-                                    styles.filterTagChip,
-                                    selectedTags.includes(tag) && styles.filterTagChipActive
-                                ]}
-                                onPress={() => toggleTag(tag)}
-                            >
-                                <Text style={[
-                                    styles.filterTagText,
-                                    selectedTags.includes(tag) && styles.filterTagTextActive
-                                ]}>
-                                    {tag}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
-                    </ScrollView>
+    const headerElement = useMemo(() => (
+        <React.Fragment>
+            <SearchHeader
+                user={user}
+                dueFlashcardsCount={dueFlashcardsCount}
+                searchQuery={searchQuery}
+                inputValue={inputValue}
+                setInputValue={setInputValue}
+                onSearch={handleSearch}
+                selectedTags={selectedTags}
+                toggleTag={toggleTag}
+                allTags={allTags}
+                clearFilters={clearFilters}
+                hasActiveFilters={searchQuery.trim() !== '' || selectedTags.length > 0}
+                resultsText={resultsText}
+                isFetchingPreviousPage={isFetchingPreviousPage}
+                onAddMaterial={() => navigation.navigate('AddMaterial')}
+                colors={colors}
+                styles={styles}
+            />
+            {isFetchingPreviousPage && (
+                <View style={styles.headerLoader}>
+                    <ActivityIndicator size="small" color={colors.primary} />
+                    <Text style={styles.headerLoaderText}>Loading previous...</Text>
                 </View>
             )}
-
-            {/* Results Count */}
-            <View style={styles.infoContainer}>
-                <Text style={styles.resultsCount}>
-                    {hasActiveFilters
-                        ? `${filteredMaterials.length} of ${allMaterials.length} loaded materials`
-                        : `${allMaterials.length} of ${totalCount} materials`}
-                </Text>
-            </View>
-        </>
-    );
+        </React.Fragment>
+    ), [user, dueFlashcardsCount, searchQuery, inputValue, handleSearch, selectedTags, allTags, resultsText, isFetchingPreviousPage, colors, styles, toggleTag, clearFilters, navigation]);
 
     const renderEmpty = () => (
         <Text style={styles.empty}>
@@ -316,14 +299,19 @@ export const HomeScreen = () => {
                 </View>
             ) : (
                 <FlatList
-                    data={filteredMaterials}
+                    data={allMaterials} // Use allMaterials directly as backend does filtering
                     renderItem={renderMaterialCard}
                     keyExtractor={(item) => item.id}
-                    ListHeaderComponent={renderHeader}
+                    ListHeaderComponent={headerElement} // Pass the element directly, not a function
                     ListFooterComponent={renderFooter}
                     ListEmptyComponent={renderEmpty}
                     onEndReached={handleLoadMore}
                     onEndReachedThreshold={0.5}
+                    onScroll={handleScroll}
+                    scrollEventThrottle={16}
+                    maintainVisibleContentPosition={{
+                        minIndexForVisible: 0,
+                    }}
                     refreshControl={
                         <RefreshControl
                             refreshing={isRefetching && !isFetchingNextPage}
@@ -498,24 +486,26 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         shadowOpacity: 0.2,
         shadowRadius: 1.41,
     },
-    cardHeader: {
+    cardRow: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 10,
+    },
+    cardContent: {
+        flex: 9, // 90%
+        marginRight: 10,
     },
     materialTitle: {
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: '600',
         color: colors.textPrimary,
-        flex: 1,
+        marginBottom: 8,
     },
     badge: {
         backgroundColor: colors.badgeBg,
         borderRadius: 12,
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-        marginLeft: 10,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        minWidth: 32,
+        alignItems: 'center',
     },
     badgeText: {
         color: colors.badgeText,
@@ -523,22 +513,25 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         fontSize: 12,
     },
     cardActions: {
-        flexDirection: 'row',
+        minWidth: 50,
+        flexDirection: 'column',
         alignItems: 'center',
+        justifyContent: 'space-between',
         gap: 8,
     },
     deleteButton: {
-        padding: 8,
+        padding: 6,
         borderRadius: 8,
         backgroundColor: colors.cardAlt,
     },
     deleteButtonText: {
-        fontSize: 16,
+        fontSize: 18,
     },
     tagsContainer: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: 8,
+        gap: 6,
+        marginTop: 4,
     },
     tagBadge: {
         backgroundColor: colors.tagBg,
@@ -569,6 +562,20 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         gap: 10,
     },
     footerLoaderText: {
+        color: colors.textSecondary,
+        fontSize: 14,
+    },
+    headerLoader: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingVertical: 15,
+        gap: 10,
+        backgroundColor: colors.cardAlt,
+        borderRadius: 8,
+        marginBottom: 10,
+    },
+    headerLoaderText: {
         color: colors.textSecondary,
         fontSize: 14,
     },

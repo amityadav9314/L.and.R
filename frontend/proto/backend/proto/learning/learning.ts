@@ -42,6 +42,8 @@ export interface MaterialSummary {
 export interface GetDueMaterialsRequest {
   page: number;
   pageSize: number;
+  searchQuery: string;
+  tags: string[];
 }
 
 export interface GetDueMaterialsResponse {
@@ -487,7 +489,7 @@ export const MaterialSummary: MessageFns<MaterialSummary> = {
 };
 
 function createBaseGetDueMaterialsRequest(): GetDueMaterialsRequest {
-  return { page: 0, pageSize: 0 };
+  return { page: 0, pageSize: 0, searchQuery: "", tags: [] };
 }
 
 export const GetDueMaterialsRequest: MessageFns<GetDueMaterialsRequest> = {
@@ -497,6 +499,12 @@ export const GetDueMaterialsRequest: MessageFns<GetDueMaterialsRequest> = {
     }
     if (message.pageSize !== 0) {
       writer.uint32(16).int32(message.pageSize);
+    }
+    if (message.searchQuery !== "") {
+      writer.uint32(26).string(message.searchQuery);
+    }
+    for (const v of message.tags) {
+      writer.uint32(34).string(v!);
     }
     return writer;
   },
@@ -524,6 +532,22 @@ export const GetDueMaterialsRequest: MessageFns<GetDueMaterialsRequest> = {
           message.pageSize = reader.int32();
           continue;
         }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.searchQuery = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.tags.push(reader.string());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -537,6 +561,8 @@ export const GetDueMaterialsRequest: MessageFns<GetDueMaterialsRequest> = {
     return {
       page: isSet(object.page) ? globalThis.Number(object.page) : 0,
       pageSize: isSet(object.pageSize) ? globalThis.Number(object.pageSize) : 0,
+      searchQuery: isSet(object.searchQuery) ? globalThis.String(object.searchQuery) : "",
+      tags: globalThis.Array.isArray(object?.tags) ? object.tags.map((e: any) => globalThis.String(e)) : [],
     };
   },
 
@@ -548,6 +574,12 @@ export const GetDueMaterialsRequest: MessageFns<GetDueMaterialsRequest> = {
     if (message.pageSize !== 0) {
       obj.pageSize = Math.round(message.pageSize);
     }
+    if (message.searchQuery !== "") {
+      obj.searchQuery = message.searchQuery;
+    }
+    if (message.tags?.length) {
+      obj.tags = message.tags;
+    }
     return obj;
   },
 
@@ -558,6 +590,8 @@ export const GetDueMaterialsRequest: MessageFns<GetDueMaterialsRequest> = {
     const message = createBaseGetDueMaterialsRequest();
     message.page = object.page ?? 0;
     message.pageSize = object.pageSize ?? 0;
+    message.searchQuery = object.searchQuery ?? "";
+    message.tags = object.tags?.map((e) => e) || [];
     return message;
   },
 };

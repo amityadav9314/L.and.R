@@ -1,0 +1,128 @@
+import React, { memo } from 'react';
+import { View, Text, TouchableOpacity, TextInput, ScrollView, StyleSheet } from 'react-native';
+import { ThemeColors } from '../utils/theme';
+
+interface SearchHeaderProps {
+    user: any;
+    dueFlashcardsCount: number;
+    searchQuery: string;
+    inputValue: string;
+    setInputValue: (text: string) => void;
+    onSearch: () => void;
+    selectedTags: string[];
+    toggleTag: (tag: string) => void;
+    allTags: string[];
+    clearFilters: () => void;
+    hasActiveFilters: boolean;
+    resultsText: string;
+    isFetchingPreviousPage: boolean;
+    onAddMaterial: () => void;
+    colors: ThemeColors;
+    styles: any;
+}
+
+export const SearchHeader = memo(({
+    user,
+    dueFlashcardsCount,
+    searchQuery, // Used for showing active filter state if needed, or remove if unused
+    inputValue,
+    setInputValue,
+    onSearch,
+    selectedTags,
+    toggleTag,
+    allTags,
+    clearFilters,
+    hasActiveFilters,
+    resultsText,
+    isFetchingPreviousPage,
+    onAddMaterial,
+    colors,
+    styles
+}: SearchHeaderProps) => {
+    return (
+        <View>
+            <View style={styles.header}>
+                <Text style={styles.title}>Welcome, {user?.name}</Text>
+            </View>
+
+            <View style={styles.titleRow}>
+                <View style={styles.titleWithBadge}>
+                    <Text style={styles.mainTitle}>Due for Review</Text>
+                    {dueFlashcardsCount > 0 && (
+                        <View style={styles.notificationBadge}>
+                            <Text style={styles.notificationBadgeText}>{dueFlashcardsCount}</Text>
+                        </View>
+                    )}
+                </View>
+                <TouchableOpacity
+                    style={styles.addButton}
+                    onPress={onAddMaterial}
+                >
+                    <Text style={styles.addButtonText}>+ Add Material</Text>
+                </TouchableOpacity>
+            </View>
+
+            {/* Search Bar */}
+            <View style={styles.searchContainer}>
+                <TextInput
+                    style={styles.searchInput}
+                    placeholder="Search by title..."
+                    placeholderTextColor={colors.textPlaceholder}
+                    value={inputValue}
+                    onChangeText={setInputValue}
+                    onSubmitEditing={onSearch} // Search on enter
+                    returnKeyType="search"
+                    clearButtonMode="while-editing"
+                />
+
+                <TouchableOpacity onPress={onSearch} style={styles.searchButton}>
+                    <Text style={styles.searchButtonText}>Search</Text>
+                </TouchableOpacity>
+
+                {hasActiveFilters && (
+                    <TouchableOpacity onPress={clearFilters} style={styles.clearButton}>
+                        <Text style={styles.clearButtonText}>Clear</Text>
+                    </TouchableOpacity>
+                )}
+            </View>
+
+            {/* Tag Filter Chips */}
+            {allTags.length > 0 && (
+                <View style={styles.tagFilterSection}>
+                    <Text style={styles.tagFilterLabel}>Filter by tags:</Text>
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.tagFilterContainer}
+                        nestedScrollEnabled={true}
+                    >
+                        {allTags.map((tag: string) => (
+                            <TouchableOpacity
+                                key={tag}
+                                style={[
+                                    styles.filterTagChip,
+                                    selectedTags.includes(tag) && styles.filterTagChipActive
+                                ]}
+                                onPress={() => toggleTag(tag)}
+                            >
+                                <Text style={[
+                                    styles.filterTagText,
+                                    selectedTags.includes(tag) && styles.filterTagTextActive
+                                ]}>
+                                    {tag}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+                </View>
+            )}
+
+            {/* Results Count with Page Range */}
+            <View style={styles.infoContainer}>
+                <Text style={styles.resultsCount}>
+                    {resultsText}
+                </Text>
+            </View>
+        </View>
+    );
+});
