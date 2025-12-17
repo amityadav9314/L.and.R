@@ -129,9 +129,13 @@ func (c *LearningCore) AddMaterial(ctx context.Context, userID, matType, content
 
 	log.Printf("[Core.AddMaterial] AI generated Title: %s, Tags: %v, Cards: %d", title, tags, len(cards))
 
+	// Use background context for DB operations - don't let client disconnect cancel saves
+	// AI is already done, we MUST save the results even if client disconnects
+	saveCtx := context.Background()
+
 	// 4. Save Material with Title
 	log.Printf("[Core.AddMaterial] Saving material to database...")
-	materialID, err := c.store.CreateMaterial(ctx, userID, matType, finalContent, title)
+	materialID, err := c.store.CreateMaterial(saveCtx, userID, matType, finalContent, title)
 	if err != nil {
 		log.Printf("[Core.AddMaterial] Failed to save material: %v", err)
 		return "", 0, "", nil, fmt.Errorf("failed to create material: %w", err)
@@ -140,7 +144,7 @@ func (c *LearningCore) AddMaterial(ctx context.Context, userID, matType, content
 
 	// 5. Save Summary if generated
 	if summary != "" && summaryErr == nil {
-		if err := c.store.UpdateMaterialSummary(ctx, materialID, summary); err != nil {
+		if err := c.store.UpdateMaterialSummary(saveCtx, materialID, summary); err != nil {
 			log.Printf("[Core.AddMaterial] Failed to save summary: %v", err)
 			// Non-critical, continue
 		} else {
@@ -151,7 +155,7 @@ func (c *LearningCore) AddMaterial(ctx context.Context, userID, matType, content
 	// 6. Save Tags and Link to Material
 	var tagIDs []string
 	for _, tagName := range tags {
-		tagID, err := c.store.CreateTag(ctx, userID, tagName)
+		tagID, err := c.store.CreateTag(saveCtx, userID, tagName)
 		if err != nil {
 			log.Printf("[Core.AddMaterial] Failed to create tag %s: %v", tagName, err)
 			continue
@@ -160,7 +164,7 @@ func (c *LearningCore) AddMaterial(ctx context.Context, userID, matType, content
 	}
 
 	if len(tagIDs) > 0 {
-		if err := c.store.AddMaterialTags(ctx, materialID, tagIDs); err != nil {
+		if err := c.store.AddMaterialTags(saveCtx, materialID, tagIDs); err != nil {
 			log.Printf("[Core.AddMaterial] Failed to link tags: %v", err)
 		}
 	}
@@ -168,7 +172,7 @@ func (c *LearningCore) AddMaterial(ctx context.Context, userID, matType, content
 	// 7. Save Flashcards
 	if len(cards) > 0 {
 		log.Printf("[Core.AddMaterial] Saving %d flashcards to database...", len(cards))
-		if err := c.store.CreateFlashcards(ctx, materialID, cards); err != nil {
+		if err := c.store.CreateFlashcards(saveCtx, materialID, cards); err != nil {
 			log.Printf("[Core.AddMaterial] Failed to save flashcards: %v", err)
 			return materialID, 0, title, tags, fmt.Errorf("failed to save flashcards: %w", err)
 		}

@@ -1,6 +1,6 @@
-import React, { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, RefreshControl, TextInput, ScrollView, ActivityIndicator, Alert } from 'react-native';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import React, { useState, useMemo, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, RefreshControl, TextInput, FlatList, ActivityIndicator, Alert } from 'react-native';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigation } from '../navigation/ManualRouter';
 import { learningClient } from '../services/api';
 import { useAuthStore } from '../store/authStore';
@@ -8,6 +8,7 @@ import { MaterialSummary } from '../../proto/backend/proto/learning/learning';
 import { MATERIALS_PER_PAGE } from '../utils/constants';
 import { AppHeader } from '../components/AppHeader';
 import { useTheme, ThemeColors } from '../utils/theme';
+import { ScrollView } from 'react-native';
 
 export const HomeScreen = () => {
     const navigation = useNavigation();
@@ -48,34 +49,51 @@ export const HomeScreen = () => {
         );
     };
 
-
     // Filter states
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedTags, setSelectedTags] = useState<string[]>([]);
-    const [currentPage, setCurrentPage] = useState(1);
-    const [refreshing, setRefreshing] = useState(false);
 
-    const { data: paginatedData, isLoading, error, refetch } = useQuery({
-        queryKey: ['dueMaterials', currentPage],
-        queryFn: async () => {
-            console.log('[HOME] Fetching due materials page:', currentPage);
+    // Infinite scroll query
+    const {
+        data,
+        fetchNextPage,
+        hasNextPage,
+        isFetchingNextPage,
+        isLoading,
+        error,
+        refetch,
+        isRefetching,
+    } = useInfiniteQuery({
+        queryKey: ['dueMaterials'],
+        queryFn: async ({ pageParam = 1 }) => {
+            console.log('[HOME] Fetching due materials page:', pageParam);
             try {
                 const response = await learningClient.getDueMaterials({
-                    page: currentPage,
+                    page: pageParam,
                     pageSize: MATERIALS_PER_PAGE,
                 });
                 console.log('[HOME] Got materials:', response.materials?.length || 0, 'of', response.totalCount);
                 return response;
             } catch (err) {
                 console.error('[HOME] Failed to fetch materials:', err);
-                return { materials: [], totalCount: 0, page: 1, pageSize: MATERIALS_PER_PAGE, totalPages: 0 };
+                return { materials: [], totalCount: 0, page: pageParam, pageSize: MATERIALS_PER_PAGE, totalPages: 0 };
             }
         },
+        getNextPageParam: (lastPage) => {
+            if (lastPage.page < lastPage.totalPages) {
+                return lastPage.page + 1;
+            }
+            return undefined;
+        },
+        initialPageParam: 1,
     });
 
-    const data = paginatedData?.materials || [];
-    const totalCount = paginatedData?.totalCount || 0;
-    const totalPages = paginatedData?.totalPages || 0;
+    // Flatten all pages into a single array
+    const allMaterials = useMemo(() => {
+        return data?.pages.flatMap(page => page.materials || []) || [];
+    }, [data]);
+
+    const totalCount = data?.pages[0]?.totalCount || 0;
 
     // Fetch notification status (due flashcards count)
     const { data: notificationData } = useQuery({
@@ -114,28 +132,14 @@ export const HomeScreen = () => {
 
     // Filter materials based on search and selected tags
     const filteredMaterials = useMemo(() => {
-        if (!data) return [];
-
-        return data.filter((material: MaterialSummary) => {
+        return allMaterials.filter((material: MaterialSummary) => {
             const matchesSearch = searchQuery.trim() === '' ||
                 material.title.toLowerCase().includes(searchQuery.toLowerCase());
             const matchesTags = selectedTags.length === 0 ||
                 selectedTags.every(tag => material.tags.includes(tag));
             return matchesSearch && matchesTags;
         });
-    }, [data, searchQuery, selectedTags]);
-
-    const handleNextPage = () => {
-        if (currentPage < totalPages) {
-            setCurrentPage(prev => prev + 1);
-        }
-    };
-
-    const handlePrevPage = () => {
-        if (currentPage > 1) {
-            setCurrentPage(prev => prev - 1);
-        }
-    };
+    }, [allMaterials, searchQuery, selectedTags]);
 
     const toggleTag = (tag: string) => {
         setSelectedTags(prev =>
@@ -148,207 +152,191 @@ export const HomeScreen = () => {
     const clearFilters = () => {
         setSearchQuery('');
         setSelectedTags([]);
-        setCurrentPage(1);
     };
 
-    const handleRefresh = React.useCallback(async () => {
-        setRefreshing(true);
-        try {
-            await refetch();
-        } catch (error) {
-            console.error('[HOME] Refresh error:', error);
-        } finally {
-            setRefreshing(false);
+    const handleRefresh = useCallback(async () => {
+        await refetch();
+    }, [refetch]);
+
+    const handleLoadMore = useCallback(() => {
+        if (hasNextPage && !isFetchingNextPage) {
+            console.log('[HOME] Loading more materials...');
+            fetchNextPage();
         }
-    }, [refetch, refreshing]);
+    }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
     const hasActiveFilters = searchQuery.trim() !== '' || selectedTags.length > 0;
     const styles = createStyles(colors);
 
-    const renderPaginationFooter = () => {
-        if (hasActiveFilters || totalPages <= 1) return null;
+    const renderMaterialCard = useCallback(({ item }: { item: MaterialSummary }) => (
+        <TouchableOpacity
+            style={styles.card}
+            onPress={() => navigation.navigate('Summary', { materialId: item.id, title: item.title })}
+        >
+            <View style={styles.cardHeader}>
+                <Text style={styles.materialTitle} numberOfLines={2}>{item.title}</Text>
+                <View style={styles.cardActions}>
+                    <View style={styles.badge}>
+                        <Text style={styles.badgeText}>{item.dueCount}</Text>
+                    </View>
+                    <TouchableOpacity
+                        style={styles.deleteButton}
+                        onPress={(e) => {
+                            e.stopPropagation();
+                            handleDelete(item.id, item.title);
+                        }}
+                    >
+                        <Text style={styles.deleteButtonText}>🗑</Text>
+                    </TouchableOpacity>
+                </View>
+            </View>
 
+            <View style={styles.tagsContainer}>
+                {item.tags.map((tag: string, index: number) => (
+                    <View key={index} style={styles.tagBadge}>
+                        <Text style={styles.tagText}>{tag}</Text>
+                    </View>
+                ))}
+            </View>
+        </TouchableOpacity>
+    ), [styles, navigation, handleDelete]);
+
+    const renderFooter = () => {
+        if (!isFetchingNextPage) return null;
         return (
-            <View style={styles.paginationContainer}>
-                <TouchableOpacity
-                    style={[styles.paginationButton, currentPage === 1 && styles.paginationButtonDisabled]}
-                    onPress={handlePrevPage}
-                    disabled={currentPage === 1}
-                >
-                    <Text style={[styles.paginationButtonText, currentPage === 1 && styles.paginationButtonTextDisabled]}>
-                        Previous
-                    </Text>
-                </TouchableOpacity>
-
-                <Text style={styles.paginationText}>
-                    Page {currentPage} of {totalPages}
-                </Text>
-
-                <TouchableOpacity
-                    style={[styles.paginationButton, currentPage === totalPages && styles.paginationButtonDisabled]}
-                    onPress={handleNextPage}
-                    disabled={currentPage === totalPages}
-                >
-                    <Text style={[styles.paginationButtonText, currentPage === totalPages && styles.paginationButtonTextDisabled]}>
-                        Next
-                    </Text>
-                </TouchableOpacity>
+            <View style={styles.footerLoader}>
+                <ActivityIndicator size="small" color={colors.primary} />
+                <Text style={styles.footerLoaderText}>Loading more...</Text>
             </View>
         );
     };
+
+    const renderHeader = () => (
+        <>
+            <View style={styles.header}>
+                <Text style={styles.title}>Welcome, {user?.name}</Text>
+            </View>
+
+            <View style={styles.titleRow}>
+                <View style={styles.titleWithBadge}>
+                    <Text style={styles.mainTitle}>Due for Review</Text>
+                    {dueFlashcardsCount > 0 && (
+                        <View style={styles.notificationBadge}>
+                            <Text style={styles.notificationBadgeText}>{dueFlashcardsCount}</Text>
+                        </View>
+                    )}
+                </View>
+                <TouchableOpacity
+                    style={styles.addButton}
+                    onPress={() => navigation.navigate('AddMaterial')}
+                >
+                    <Text style={styles.addButtonText}>+ Add Material</Text>
+                </TouchableOpacity>
+            </View>
+
+            {/* Search Bar */}
+            <View style={styles.searchContainer}>
+                <TextInput
+                    style={styles.searchInput}
+                    placeholder="Search by title..."
+                    placeholderTextColor={colors.textPlaceholder}
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                    clearButtonMode="while-editing"
+                />
+                {hasActiveFilters && (
+                    <TouchableOpacity onPress={clearFilters} style={styles.clearButton}>
+                        <Text style={styles.clearButtonText}>Clear</Text>
+                    </TouchableOpacity>
+                )}
+            </View>
+
+            {/* Tag Filter Chips */}
+            {allTags.length > 0 && (
+                <View style={styles.tagFilterSection}>
+                    <Text style={styles.tagFilterLabel}>Filter by tags:</Text>
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.tagFilterContainer}
+                        nestedScrollEnabled={true}
+                    >
+                        {allTags.map((tag: string) => (
+                            <TouchableOpacity
+                                key={tag}
+                                style={[
+                                    styles.filterTagChip,
+                                    selectedTags.includes(tag) && styles.filterTagChipActive
+                                ]}
+                                onPress={() => toggleTag(tag)}
+                            >
+                                <Text style={[
+                                    styles.filterTagText,
+                                    selectedTags.includes(tag) && styles.filterTagTextActive
+                                ]}>
+                                    {tag}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+                </View>
+            )}
+
+            {/* Results Count */}
+            <View style={styles.infoContainer}>
+                <Text style={styles.resultsCount}>
+                    {hasActiveFilters
+                        ? `${filteredMaterials.length} of ${allMaterials.length} loaded materials`
+                        : `${allMaterials.length} of ${totalCount} materials`}
+                </Text>
+            </View>
+        </>
+    );
+
+    const renderEmpty = () => (
+        <Text style={styles.empty}>
+            {hasActiveFilters
+                ? 'No materials match your filters'
+                : 'No materials due! Good job.'}
+        </Text>
+    );
 
     return (
         <View style={styles.container}>
             <AppHeader />
 
-            <ScrollView
-                style={styles.scrollView}
-                contentContainerStyle={styles.scrollContent}
-                showsVerticalScrollIndicator={true}
-                refreshControl={
-                    <RefreshControl
-                        refreshing={refreshing}
-                        onRefresh={handleRefresh}
-                        colors={[colors.primary]}
-                        tintColor={colors.primary}
-                        progressBackgroundColor={colors.card}
-                    />
-                }
-            >
-                <View style={styles.header}>
-                    <Text style={styles.title}>Welcome, {user?.name}</Text>
+            {isLoading ? (
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color={colors.primary} />
+                    <Text style={styles.loadingText}>Loading materials...</Text>
                 </View>
-
-                <View style={styles.titleRow}>
-                    <View style={styles.titleWithBadge}>
-                        <Text style={styles.mainTitle}>Due for Review</Text>
-                        {dueFlashcardsCount > 0 && (
-                            <View style={styles.notificationBadge}>
-                                <Text style={styles.notificationBadgeText}>{dueFlashcardsCount}</Text>
-                            </View>
-                        )}
-                    </View>
-                    <TouchableOpacity
-                        style={styles.addButton}
-                        onPress={() => navigation.navigate('AddMaterial')}
-                    >
-                        <Text style={styles.addButtonText}>+ Add Material</Text>
-                    </TouchableOpacity>
-                </View>
-
-                {/* Search Bar */}
-                <View style={styles.searchContainer}>
-                    <TextInput
-                        style={styles.searchInput}
-                        placeholder="Search by title..."
-                        placeholderTextColor={colors.textPlaceholder}
-                        value={searchQuery}
-                        onChangeText={setSearchQuery}
-                        clearButtonMode="while-editing"
-                    />
-                    {hasActiveFilters && (
-                        <TouchableOpacity onPress={clearFilters} style={styles.clearButton}>
-                            <Text style={styles.clearButtonText}>Clear</Text>
-                        </TouchableOpacity>
-                    )}
-                </View>
-
-                {/* Tag Filter Chips */}
-                {allTags.length > 0 && (
-                    <View style={styles.tagFilterSection}>
-                        <Text style={styles.tagFilterLabel}>Filter by tags:</Text>
-                        <ScrollView
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            contentContainerStyle={styles.tagFilterContainer}
-                            nestedScrollEnabled={true}
-                        >
-                            {allTags.map((tag: string) => (
-                                <TouchableOpacity
-                                    key={tag}
-                                    style={[
-                                        styles.filterTagChip,
-                                        selectedTags.includes(tag) && styles.filterTagChipActive
-                                    ]}
-                                    onPress={() => toggleTag(tag)}
-                                >
-                                    <Text style={[
-                                        styles.filterTagText,
-                                        selectedTags.includes(tag) && styles.filterTagTextActive
-                                    ]}>
-                                        {tag}
-                                    </Text>
-                                </TouchableOpacity>
-                            ))}
-                        </ScrollView>
-                    </View>
-                )}
-
-                {/* Results Count and Pagination Info */}
-                <View style={styles.infoContainer}>
-                    {hasActiveFilters ? (
-                        <Text style={styles.resultsCount}>
-                            {filteredMaterials.length} of {data?.length || 0} materials on this page
-                        </Text>
-                    ) : (
-                        <Text style={styles.resultsCount}>
-                            Page {currentPage} of {totalPages} ({totalCount} total materials)
-                        </Text>
-                    )}
-                </View>
-
-                {isLoading ? (
-                    <View style={styles.loadingContainer}>
-                        <ActivityIndicator size="large" color={colors.primary} />
-                        <Text style={styles.loadingText}>Loading materials...</Text>
-                    </View>
-                ) : error ? (
+            ) : error ? (
+                <View style={styles.loadingContainer}>
                     <Text style={styles.error}>Failed to load materials</Text>
-                ) : filteredMaterials.length === 0 ? (
-                    <Text style={styles.empty}>
-                        {hasActiveFilters
-                            ? 'No materials match your filters'
-                            : 'No materials due! Good job.'}
-                    </Text>
-                ) : (
-                    <>
-                        {filteredMaterials.map((item: MaterialSummary) => (
-                            <TouchableOpacity
-                                key={item.id}
-                                style={styles.card}
-                                onPress={() => navigation.navigate('Summary', { materialId: item.id, title: item.title })}
-                            >
-                                <View style={styles.cardHeader}>
-                                    <Text style={styles.materialTitle} numberOfLines={2}>{item.title}</Text>
-                                    <View style={styles.cardActions}>
-                                        <View style={styles.badge}>
-                                            <Text style={styles.badgeText}>{item.dueCount}</Text>
-                                        </View>
-                                        <TouchableOpacity
-                                            style={styles.deleteButton}
-                                            onPress={(e) => {
-                                                e.stopPropagation();
-                                                handleDelete(item.id, item.title);
-                                            }}
-                                        >
-                                            <Text style={styles.deleteButtonText}>🗑</Text>
-                                        </TouchableOpacity>
-                                    </View>
-                                </View>
-
-                                <View style={styles.tagsContainer}>
-                                    {item.tags.map((tag: string, index: number) => (
-                                        <View key={index} style={styles.tagBadge}>
-                                            <Text style={styles.tagText}>{tag}</Text>
-                                        </View>
-                                    ))}
-                                </View>
-                            </TouchableOpacity>
-                        ))}
-                        {renderPaginationFooter()}
-                    </>
-                )}
-            </ScrollView>
+                </View>
+            ) : (
+                <FlatList
+                    data={filteredMaterials}
+                    renderItem={renderMaterialCard}
+                    keyExtractor={(item) => item.id}
+                    ListHeaderComponent={renderHeader}
+                    ListFooterComponent={renderFooter}
+                    ListEmptyComponent={renderEmpty}
+                    onEndReached={handleLoadMore}
+                    onEndReachedThreshold={0.5}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={isRefetching && !isFetchingNextPage}
+                            onRefresh={handleRefresh}
+                            colors={[colors.primary]}
+                            tintColor={colors.primary}
+                            progressBackgroundColor={colors.card}
+                        />
+                    }
+                    contentContainerStyle={styles.listContent}
+                    showsVerticalScrollIndicator={true}
+                />
+            )}
         </View>
     );
 };
@@ -358,10 +346,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         flex: 1,
         backgroundColor: colors.background,
     },
-    scrollView: {
-        flex: 1,
-    },
-    scrollContent: {
+    listContent: {
         paddingHorizontal: 20,
         paddingTop: 20,
         paddingBottom: 20,
@@ -576,46 +561,15 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         marginTop: 50,
         fontStyle: 'italic',
     },
-    paginationContainer: {
+    footerLoader: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
+        justifyContent: 'center',
         alignItems: 'center',
-        paddingVertical: 15,
-        paddingHorizontal: 20,
-        backgroundColor: colors.card,
-        borderTopWidth: 1,
-        borderTopColor: colors.border,
-        marginTop: 10,
-        marginBottom: 10,
-        borderRadius: 10,
-        elevation: 2,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.2,
-        shadowRadius: 1.41,
+        paddingVertical: 20,
+        gap: 10,
     },
-    paginationButton: {
-        backgroundColor: colors.primary,
-        paddingHorizontal: 20,
-        paddingVertical: 10,
-        borderRadius: 8,
-        minWidth: 100,
-        alignItems: 'center',
-    },
-    paginationButtonDisabled: {
-        backgroundColor: colors.paginationDisabledBg,
-    },
-    paginationButtonText: {
-        color: colors.textInverse,
-        fontWeight: '600',
+    footerLoaderText: {
+        color: colors.textSecondary,
         fontSize: 14,
-    },
-    paginationButtonTextDisabled: {
-        color: colors.paginationDisabledText,
-    },
-    paginationText: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: colors.textPrimary,
     },
 });

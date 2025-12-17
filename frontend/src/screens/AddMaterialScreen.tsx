@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Image, Platform } from 'react-native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigation } from '../navigation/ManualRouter';
@@ -6,6 +6,7 @@ import { learningClient } from '../services/api';
 import { AppHeader } from '../components/AppHeader';
 import { useTheme, ThemeColors } from '../utils/theme';
 import * as ImagePickerUtil from '../utils/imagePicker';
+import { useProcessingStore } from '../store/processingStore';
 
 type MaterialType = 'TEXT' | 'LINK' | 'IMAGE' | 'YOUTUBE';
 
@@ -18,17 +19,27 @@ export const AddMaterialScreen = () => {
     const [imageData, setImageData] = useState<string | null>(null);
     const [imagePreview, setImagePreview] = useState<string | null>(null);
 
+    // Processing state - prevents multiple concurrent submissions
+    const { isProcessing, startProcessing, stopProcessing, checkProcessing } = useProcessingStore();
+
+    // Check on mount if there's an active processing
+    useEffect(() => {
+        checkProcessing();
+    }, []);
+
     const mutation = useMutation({
         mutationFn: async () => {
             console.log('[ADD_MATERIAL] Submitting material, type:', type);
+            await startProcessing(); // Mark as processing
             return await learningClient.addMaterial({
                 type,
                 content: type === 'IMAGE' ? '' : content,
                 imageData: type === 'IMAGE' ? imageData || '' : '',
             });
         },
-        onSuccess: (data) => {
+        onSuccess: async (data) => {
             console.log('[ADD_MATERIAL] Success! Created flashcards:', data.flashcardsCreated);
+            await stopProcessing(); // Clear processing state
             Alert.alert('Success', `Created ${data.flashcardsCreated} flashcards for "${data.title}"!`);
             queryClient.invalidateQueries({ queryKey: ['dueMaterials'], refetchType: 'all' });
             queryClient.invalidateQueries({ queryKey: ['dueFlashcards'], refetchType: 'all' });
@@ -36,8 +47,9 @@ export const AddMaterialScreen = () => {
             queryClient.invalidateQueries({ queryKey: ['notificationStatus'], refetchType: 'all' });
             navigation.goBack();
         },
-        onError: (error) => {
+        onError: async (error) => {
             console.error('[ADD_MATERIAL] Error:', error);
+            await stopProcessing(); // Clear processing state on error too
             Alert.alert('Error', 'Failed to add material. Please try again.');
         },
     });
@@ -169,9 +181,9 @@ export const AddMaterialScreen = () => {
 
                 {/* Submit Button */}
                 <TouchableOpacity
-                    style={[styles.submitButton, mutation.isPending && styles.submitButtonDisabled]}
+                    style={[styles.submitButton, (mutation.isPending || isProcessing) && styles.submitButtonDisabled]}
                     onPress={handleSubmit}
-                    disabled={mutation.isPending}
+                    disabled={mutation.isPending || isProcessing}
                 >
                     {mutation.isPending ? (
                         <View style={styles.loadingContainer}>
@@ -179,6 +191,11 @@ export const AddMaterialScreen = () => {
                             <Text style={styles.loadingText}>
                                 {type === 'IMAGE' ? 'Extracting text & generating...' : 'Generating flashcards...'}
                             </Text>
+                        </View>
+                    ) : isProcessing ? (
+                        <View style={styles.loadingContainer}>
+                            <ActivityIndicator color={colors.textInverse} />
+                            <Text style={styles.loadingText}>Processing another material...</Text>
                         </View>
                     ) : (
                         <Text style={styles.submitText}>Generate Flashcards</Text>
