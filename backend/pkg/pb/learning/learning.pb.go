@@ -736,11 +736,13 @@ func (x *GetAllTagsResponse) GetTags() []string {
 }
 
 type NotificationStatusResponse struct {
-	state              protoimpl.MessageState `protogen:"open.v1"`
-	DueFlashcardsCount int32                  `protobuf:"varint,1,opt,name=due_flashcards_count,json=dueFlashcardsCount,proto3" json:"due_flashcards_count,omitempty"`
-	HasDueMaterials    bool                   `protobuf:"varint,2,opt,name=has_due_materials,json=hasDueMaterials,proto3" json:"has_due_materials,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	state                 protoimpl.MessageState `protogen:"open.v1"`
+	DueFlashcardsCount    int32                  `protobuf:"varint,1,opt,name=due_flashcards_count,json=dueFlashcardsCount,proto3" json:"due_flashcards_count,omitempty"`
+	HasDueMaterials       bool                   `protobuf:"varint,2,opt,name=has_due_materials,json=hasDueMaterials,proto3" json:"has_due_materials,omitempty"`
+	DueMaterialsCount     int32                  `protobuf:"varint,3,opt,name=due_materials_count,json=dueMaterialsCount,proto3" json:"due_materials_count,omitempty"`
+	FirstDueMaterialTitle string                 `protobuf:"bytes,4,opt,name=first_due_material_title,json=firstDueMaterialTitle,proto3" json:"first_due_material_title,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *NotificationStatusResponse) Reset() {
@@ -785,6 +787,20 @@ func (x *NotificationStatusResponse) GetHasDueMaterials() bool {
 		return x.HasDueMaterials
 	}
 	return false
+}
+
+func (x *NotificationStatusResponse) GetDueMaterialsCount() int32 {
+	if x != nil {
+		return x.DueMaterialsCount
+	}
+	return 0
+}
+
+func (x *NotificationStatusResponse) GetFirstDueMaterialTitle() string {
+	if x != nil {
+		return x.FirstDueMaterialTitle
+	}
+	return ""
 }
 
 type GetMaterialSummaryRequest struct {
@@ -1002,10 +1018,12 @@ const file_backend_proto_learning_learning_proto_rawDesc = "" +
 	"\x11FailReviewRequest\x12!\n" +
 	"\fflashcard_id\x18\x01 \x01(\tR\vflashcardId\"(\n" +
 	"\x12GetAllTagsResponse\x12\x12\n" +
-	"\x04tags\x18\x01 \x03(\tR\x04tags\"z\n" +
+	"\x04tags\x18\x01 \x03(\tR\x04tags\"\xe3\x01\n" +
 	"\x1aNotificationStatusResponse\x120\n" +
 	"\x14due_flashcards_count\x18\x01 \x01(\x05R\x12dueFlashcardsCount\x12*\n" +
-	"\x11has_due_materials\x18\x02 \x01(\bR\x0fhasDueMaterials\"<\n" +
+	"\x11has_due_materials\x18\x02 \x01(\bR\x0fhasDueMaterials\x12.\n" +
+	"\x13due_materials_count\x18\x03 \x01(\x05R\x11dueMaterialsCount\x127\n" +
+	"\x18first_due_material_title\x18\x04 \x01(\tR\x15firstDueMaterialTitle\"<\n" +
 	"\x19GetMaterialSummaryRequest\x12\x1f\n" +
 	"\vmaterial_id\x18\x01 \x01(\tR\n" +
 	"materialId\"L\n" +

@@ -317,18 +317,16 @@ func (c *LearningCore) GetAllTags(ctx context.Context, userID string) ([]string,
 	return c.store.GetTags(ctx, userID)
 }
 
-func (c *LearningCore) GetNotificationStatus(ctx context.Context, userID string) (int32, bool, error) {
+func (c *LearningCore) GetNotificationStatus(ctx context.Context, userID string) (int32, bool, int32, string, error) {
 	log.Printf("[Core.GetNotificationStatus] Getting notification status for userID: %s", userID)
 
-	count, err := c.store.GetDueFlashcardsCount(ctx, userID)
+	flashcardCount, materialCount, firstTitle, err := c.store.GetNotificationData(ctx, userID)
 	if err != nil {
-		log.Printf("[Core.GetNotificationStatus] Failed to get count: %v", err)
-		return 0, false, err
+		log.Printf("[Core.GetNotificationStatus] Failed to get data: %v", err)
+		return 0, false, 0, "", err
 	}
 
-	hasDue := count > 0
-	log.Printf("[Core.GetNotificationStatus] User has %d due flashcards", count)
-	return count, hasDue, nil
+	return flashcardCount, materialCount > 0, materialCount, firstTitle, nil
 }
 
 func (c *LearningCore) GetMaterialSummary(ctx context.Context, userID, materialID string) (string, string, error) {

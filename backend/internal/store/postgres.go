@@ -378,6 +378,45 @@ func (s *PostgresStore) GetDueFlashcardsCount(ctx context.Context, userID string
 	log.Printf("[Store.GetDueFlashcardsCount] Found %d due flashcards", count)
 	return count, nil
 }
+func (s *PostgresStore) GetNotificationData(ctx context.Context, userID string) (int32, int32, string, error) {
+	log.Printf("[Store.GetNotificationData] Fetching data for userID: %s", userID)
+
+	// 1. Get due flashcards count
+	flashcardQuery := `
+		SELECT COUNT(f.id)
+		FROM flashcards f
+		JOIN materials m ON f.material_id = m.id
+		WHERE m.user_id = $1 AND f.next_review_at <= NOW() AND (m.is_deleted = FALSE OR m.is_deleted IS NULL);
+	`
+	var flashcardsCount int32
+	if err := s.db.QueryRow(ctx, flashcardQuery, userID).Scan(&flashcardsCount); err != nil {
+		return 0, 0, "", fmt.Errorf("failed to count due flashcards: %w", err)
+	}
+
+	// 2. Get due materials count and first title
+	// A material is due if it has at least one due flashcard
+	materialQuery := `
+		SELECT COUNT(DISTINCT m.id), COALESCE(MAX(m.title) FILTER (WHERE m.id = (
+			SELECT sub_m.id 
+			FROM materials sub_m
+			JOIN flashcards f ON sub_m.id = f.material_id
+			WHERE sub_m.user_id = $1 AND f.next_review_at <= NOW() AND (sub_m.is_deleted = FALSE OR sub_m.is_deleted IS NULL)
+			ORDER BY f.next_review_at ASC
+			LIMIT 1
+		)), '')
+		FROM materials m
+		JOIN flashcards f ON m.id = f.material_id
+		WHERE m.user_id = $1 AND f.next_review_at <= NOW() AND (m.is_deleted = FALSE OR m.is_deleted IS NULL);
+	`
+	var materialsCount int32
+	var firstTitle string
+	if err := s.db.QueryRow(ctx, materialQuery, userID).Scan(&materialsCount, &firstTitle); err != nil {
+		return 0, 0, "", fmt.Errorf("failed to get material notification data: %w", err)
+	}
+
+	log.Printf("[Store.GetNotificationData] flashcards: %d, materials: %d, firstTitle: %s", flashcardsCount, materialsCount, firstTitle)
+	return flashcardsCount, materialsCount, firstTitle, nil
+}
 
 func (s *PostgresStore) UpdateFlashcard(ctx context.Context, id string, stage int32, nextReviewAt time.Time) error {
 	log.Printf("[Store.UpdateFlashcard] Updating flashcard: %s, Stage: %d, NextReviewAt: %v", id, stage, nextReviewAt)

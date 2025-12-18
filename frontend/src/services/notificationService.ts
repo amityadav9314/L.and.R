@@ -87,11 +87,11 @@ export class NotificationService {
                     repeats: true,
                 };
 
-            // Schedule daily notification at 9 AM
+            // Schedule daily notification at 8 AM
             this.notificationIdentifier = await Notifications.scheduleNotificationAsync({
                 content: {
-                    title: `${APP_NAME} - Time to Review! 📚`,
-                    body: 'You have flashcards due for review. Keep up your learning streak!',
+                    title: `${APP_NAME} - Daily Review! 📚`,
+                    body: 'Check your vault to see what items are due for review today.',
                     data: { type: 'daily_reminder' },
                 },
                 trigger,
@@ -110,23 +110,31 @@ export class NotificationService {
         try {
             const response = await learningClient.getNotificationStatus({});
 
-            if (response.hasDueMaterials && response.dueFlashcardsCount > 0) {
+            if (response.hasDueMaterials && response.dueMaterialsCount > 0) {
+                const count = response.dueMaterialsCount;
+                const moreCount = count - 1;
+                const title = response.firstDueMaterialTitle || 'Untitled';
+
+                const body = moreCount > 0
+                    ? `You have "${title}" and ${moreCount} more material${moreCount > 1 ? 's' : ''} to revise today.`
+                    : `You have "${title}" to revise today.`;
+
                 await Notifications.scheduleNotificationAsync({
                     content: {
-                        title: `${APP_NAME} - Flashcards Due! 🎯`,
-                        body: `You have ${response.dueFlashcardsCount} flashcard${response.dueFlashcardsCount > 1 ? 's' : ''} ready for review.`,
+                        title: `${APP_NAME} - Review Due! 🎯`,
+                        body: body,
                         data: {
-                            type: 'due_flashcards',
-                            count: response.dueFlashcardsCount,
+                            type: 'due_materials',
+                            count: count,
                         },
                     },
                     trigger: null, // Send immediately
                 });
 
-                console.log(`[Notifications] Sent notification for ${response.dueFlashcardsCount} due flashcards`);
+                console.log(`[Notifications] Sent notification for ${count} due materials`);
             }
         } catch (error) {
-            console.error('[Notifications] Error checking due flashcards:', error);
+            console.error('[Notifications] Error checking due materials:', error);
         }
     }
 
@@ -166,7 +174,8 @@ export class NotificationService {
 
             if (hasPermission) {
                 await this.scheduleDailyNotification();
-                await this.checkAndNotify();
+                // We no longer call checkAndNotify here to avoid immediate notification on startup
+                // If there are due materials, they will be visible on the Home Screen immediately.
             }
         } catch (error) {
             console.warn('[Notifications] Failed to initialize (likely running in Expo Go):', error);

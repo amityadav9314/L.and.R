@@ -88,6 +88,8 @@ export interface GetAllTagsResponse {
 export interface NotificationStatusResponse {
   dueFlashcardsCount: number;
   hasDueMaterials: boolean;
+  dueMaterialsCount: number;
+  firstDueMaterialTitle: string;
 }
 
 export interface GetMaterialSummaryRequest {
@@ -1190,7 +1192,7 @@ export const GetAllTagsResponse: MessageFns<GetAllTagsResponse> = {
 };
 
 function createBaseNotificationStatusResponse(): NotificationStatusResponse {
-  return { dueFlashcardsCount: 0, hasDueMaterials: false };
+  return { dueFlashcardsCount: 0, hasDueMaterials: false, dueMaterialsCount: 0, firstDueMaterialTitle: "" };
 }
 
 export const NotificationStatusResponse: MessageFns<NotificationStatusResponse> = {
@@ -1200,6 +1202,12 @@ export const NotificationStatusResponse: MessageFns<NotificationStatusResponse> 
     }
     if (message.hasDueMaterials !== false) {
       writer.uint32(16).bool(message.hasDueMaterials);
+    }
+    if (message.dueMaterialsCount !== 0) {
+      writer.uint32(24).int32(message.dueMaterialsCount);
+    }
+    if (message.firstDueMaterialTitle !== "") {
+      writer.uint32(34).string(message.firstDueMaterialTitle);
     }
     return writer;
   },
@@ -1227,6 +1235,22 @@ export const NotificationStatusResponse: MessageFns<NotificationStatusResponse> 
           message.hasDueMaterials = reader.bool();
           continue;
         }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.dueMaterialsCount = reader.int32();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.firstDueMaterialTitle = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1240,6 +1264,8 @@ export const NotificationStatusResponse: MessageFns<NotificationStatusResponse> 
     return {
       dueFlashcardsCount: isSet(object.dueFlashcardsCount) ? globalThis.Number(object.dueFlashcardsCount) : 0,
       hasDueMaterials: isSet(object.hasDueMaterials) ? globalThis.Boolean(object.hasDueMaterials) : false,
+      dueMaterialsCount: isSet(object.dueMaterialsCount) ? globalThis.Number(object.dueMaterialsCount) : 0,
+      firstDueMaterialTitle: isSet(object.firstDueMaterialTitle) ? globalThis.String(object.firstDueMaterialTitle) : "",
     };
   },
 
@@ -1251,6 +1277,12 @@ export const NotificationStatusResponse: MessageFns<NotificationStatusResponse> 
     if (message.hasDueMaterials !== false) {
       obj.hasDueMaterials = message.hasDueMaterials;
     }
+    if (message.dueMaterialsCount !== 0) {
+      obj.dueMaterialsCount = Math.round(message.dueMaterialsCount);
+    }
+    if (message.firstDueMaterialTitle !== "") {
+      obj.firstDueMaterialTitle = message.firstDueMaterialTitle;
+    }
     return obj;
   },
 
@@ -1261,6 +1293,8 @@ export const NotificationStatusResponse: MessageFns<NotificationStatusResponse> 
     const message = createBaseNotificationStatusResponse();
     message.dueFlashcardsCount = object.dueFlashcardsCount ?? 0;
     message.hasDueMaterials = object.hasDueMaterials ?? false;
+    message.dueMaterialsCount = object.dueMaterialsCount ?? 0;
+    message.firstDueMaterialTitle = object.firstDueMaterialTitle ?? "";
     return message;
   },
 };

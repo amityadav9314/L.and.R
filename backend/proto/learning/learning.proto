@@ -94,6 +94,8 @@ message GetAllTagsResponse {
 message NotificationStatusResponse {
   int32 due_flashcards_count = 1;
   bool has_due_materials = 2;
+  int32 due_materials_count = 3;
+  string first_due_material_title = 4;
 }
 
 message GetMaterialSummaryRequest {

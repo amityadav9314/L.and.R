@@ -194,16 +194,18 @@ func (s *LearningService) GetNotificationStatus(ctx context.Context, _ *emptypb.
 
 	log.Printf("[GetNotificationStatus] Fetching notification status for userID: %s", userID)
 
-	count, hasDue, err := s.core.GetNotificationStatus(ctx, userID)
+	flashcardCount, hasDue, materialCount, firstTitle, err := s.core.GetNotificationStatus(ctx, userID)
 	if err != nil {
 		log.Printf("[GetNotificationStatus] ERROR: %v", err)
 		return nil, status.Errorf(codes.Internal, "failed to get notification status: %v", err)
 	}
 
-	log.Printf("[GetNotificationStatus] SUCCESS - %d due flashcards", count)
+	log.Printf("[GetNotificationStatus] SUCCESS - %d due flashcards, %d materials", flashcardCount, materialCount)
 	return &learning.NotificationStatusResponse{
-		DueFlashcardsCount: count,
-		HasDueMaterials:    hasDue,
+		DueFlashcardsCount:    flashcardCount,
+		HasDueMaterials:       hasDue,
+		DueMaterialsCount:     materialCount,
+		FirstDueMaterialTitle: firstTitle,
 	}, nil
 }
 
