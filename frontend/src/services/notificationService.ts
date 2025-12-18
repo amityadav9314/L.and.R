@@ -1,6 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { learningClient } from './api';
+import { APP_NAME } from '../utils/constants';
 
 // Configure notification behavior
 export class NotificationService {
@@ -14,7 +15,7 @@ export class NotificationService {
             // Set up Android notification channel (required for Android 8+)
             if (Platform.OS === 'android') {
                 await Notifications.setNotificationChannelAsync('default', {
-                    name: 'LandR Notifications',
+                    name: `${APP_NAME} Notifications`,
                     importance: Notifications.AndroidImportance.HIGH,
                     vibrationPattern: [0, 250, 250, 250],
                     lightColor: '#4285F4',
@@ -89,7 +90,7 @@ export class NotificationService {
             // Schedule daily notification at 9 AM
             this.notificationIdentifier = await Notifications.scheduleNotificationAsync({
                 content: {
-                    title: 'LandR - Time to Review! 📚',
+                    title: `${APP_NAME} - Time to Review! 📚`,
                     body: 'You have flashcards due for review. Keep up your learning streak!',
                     data: { type: 'daily_reminder' },
                 },
@@ -112,7 +113,7 @@ export class NotificationService {
             if (response.hasDueMaterials && response.dueFlashcardsCount > 0) {
                 await Notifications.scheduleNotificationAsync({
                     content: {
-                        title: 'LandR - Flashcards Due! 🎯',
+                        title: `${APP_NAME} - Flashcards Due! 🎯`,
                         body: `You have ${response.dueFlashcardsCount} flashcard${response.dueFlashcardsCount > 1 ? 's' : ''} ready for review.`,
                         data: {
                             type: 'due_flashcards',

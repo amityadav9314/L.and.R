@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '../navigation/ManualRouter';
 import { useAuthStore } from '../store/authStore';
 import { useTheme } from '../utils/theme';
+import { APP_NAME } from '../utils/constants';
 
 export const AppHeader = () => {
     const { navigate, goBack, canGoBack } = useNavigation();
@@ -38,7 +39,7 @@ export const AppHeader = () => {
             </View>
 
             <TouchableOpacity onPress={handleHomePress} style={styles.centerContainer}>
-                <Text style={[styles.logo, { color: colors.primary }]}>LandR</Text>
+                <Text style={[styles.logo, { color: colors.primary }]}>{APP_NAME}</Text>
             </TouchableOpacity>
 
             <View style={styles.rightContainer}>
@@ -89,7 +90,7 @@ const styles = StyleSheet.create({
     logo: {
         fontSize: 24,
         fontWeight: 'bold',
-        letterSpacing: 1,
+        letterSpacing: -0.5,
     },
     logoutButton: {
         padding: 8,

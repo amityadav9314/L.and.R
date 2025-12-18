@@ -9,6 +9,7 @@ import { useAuthStore } from '../store/authStore';
 import { authClient } from '../services/api';
 import { GOOGLE_WEB_CLIENT_ID, GOOGLE_ANDROID_CLIENT_ID } from '../utils/config';
 import { useTheme, ThemeColors } from '../utils/theme';
+import { APP_NAME } from '../utils/constants';
 
 export const LoginScreen = () => {
     const { login } = useAuthStore();
@@ -155,7 +156,7 @@ export const LoginScreen = () => {
                     style={styles.logoIcon}
                     resizeMode="contain"
                 />
-                <Text style={[styles.logoText, { color: colors.primary }]}>LandR</Text>
+                <Text style={[styles.logoText, { color: colors.primary }]}>{APP_NAME}</Text>
             </View>
 
             <Text style={styles.title}>Learn & Revise</Text>
@@ -200,7 +201,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     logoText: {
         fontSize: 42,
         fontWeight: 'bold',
-        letterSpacing: 2,
+        letterSpacing: -1,
     },
     title: {
         fontSize: 24,
