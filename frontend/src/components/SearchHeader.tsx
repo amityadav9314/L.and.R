@@ -101,35 +101,46 @@ export const SearchHeader = memo(({
             </View>
 
             {/* Tag Filter Chips */}
-            {allTags.length > 0 && (
-                <View style={styles.tagFilterSection}>
-                    <Text style={styles.tagFilterLabel}>Filter by tags:</Text>
-                    <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.tagFilterContainer}
-                        nestedScrollEnabled={true}
-                    >
-                        {allTags.map((tag: string) => (
-                            <TouchableOpacity
-                                key={tag}
-                                style={[
-                                    styles.filterTagChip,
-                                    selectedTags.includes(tag) && styles.filterTagChipActive
-                                ]}
-                                onPress={() => toggleTag(tag)}
-                            >
-                                <Text style={[
-                                    styles.filterTagText,
-                                    selectedTags.includes(tag) && styles.filterTagTextActive
-                                ]}>
-                                    {tag}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
-                    </ScrollView>
-                </View>
-            )}
+            {allTags.length > 0 && (() => {
+                // Sort tags to show selected ones first
+                const sortedTags = [...allTags].sort((a, b) => {
+                    const aSelected = selectedTags.includes(a);
+                    const bSelected = selectedTags.includes(b);
+                    if (aSelected && !bSelected) return -1;
+                    if (!aSelected && bSelected) return 1;
+                    return 0;
+                });
+
+                return (
+                    <View style={styles.tagFilterSection}>
+                        <Text style={styles.tagFilterLabel}>Filter by tags:</Text>
+                        <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={styles.tagFilterContainer}
+                            nestedScrollEnabled={true}
+                        >
+                            {sortedTags.map((tag: string) => (
+                                <TouchableOpacity
+                                    key={tag}
+                                    style={[
+                                        styles.filterTagChip,
+                                        selectedTags.includes(tag) && styles.filterTagChipActive
+                                    ]}
+                                    onPress={() => toggleTag(tag)}
+                                >
+                                    <Text style={[
+                                        styles.filterTagText,
+                                        selectedTags.includes(tag) && styles.filterTagTextActive
+                                    ]}>
+                                        {tag}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                    </View>
+                );
+            })()}
 
             {/* Results Count with Page Range */}
             <View style={styles.infoContainer}>
