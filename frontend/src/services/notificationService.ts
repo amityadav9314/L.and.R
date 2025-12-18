@@ -1,7 +1,11 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import * as BackgroundFetch from 'expo-background-fetch';
+import * as TaskManager from 'expo-task-manager';
 import { learningClient } from './api';
 import { APP_NAME } from '../utils/constants';
+
+const BACKGROUND_FETCH_TASK = 'background-fetch-due-materials';
 
 // Configure notification behavior
 export class NotificationService {
@@ -165,6 +169,28 @@ export class NotificationService {
     }
 
     /**
+     * Register background task for checking due materials
+     */
+    static async registerBackgroundTask(): Promise<void> {
+        try {
+            const isRegistered = await TaskManager.isTaskRegisteredAsync(BACKGROUND_FETCH_TASK);
+            if (isRegistered) {
+                console.log('[Notifications] Background task already registered');
+                return;
+            }
+
+            await BackgroundFetch.registerTaskAsync(BACKGROUND_FETCH_TASK, {
+                minimumInterval: 60 * 60, // 1 hour (minimum allowed by OS)
+                stopOnTerminate: false, // Continue after app is closed
+                startOnBoot: true, // Start after device reboot
+            });
+            console.log('[Notifications] Background fetch task registered successfully');
+        } catch (error) {
+            console.error('[Notifications] Failed to register background task:', error);
+        }
+    }
+
+    /**
      * Initialize notification service
      */
     static async initialize(): Promise<void> {
@@ -174,12 +200,25 @@ export class NotificationService {
 
             if (hasPermission) {
                 await this.scheduleDailyNotification();
+                await this.registerBackgroundTask();
                 // We no longer call checkAndNotify here to avoid immediate notification on startup
-                // If there are due materials, they will be visible on the Home Screen immediately.
             }
         } catch (error) {
             console.warn('[Notifications] Failed to initialize (likely running in Expo Go):', error);
         }
     }
 }
+
+// Define the background task
+TaskManager.defineTask(BACKGROUND_FETCH_TASK, async () => {
+    try {
+        console.log('[Notifications] Background fetch task triggered');
+        await NotificationService.checkAndNotify();
+        return BackgroundFetch.BackgroundFetchResult.NewData;
+    } catch (error) {
+        console.error('[Notifications] Background fetch task failed:', error);
+        return BackgroundFetch.BackgroundFetchResult.Failed;
+    }
+});
+
 

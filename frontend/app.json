@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "LandR",
+    "name": "L.and.R",
     "slug": "landr",
     "version": "1.0.0",
     "scheme": "landr",
@@ -14,12 +14,22 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.amityadav.landr"
+      "bundleIdentifier": "com.amityadav.landr",
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "fetch",
+          "processing"
+        ]
+      }
     },
     "android": {
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": true,
       "package": "com.amityadav.landr",
+      "permissions": [
+        "RECEIVE_BOOT_COMPLETED",
+        "WAKE_LOCK"
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -29,7 +39,7 @@
       "icon": "./assets/icon.png",
       "color": "#4285F4",
       "androidMode": "default",
-      "androidCollapsedTitle": "LandR Notifications"
+      "androidCollapsedTitle": "L.and.R Notifications"
     },
     "plugins": [
       "@react-native-google-signin/google-signin",
@@ -40,7 +50,9 @@
           "color": "#4285F4",
           "defaultChannel": "default"
         }
-      ]
+      ],
+      "expo-background-fetch",
+      "expo-task-manager"
     ],
     "web": {
       "favicon": "./assets/favicon.png"
