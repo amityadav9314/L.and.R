@@ -1,9 +1,20 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
-import * as BackgroundFetch from 'expo-background-fetch';
-import * as TaskManager from 'expo-task-manager';
 import { learningClient } from './api';
 import { APP_NAME } from '../utils/constants';
+
+// Define these safely using require to avoid top-level import crashes on missing native modules
+let BackgroundFetch: any = null;
+let TaskManager: any = null;
+
+try {
+    if (Platform.OS !== 'web') {
+        BackgroundFetch = require('expo-background-fetch');
+        TaskManager = require('expo-task-manager');
+    }
+} catch (e) {
+    console.warn('[Notifications] Native background modules could not be loaded:', e);
+}
 
 const BACKGROUND_FETCH_TASK = 'background-fetch-due-materials';
 
@@ -172,7 +183,19 @@ export class NotificationService {
      * Register background task for checking due materials
      */
     static async registerBackgroundTask(): Promise<void> {
+        if (Platform.OS === 'web' || !TaskManager || !BackgroundFetch) {
+            console.log('[Notifications] Background tasks are not supported on this platform/build');
+            return;
+        }
+
         try {
+            // Check if TaskManager is actually usable
+            const available = await TaskManager.isAvailableAsync();
+            if (!available) {
+                console.warn('[Notifications] TaskManager is not available in this build.');
+                return;
+            }
+
             const isRegistered = await TaskManager.isTaskRegisteredAsync(BACKGROUND_FETCH_TASK);
             if (isRegistered) {
                 console.log('[Notifications] Background task already registered');
@@ -186,7 +209,7 @@ export class NotificationService {
             });
             console.log('[Notifications] Background fetch task registered successfully');
         } catch (error) {
-            console.error('[Notifications] Failed to register background task:', error);
+            console.warn('[Notifications] Failed to register background task (this is normal if no native rebuild done yet):', error);
         }
     }
 
@@ -209,16 +232,28 @@ export class NotificationService {
     }
 }
 
-// Define the background task
-TaskManager.defineTask(BACKGROUND_FETCH_TASK, async () => {
+// Define the background task if TaskManager is available
+if (Platform.OS !== 'web' && TaskManager && BackgroundFetch) {
     try {
-        console.log('[Notifications] Background fetch task triggered');
-        await NotificationService.checkAndNotify();
-        return BackgroundFetch.BackgroundFetchResult.NewData;
-    } catch (error) {
-        console.error('[Notifications] Background fetch task failed:', error);
-        return BackgroundFetch.BackgroundFetchResult.Failed;
+        TaskManager.isAvailableAsync().then((available: boolean) => {
+            if (available) {
+                TaskManager.defineTask(BACKGROUND_FETCH_TASK, async () => {
+                    try {
+                        console.log('[Notifications] Background fetch task triggered');
+                        await NotificationService.checkAndNotify();
+                        return BackgroundFetch.BackgroundFetchResult.NewData;
+                    } catch (error) {
+                        console.error('[Notifications] Background fetch task failed:', error);
+                        return BackgroundFetch.BackgroundFetchResult.Failed;
+                    }
+                });
+            }
+        }).catch((err: any) => {
+            console.warn('[Notifications] TaskManager availability check failed:', err);
+        });
+    } catch (e) {
+        console.warn('[Notifications] Failed to define background task:', e);
     }
-});
+}
 
 
