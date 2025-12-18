@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigation, useRoute } from '../navigation/ManualRouter';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { learningClient } from '../services/api';
 import { AppHeader } from '../components/AppHeader';
 import { useTheme, ThemeColors } from '../utils/theme';
@@ -17,6 +18,7 @@ export const SummaryScreen = () => {
     const navigation = useNavigation();
     const route = useRoute();
     const { colors } = useTheme();
+    const insets = useSafeAreaInsets();
     const { materialId, title } = route.params as { materialId: string; title: string };
     const displayTitle = title || 'Material Summary';
 
@@ -77,7 +79,7 @@ export const SummaryScreen = () => {
     }
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { paddingBottom: insets.bottom }]}>
             <AppHeader />
             <View style={styles.contentContainer}>
                 <Text style={styles.headerTitle} numberOfLines={2}>{displayTitle}</Text>

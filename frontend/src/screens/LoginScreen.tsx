@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Platform, Image } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GoogleSignin, statusCodes, GoogleSigninButton } from '@react-native-google-signin/google-signin';
 import * as WebBrowser from 'expo-web-browser';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
@@ -12,6 +13,7 @@ import { useTheme, ThemeColors } from '../utils/theme';
 export const LoginScreen = () => {
     const { login } = useAuthStore();
     const { colors } = useTheme();
+    const insets = useSafeAreaInsets();
     const [isLoggingIn, setIsLoggingIn] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -145,7 +147,7 @@ export const LoginScreen = () => {
     const styles = createStyles(colors);
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { paddingBottom: insets.bottom }]}>
             {/* Logo */}
             <View style={styles.logoContainer}>
                 <Image

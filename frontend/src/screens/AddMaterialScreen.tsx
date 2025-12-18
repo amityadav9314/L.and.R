@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Image, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigation } from '../navigation/ManualRouter';
 import { learningClient } from '../services/api';
@@ -14,6 +15,7 @@ export const AddMaterialScreen = () => {
     const navigation = useNavigation();
     const queryClient = useQueryClient();
     const { colors } = useTheme();
+    const insets = useSafeAreaInsets();
     const [content, setContent] = useState('');
     const [type, setType] = useState<MaterialType>('TEXT');
     const [imageData, setImageData] = useState<string | null>(null);
@@ -101,7 +103,7 @@ export const AddMaterialScreen = () => {
     const styles = createStyles(colors);
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { paddingBottom: insets.bottom }]}>
             <AppHeader />
             <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
                 <Text style={styles.title}>Add New Material</Text>

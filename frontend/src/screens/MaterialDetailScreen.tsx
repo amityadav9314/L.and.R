@@ -14,6 +14,7 @@ import {
     TextInput,
     KeyboardAvoidingView,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigation, useRoute } from '../navigation/ManualRouter';
 import { learningClient } from '../services/api';
@@ -29,6 +30,7 @@ export const MaterialDetailScreen = () => {
     const route = useRoute();
     const queryClient = useQueryClient();
     const { colors } = useTheme();
+    const insets = useSafeAreaInsets();
     const { materialId, title } = route.params as { materialId: string; title: string };
     const displayTitle = title || 'Material Details';
 
@@ -312,7 +314,7 @@ export const MaterialDetailScreen = () => {
     }
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { paddingBottom: insets.bottom }]}>
             <AppHeader />
             <View style={styles.contentContainer}>
                 <View style={styles.headerRow}>

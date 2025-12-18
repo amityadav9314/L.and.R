@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Alert } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigation, useRoute } from '../navigation/ManualRouter';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { learningClient } from '../services/api';
 import { Flashcard } from '../../proto/backend/proto/learning/learning';
 import { AppHeader } from '../components/AppHeader';
@@ -13,6 +14,7 @@ export const ReviewScreen = () => {
     const { flashcardId } = route.params as { flashcardId: string };
     const queryClient = useQueryClient();
     const { colors } = useTheme();
+    const insets = useSafeAreaInsets();
     const [showAnswer, setShowAnswer] = useState(false);
 
     // Find the flashcard from any material's cache
@@ -59,7 +61,7 @@ export const ReviewScreen = () => {
     }
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { paddingBottom: insets.bottom }]}>
             <AppHeader />
             <View style={styles.contentContainer}>
                 <View style={styles.card}>

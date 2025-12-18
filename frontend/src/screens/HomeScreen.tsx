@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, RefreshControl, TextInput, FlatList, ActivityIndicator, Alert, NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigation } from '../navigation/ManualRouter';
 import { learningClient } from '../services/api';
@@ -16,6 +17,7 @@ export const HomeScreen = () => {
     const { user } = useAuthStore();
     const { colors } = useTheme();
     const queryClient = useQueryClient();
+    const insets = useSafeAreaInsets();
 
     // Filter states
     const [inputValue, setInputValue] = useState(''); // Local input state
@@ -285,7 +287,7 @@ export const HomeScreen = () => {
     );
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { paddingBottom: insets.bottom }]}>
             <AppHeader />
 
             {isLoading ? (
@@ -411,14 +413,32 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         borderColor: colors.inputBorder,
         color: colors.textPrimary,
     },
-    clearButton: {
-        backgroundColor: colors.error,
+    searchButton: {
+        backgroundColor: colors.primary,
         paddingHorizontal: 15,
         paddingVertical: 12,
         borderRadius: 8,
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.2,
+        shadowRadius: 1.41,
+    },
+    searchButtonText: {
+        color: colors.textInverse,
+        fontWeight: 'bold',
+        fontSize: 14,
+    },
+    clearButton: {
+        backgroundColor: colors.cardAlt,
+        paddingHorizontal: 15,
+        paddingVertical: 12,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: colors.border,
     },
     clearButtonText: {
-        color: colors.textInverse,
+        color: colors.textSecondary,
         fontWeight: '600',
         fontSize: 14,
     },

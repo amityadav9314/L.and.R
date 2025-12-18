@@ -31,17 +31,43 @@ export const queryClient = new QueryClient({
   },
 });
 
-const ScreenRenderer = () => {
-  const { currentScreen } = useNavigation();
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { View, StyleSheet } from 'react-native';
 
-  switch (currentScreen) {
-    case 'Home': return <HomeScreen />;
-    case 'AddMaterial': return <AddMaterialScreen />;
-    case 'MaterialDetail': return <MaterialDetailScreen />;
-    case 'Review': return <ReviewScreen />;
-    case 'Summary': return <SummaryScreen />;
-    default: return <HomeScreen />;
-  }
+const ScreenRenderer = () => {
+  const { currentScreen, goBack, canGoBack } = useNavigation();
+
+  // Swipe Back Gesture - restrict to left edge and non-swiping screens
+  const swipeBack = Gesture.Pan()
+    .activeOffsetX(20) // Activate only if moved 20px right
+    .failOffsetY([-20, 20]) // Fail if moved vertically (scrolling)
+    .hitSlop({ left: 0, width: 40 }) // Only start from the very left edge
+    .onEnd((e) => {
+      const screensWithInternalSwipe = ['MaterialDetail', 'Review'];
+      if (canGoBack && e.translationX > 50 && !screensWithInternalSwipe.includes(currentScreen)) {
+        goBack();
+      }
+    });
+
+  // Keep HomeScreen mounted to preserve scroll position and state
+  return (
+    <GestureDetector gesture={swipeBack}>
+      <View style={{ flex: 1 }}>
+        <View style={[StyleSheet.absoluteFill, { display: currentScreen === 'Home' ? 'flex' : 'none', zIndex: currentScreen === 'Home' ? 1 : 0 }]}>
+          <HomeScreen />
+        </View>
+
+        {currentScreen !== 'Home' && (
+          <View style={{ flex: 1, zIndex: 2 }}>
+            {currentScreen === 'AddMaterial' && <AddMaterialScreen />}
+            {currentScreen === 'MaterialDetail' && <MaterialDetailScreen />}
+            {currentScreen === 'Review' && <ReviewScreen />}
+            {currentScreen === 'Summary' && <SummaryScreen />}
+          </View>
+        )}
+      </View>
+    </GestureDetector>
+  );
 };
 
 function AppContent() {
