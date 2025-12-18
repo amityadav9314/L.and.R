@@ -17,6 +17,8 @@ interface SearchHeaderProps {
     resultsText: string;
     isFetchingPreviousPage: boolean;
     onAddMaterial: () => void;
+    onlyDue: boolean;
+    setOnlyDue: (val: boolean) => void;
     colors: ThemeColors;
     styles: any;
 }
@@ -36,6 +38,8 @@ export const SearchHeader = memo(({
     resultsText,
     isFetchingPreviousPage,
     onAddMaterial,
+    onlyDue,
+    setOnlyDue,
     colors,
     styles
 }: SearchHeaderProps) => {
@@ -47,19 +51,29 @@ export const SearchHeader = memo(({
 
             <View style={styles.titleRow}>
                 <View style={styles.titleWithBadge}>
-                    <Text style={styles.mainTitle}>Due for Review</Text>
-                    {dueFlashcardsCount > 0 && (
+                    <Text style={styles.mainTitle}>{onlyDue ? 'Due for Review' : 'All Materials'}</Text>
+                    {onlyDue && dueFlashcardsCount > 0 && (
                         <View style={styles.notificationBadge}>
                             <Text style={styles.notificationBadgeText}>{dueFlashcardsCount}</Text>
                         </View>
                     )}
                 </View>
-                <TouchableOpacity
-                    style={styles.addButton}
-                    onPress={onAddMaterial}
-                >
-                    <Text style={styles.addButtonText}>+ Add Material</Text>
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                    <TouchableOpacity
+                        style={[styles.toggleButton, !onlyDue && styles.toggleButtonActive]}
+                        onPress={() => setOnlyDue(!onlyDue)}
+                    >
+                        <Text style={[styles.toggleButtonText, !onlyDue && styles.toggleButtonTextActive]}>
+                            {onlyDue ? 'View All' : 'Show Due'}
+                        </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={styles.addButton}
+                        onPress={onAddMaterial}
+                    >
+                        <Text style={styles.addButtonText}>+ Add</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
 
             {/* Search Bar */}

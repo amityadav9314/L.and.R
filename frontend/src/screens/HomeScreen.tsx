@@ -23,6 +23,7 @@ export const HomeScreen = () => {
     const [inputValue, setInputValue] = useState(''); // Local input state
     const [searchQuery, setSearchQuery] = useState(''); // API query state
     const [selectedTags, setSelectedTags] = useState<string[]>([]);
+    const [onlyDue, setOnlyDue] = useState(true); // Default to ONLY showing due materials
 
     const handleSearch = useCallback(() => {
         setSearchQuery(inputValue); // Trigger API search
@@ -76,15 +77,16 @@ export const HomeScreen = () => {
         refetch,
         isRefetching,
     } = useInfiniteQuery({
-        queryKey: ['dueMaterials', searchQuery, selectedTags], // Re-fetch when filters change
+        queryKey: ['dueMaterials', searchQuery, selectedTags, onlyDue], // Re-fetch when filters change
         queryFn: async ({ pageParam = 1 }) => {
-            console.log('[HOME] Fetching due materials page:', pageParam, 'query:', searchQuery, 'tags:', selectedTags);
+            console.log('[HOME] Fetching materials page:', pageParam, 'query:', searchQuery, 'tags:', selectedTags, 'onlyDue:', onlyDue);
             try {
                 const response = await learningClient.getDueMaterials({
                     page: pageParam,
                     pageSize: MATERIALS_PER_PAGE,
                     searchQuery: searchQuery,
                     tags: selectedTags,
+                    onlyDue: onlyDue,
                 });
                 console.log('[HOME] Got materials:', response.materials?.length || 0, 'of', response.totalCount);
                 return response;
@@ -159,6 +161,7 @@ export const HomeScreen = () => {
         setInputValue('');
         setSearchQuery('');
         setSelectedTags([]);
+        // We don't clear onlyDue by default, as that's a view mode
     }, []);
 
     const handleRefresh = useCallback(async () => {
@@ -186,7 +189,8 @@ export const HomeScreen = () => {
 
     // Results text logic
     const resultsText = useMemo(() => {
-        if (!data?.pages?.length) return hasActiveFilters ? 'No matches found' : 'No materials due';
+        const baseMsg = onlyDue ? 'materials due' : 'total materials';
+        if (!data?.pages?.length) return hasActiveFilters ? 'No matches found' : `No ${baseMsg}`;
         const pages = data.pages.map(p => p.page).sort((a, b) => a - b);
         const minPage = pages[0];
         const maxPage = pages[pages.length - 1];
@@ -215,9 +219,11 @@ export const HomeScreen = () => {
                     </View>
                 </View>
                 <View style={styles.cardActions}>
-                    <View style={styles.badge}>
-                        <Text style={styles.badgeText}>{item.dueCount}</Text>
-                    </View>
+                    {item.dueCount > 0 && (
+                        <View style={styles.badge}>
+                            <Text style={styles.badgeText}>{item.dueCount}</Text>
+                        </View>
+                    )}
                     <TouchableOpacity
                         style={styles.deleteButton}
                         onPress={(e) => {
@@ -266,6 +272,8 @@ export const HomeScreen = () => {
                 resultsText={resultsText}
                 isFetchingPreviousPage={isFetchingPreviousPage}
                 onAddMaterial={() => navigation.navigate('AddMaterial')}
+                onlyDue={onlyDue}
+                setOnlyDue={setOnlyDue}
                 colors={colors}
                 styles={styles}
             />
@@ -282,7 +290,7 @@ export const HomeScreen = () => {
         <Text style={styles.empty}>
             {hasActiveFilters
                 ? 'No materials match your filters'
-                : 'No materials due! Good job.'}
+                : onlyDue ? 'No materials due for revision! Good job.' : 'Your vault is empty. Add some materials!'}
         </Text>
     );
 
@@ -441,6 +449,26 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         color: colors.textSecondary,
         fontWeight: '600',
         fontSize: 14,
+    },
+    toggleButton: {
+        backgroundColor: colors.cardAlt,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: colors.border,
+    },
+    toggleButtonActive: {
+        backgroundColor: colors.primary,
+        borderColor: colors.primary,
+    },
+    toggleButtonText: {
+        color: colors.textSecondary,
+        fontWeight: '600',
+        fontSize: 12,
+    },
+    toggleButtonTextActive: {
+        color: colors.textInverse,
     },
     tagFilterSection: {
         marginBottom: 15,

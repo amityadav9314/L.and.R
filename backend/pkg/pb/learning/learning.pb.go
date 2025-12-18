@@ -277,6 +277,7 @@ type GetDueMaterialsRequest struct {
 	PageSize      int32                  `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
 	SearchQuery   string                 `protobuf:"bytes,3,opt,name=search_query,json=searchQuery,proto3" json:"search_query,omitempty"`
 	Tags          []string               `protobuf:"bytes,4,rep,name=tags,proto3" json:"tags,omitempty"`
+	OnlyDue       bool                   `protobuf:"varint,5,opt,name=only_due,json=onlyDue,proto3" json:"only_due,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -337,6 +338,13 @@ func (x *GetDueMaterialsRequest) GetTags() []string {
 		return x.Tags
 	}
 	return nil
+}
+
+func (x *GetDueMaterialsRequest) GetOnlyDue() bool {
+	if x != nil {
+		return x.OnlyDue
+	}
+	return false
 }
 
 type GetDueMaterialsResponse struct {
@@ -959,12 +967,13 @@ const file_backend_proto_learning_learning_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x1b\n" +
 	"\tdue_count\x18\x03 \x01(\x05R\bdueCount\x12\x12\n" +
-	"\x04tags\x18\x04 \x03(\tR\x04tags\"\x80\x01\n" +
+	"\x04tags\x18\x04 \x03(\tR\x04tags\"\x9b\x01\n" +
 	"\x16GetDueMaterialsRequest\x12\x12\n" +
 	"\x04page\x18\x01 \x01(\x05R\x04page\x12\x1b\n" +
 	"\tpage_size\x18\x02 \x01(\x05R\bpageSize\x12!\n" +
 	"\fsearch_query\x18\x03 \x01(\tR\vsearchQuery\x12\x12\n" +
-	"\x04tags\x18\x04 \x03(\tR\x04tags\"\xc5\x01\n" +
+	"\x04tags\x18\x04 \x03(\tR\x04tags\x12\x19\n" +
+	"\bonly_due\x18\x05 \x01(\bR\aonlyDue\"\xc5\x01\n" +
 	"\x17GetDueMaterialsResponse\x127\n" +
 	"\tmaterials\x18\x01 \x03(\v2\x19.learning.MaterialSummaryR\tmaterials\x12\x1f\n" +
 	"\vtotal_count\x18\x02 \x01(\x05R\n" +

@@ -266,8 +266,8 @@ func (s *PostgresStore) UpdateFlashcardContent(ctx context.Context, id, question
 	return nil
 }
 
-func (s *PostgresStore) GetDueMaterials(ctx context.Context, userID string, page, pageSize int32, searchQuery string, filterTags []string) ([]*learning.MaterialSummary, int32, error) {
-	log.Printf("[Store.GetDueMaterials] Querying materials for userID: %s, page: %d, pageSize: %d, search: %s, tags: %v", userID, page, pageSize, searchQuery, filterTags)
+func (s *PostgresStore) GetDueMaterials(ctx context.Context, userID string, page, pageSize int32, searchQuery string, filterTags []string, onlyDue bool) ([]*learning.MaterialSummary, int32, error) {
+	log.Printf("[Store.GetDueMaterials] Querying materials for userID: %s, page: %d, pageSize: %d, search: %s, tags: %v, onlyDue: %v", userID, page, pageSize, searchQuery, filterTags, onlyDue)
 
 	// Base conditions
 	whereClause := "m.user_id = $1 AND (m.is_deleted = FALSE OR m.is_deleted IS NULL)"
@@ -283,13 +283,6 @@ func (s *PostgresStore) GetDueMaterials(ctx context.Context, userID string, page
 
 	// Add tag filter
 	if len(filterTags) > 0 {
-		// Subquery to find material IDs that have ALL the specified tags (AND logic)
-		// Or ANY tags (OR logic) - usually user expects OR or AND.
-		// Let's implement OR logic for now as it's common filter behavior, or check user requirement.
-		// User requirement "matchesSearch && matchesTags" in frontend implies AND logic implementation on frontend currently.
-		// Detailed view of frontend filter: "selectedTags.every(tag => material.tags.includes(tag))" -> This is AND logic.
-		// So we must implement AND logic.
-
 		paramCount++
 		whereClause += fmt.Sprintf(` AND m.id IN (
 			SELECT mt.material_id 
@@ -301,6 +294,14 @@ func (s *PostgresStore) GetDueMaterials(ctx context.Context, userID string, page
 		)`, paramCount, paramCount+1)
 		args = append(args, filterTags, len(filterTags))
 		paramCount++
+	}
+
+	// Subquery for due count
+	dueCountSubquery := `(SELECT COUNT(f.id) FROM flashcards f WHERE f.material_id = m.id AND f.next_review_at <= NOW())`
+
+	// Add only_due filter
+	if onlyDue {
+		whereClause += fmt.Sprintf(" AND %s > 0", dueCountSubquery)
 	}
 
 	// 1. Get total count
@@ -316,10 +317,8 @@ func (s *PostgresStore) GetDueMaterials(ctx context.Context, userID string, page
 	}
 
 	// 2. Get paginated results
-	// Calculate offset
 	offset := (page - 1) * pageSize
 
-	// Add ordering and pagination limits
 	paramCount++
 	limitArgIdx := paramCount
 	args = append(args, pageSize)
@@ -329,14 +328,12 @@ func (s *PostgresStore) GetDueMaterials(ctx context.Context, userID string, page
 	args = append(args, offset)
 
 	query := fmt.Sprintf(`
-		SELECT m.id, m.title, COUNT(f.id) as due_count
+		SELECT m.id, m.title, %s as due_count
 		FROM materials m
-		LEFT JOIN flashcards f ON m.id = f.material_id
 		WHERE %s
-		GROUP BY m.id, m.title
 		ORDER BY m.created_at DESC
 		LIMIT $%d OFFSET $%d;
-	`, whereClause, limitArgIdx, offsetArgIdx)
+	`, dueCountSubquery, whereClause, limitArgIdx, offsetArgIdx)
 
 	rows, err := s.db.Query(ctx, query, args...)
 	if err != nil {

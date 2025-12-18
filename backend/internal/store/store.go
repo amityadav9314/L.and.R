@@ -27,7 +27,7 @@ type Store interface {
 	CreateFlashcards(ctx context.Context, materialID string, cards []*learning.Flashcard) error
 	GetFlashcard(ctx context.Context, id string) (*learning.Flashcard, error)
 	GetDueFlashcards(ctx context.Context, userID, materialID string) ([]*learning.Flashcard, error)
-	GetDueMaterials(ctx context.Context, userID string, page, pageSize int32, searchQuery string, tags []string) ([]*learning.MaterialSummary, int32, error)
+	GetDueMaterials(ctx context.Context, userID string, page, pageSize int32, searchQuery string, tags []string, onlyDue bool) ([]*learning.MaterialSummary, int32, error)
 	GetDueFlashcardsCount(ctx context.Context, userID string) (int32, error)
 	UpdateFlashcard(ctx context.Context, id string, stage int32, nextReviewAt time.Time) error
 	UpdateFlashcardContent(ctx context.Context, id, question, answer string) error

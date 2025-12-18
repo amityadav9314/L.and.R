@@ -44,6 +44,7 @@ export interface GetDueMaterialsRequest {
   pageSize: number;
   searchQuery: string;
   tags: string[];
+  onlyDue: boolean;
 }
 
 export interface GetDueMaterialsResponse {
@@ -489,7 +490,7 @@ export const MaterialSummary: MessageFns<MaterialSummary> = {
 };
 
 function createBaseGetDueMaterialsRequest(): GetDueMaterialsRequest {
-  return { page: 0, pageSize: 0, searchQuery: "", tags: [] };
+  return { page: 0, pageSize: 0, searchQuery: "", tags: [], onlyDue: false };
 }
 
 export const GetDueMaterialsRequest: MessageFns<GetDueMaterialsRequest> = {
@@ -505,6 +506,9 @@ export const GetDueMaterialsRequest: MessageFns<GetDueMaterialsRequest> = {
     }
     for (const v of message.tags) {
       writer.uint32(34).string(v!);
+    }
+    if (message.onlyDue !== false) {
+      writer.uint32(40).bool(message.onlyDue);
     }
     return writer;
   },
@@ -548,6 +552,14 @@ export const GetDueMaterialsRequest: MessageFns<GetDueMaterialsRequest> = {
           message.tags.push(reader.string());
           continue;
         }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.onlyDue = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -563,6 +575,7 @@ export const GetDueMaterialsRequest: MessageFns<GetDueMaterialsRequest> = {
       pageSize: isSet(object.pageSize) ? globalThis.Number(object.pageSize) : 0,
       searchQuery: isSet(object.searchQuery) ? globalThis.String(object.searchQuery) : "",
       tags: globalThis.Array.isArray(object?.tags) ? object.tags.map((e: any) => globalThis.String(e)) : [],
+      onlyDue: isSet(object.onlyDue) ? globalThis.Boolean(object.onlyDue) : false,
     };
   },
 
@@ -580,6 +593,9 @@ export const GetDueMaterialsRequest: MessageFns<GetDueMaterialsRequest> = {
     if (message.tags?.length) {
       obj.tags = message.tags;
     }
+    if (message.onlyDue !== false) {
+      obj.onlyDue = message.onlyDue;
+    }
     return obj;
   },
 
@@ -592,6 +608,7 @@ export const GetDueMaterialsRequest: MessageFns<GetDueMaterialsRequest> = {
     message.pageSize = object.pageSize ?? 0;
     message.searchQuery = object.searchQuery ?? "";
     message.tags = object.tags?.map((e) => e) || [];
+    message.onlyDue = object.onlyDue ?? false;
     return message;
   },
 };

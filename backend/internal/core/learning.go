@@ -204,9 +204,9 @@ func (c *LearningCore) GetDueFlashcards(ctx context.Context, userID, materialID 
 	return cards, nil
 }
 
-func (c *LearningCore) GetDueMaterials(ctx context.Context, userID string, page, pageSize int32, searchQuery string, tags []string) ([]*learning.MaterialSummary, int32, error) {
-	log.Printf("[Core.GetDueMaterials] Querying for userID: %s, page: %d, pageSize: %d, search: %s, tags: %v", userID, page, pageSize, searchQuery, tags)
-	materials, totalCount, err := c.store.GetDueMaterials(ctx, userID, page, pageSize, searchQuery, tags)
+func (c *LearningCore) GetDueMaterials(ctx context.Context, userID string, page, pageSize int32, searchQuery string, tags []string, onlyDue bool) ([]*learning.MaterialSummary, int32, error) {
+	log.Printf("[Core.GetDueMaterials] Querying for userID: %s, page: %d, pageSize: %d, search: %s, tags: %v, onlyDue: %v", userID, page, pageSize, searchQuery, tags, onlyDue)
+	materials, totalCount, err := c.store.GetDueMaterials(ctx, userID, page, pageSize, searchQuery, tags, onlyDue)
 	if err != nil {
 		log.Printf("[Core.GetDueMaterials] Query failed: %v", err)
 		return nil, 0, err

@@ -105,9 +105,9 @@ func (s *LearningService) GetDueMaterials(ctx context.Context, req *learning.Get
 		pageSize = 10 // Default page size
 	}
 
-	log.Printf("[GetDueMaterials] Fetching materials for userID: %s, page: %d, pageSize: %d, search: %s, tags: %v", userID, page, pageSize, req.SearchQuery, req.Tags)
+	log.Printf("[GetDueMaterials] Fetching materials for userID: %s, page: %d, pageSize: %d, search: %s, tags: %v, onlyDue: %v", userID, page, pageSize, req.SearchQuery, req.Tags, req.OnlyDue)
 
-	materials, totalCount, err := s.core.GetDueMaterials(ctx, userID, page, pageSize, req.SearchQuery, req.Tags)
+	materials, totalCount, err := s.core.GetDueMaterials(ctx, userID, page, pageSize, req.SearchQuery, req.Tags, req.OnlyDue)
 	if err != nil {
 		log.Printf("[GetDueMaterials] ERROR: %v", err)
 		return nil, status.Errorf(codes.Internal, "failed to get due materials: %v", err)
