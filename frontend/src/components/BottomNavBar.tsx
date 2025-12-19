@@ -21,7 +21,8 @@ export const BottomNavBar = () => {
 
     const navItems = [
         { name: 'Home', icon: '🏠', label: 'Home', filter: true, activeColor: '#FF6B6B' },
-        { name: 'Vault', icon: '🏛️', label: 'Vault', filter: false, activeColor: '#4ECDC4' }, // Or 📚
+        { name: 'Vault', icon: '🏛️', label: 'Vault', filter: false, activeColor: '#4ECDC4' },
+        { name: 'DailyFeed', icon: '📰', label: 'Feed', activeColor: '#9B59B6' },
         { name: 'AddMaterial', icon: '➕', label: 'Add', activeColor: '#45B7D1' },
         { name: 'Settings', icon: '⚙️', label: 'Settings', activeColor: '#FFD93D' },
     ];

@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+package feed;
+
+option go_package = "github.com/amityadav/landr/pkg/pb/feed";
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+service FeedService {
+  // Update user's feed preferences (interest prompt and enable/disable)
+  rpc UpdateFeedPreferences(UpdateFeedPreferencesRequest) returns (google.protobuf.Empty);
+
+  // Get user's current feed preferences
+  rpc GetFeedPreferences(google.protobuf.Empty) returns (FeedPreferencesResponse);
+
+  // Get articles for a specific date
+  rpc GetDailyFeed(GetDailyFeedRequest) returns (GetDailyFeedResponse);
+
+  // Get dates that have articles for the calendar view
+  rpc GetFeedCalendarStatus(GetFeedCalendarStatusRequest) returns (GetFeedCalendarStatusResponse);
+}
+
+message UpdateFeedPreferencesRequest {
+  string interest_prompt = 1;
+  bool feed_enabled = 2;
+}
+
+message FeedPreferencesResponse {
+  string interest_prompt = 1;
+  bool feed_enabled = 2;
+}
+
+message GetDailyFeedRequest {
+  // Date in YYYY-MM-DD format
+  string date = 1;
+}
+
+message Article {
+  string id = 1;
+  string title = 2;
+  string url = 3;
+  string snippet = 4;
+  float relevance_score = 5;
+  google.protobuf.Timestamp created_at = 6;
+}
+
+message GetDailyFeedResponse {
+  string date = 1;
+  repeated Article articles = 2;
+}
+
+message GetFeedCalendarStatusRequest {
+  // Month in YYYY-MM format, defaults to current month
+  string month = 1;
+}
+
+message CalendarDay {
+  string date = 1;
+  int32 article_count = 2;
+}
+
+message GetFeedCalendarStatusResponse {
+  repeated CalendarDay days = 1;
+}

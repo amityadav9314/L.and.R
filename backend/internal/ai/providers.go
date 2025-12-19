@@ -19,6 +19,7 @@ type Provider interface {
 	GenerateFlashcards(content string, existingTags []string) (string, []string, []*learning.Flashcard, error)
 	GenerateSummary(content string) (string, error)
 	ExtractTextFromImage(base64Image string) (string, error)
+	OptimizeSearchQuery(userInterests string) (string, error) // Convert user interests to optimized search query
 }
 
 // ProviderConfig holds configuration for a provider
@@ -219,6 +220,44 @@ Return ONLY the extracted text, no commentary or additional formatting.`
 	return p.sendRequest(reqBody, "OCR")
 }
 
+// OptimizeSearchQuery converts user interests into an optimized search query
+func (p *BaseProvider) OptimizeSearchQuery(userInterests string) (string, error) {
+	log.Printf("[%s.SearchQuery] Optimizing query for: %s", p.config.Name, userInterests)
+
+	prompt := fmt.Sprintf(`You are an expert at crafting search queries for finding the latest news and articles.
+
+User's interests: "%s"
+
+Create a single, optimized search query that will find the most relevant and recent articles about these topics.
+The query should:
+- Be concise (10-15 words max)
+- Focus on finding NEWS articles, not general information
+- Include key terms that will return high-quality, recent content
+- Be specific enough to avoid generic results
+
+Return ONLY the search query text, nothing else. No quotes, no explanation.`, userInterests)
+
+	reqBody := chatRequest{
+		Model: p.config.TextModel,
+		Messages: []interface{}{
+			textMessage{Role: "user", Content: prompt},
+		},
+	}
+
+	query, err := p.sendRequest(reqBody, "SearchQuery")
+	if err != nil {
+		// Fallback to original interests if LLM fails
+		log.Printf("[%s.SearchQuery] LLM failed, using original: %v", p.config.Name, err)
+		return userInterests, nil
+	}
+
+	// Clean up the query
+	query = strings.TrimSpace(query)
+	query = strings.Trim(query, `"'`)
+	log.Printf("[%s.SearchQuery] Optimized query: %s", p.config.Name, query)
+	return query, nil
+}
+
 // MultiProvider distributes work across providers to avoid rate limits
 // Flashcards -> provider[0], Summary -> provider[1] (or wraps around)
 type MultiProvider struct {
@@ -286,6 +325,11 @@ func (m *MultiProvider) GenerateSummary(content string) (string, error) {
 // ExtractTextFromImage uses primary provider (only Groq has vision)
 func (m *MultiProvider) ExtractTextFromImage(base64Image string) (string, error) {
 	return m.primary.ExtractTextFromImage(base64Image)
+}
+
+// OptimizeSearchQuery uses primary provider
+func (m *MultiProvider) OptimizeSearchQuery(userInterests string) (string, error) {
+	return m.primary.OptimizeSearchQuery(userInterests)
 }
 
 // Convenience constructors for specific providers

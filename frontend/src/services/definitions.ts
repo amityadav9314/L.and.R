@@ -115,3 +115,49 @@ export const LearningServiceDefinition = {
     },
 } as const;
 
+// Feed Service (Daily AI Feed)
+import {
+    UpdateFeedPreferencesRequest,
+    FeedPreferencesResponse,
+    GetDailyFeedRequest, GetDailyFeedResponse,
+    GetFeedCalendarStatusRequest, GetFeedCalendarStatusResponse
+} from '../../proto/backend/proto/feed/feed';
+
+export const FeedServiceDefinition = {
+    name: 'FeedService',
+    fullName: 'feed.FeedService',
+    methods: {
+        updateFeedPreferences: {
+            name: 'UpdateFeedPreferences',
+            requestType: UpdateFeedPreferencesRequest,
+            requestStream: false,
+            responseType: Empty,
+            responseStream: false,
+            options: {},
+        },
+        getFeedPreferences: {
+            name: 'GetFeedPreferences',
+            requestType: Empty,
+            requestStream: false,
+            responseType: FeedPreferencesResponse,
+            responseStream: false,
+            options: {},
+        },
+        getDailyFeed: {
+            name: 'GetDailyFeed',
+            requestType: GetDailyFeedRequest,
+            requestStream: false,
+            responseType: GetDailyFeedResponse,
+            responseStream: false,
+            options: {},
+        },
+        getFeedCalendarStatus: {
+            name: 'GetFeedCalendarStatus',
+            requestType: GetFeedCalendarStatusRequest,
+            requestStream: false,
+            responseType: GetFeedCalendarStatusResponse,
+            responseStream: false,
+            options: {},
+        },
+    },
+} as const;

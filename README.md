@@ -90,6 +90,28 @@ The service is defined in `backend/proto/learning/learning.proto`.
 ### Service: `AuthService`
 - **Login** – `LoginRequest → LoginResponse`
 
+### Service: `FeedService` (Daily AI Feed)
+- **GetFeedPreferences** – Get user's feed preferences
+- **UpdateFeedPreferences** – Update interest prompt and enable/disable
+- **GetDailyFeed** – Get articles for a specific date
+- **GetFeedCalendarStatus** – Get calendar days with articles
+
+### REST API: Manual Feed Trigger
+Manually trigger daily feed generation for a user by email (requires API key):
+
+```bash
+# Set your API key and user email
+curl -X POST "http://localhost:8080/api/feed/refresh?email=user@example.com" \
+  -H "X-API-Key: your-secret-api-key"
+```
+
+**Response:**
+```json
+{"status": "success", "message": "Daily feed refreshed successfully"}
+```
+
+> **Note**: Set `FEED_API_KEY` in your `.env` file. This same key must be passed in the `X-API-Key` header.
+
 The generated TypeScript client lives in `frontend/proto/...` and is used via `nice-grpc-web`.
 
 ## Running the Application

@@ -128,3 +128,28 @@ React Native's JavaScript runtime lacks certain browser globals that `nice-grpc-
 2.  Backend queries `flashcards` joined with `materials` and `tags`.
 3.  Frontend displays grouped flashcards with swipe/flip UI.
 4.  User marks cards as reviewed, advancing their spaced repetition stage.
+
+## Daily AI Feed Feature
+
+### Overview
+Provides users with personalized daily article recommendations. **Disabled by default** – users must opt-in via Settings.
+
+### Database Tables
+- **`users`**: Extended with `interest_prompt` (TEXT) and `feed_enabled` (BOOLEAN, default FALSE)
+- **`daily_articles`**: Stores articles with `title`, `url`, `snippet`, `suggested_date`, `relevance_score`
+
+### Backend Components
+- **`TavilyClient`** (`internal/tavily/client.go`): HTTP client for Tavily Search API
+- **`FeedCore`** (`internal/core/feed.go`): Business logic for feed preferences and article generation
+- **`FeedService`** (`internal/service/feed.go`): gRPC handlers for `FeedService`
+
+### REST API
+- **`POST /api/feed/refresh?email=<email>`**: Manually trigger feed generation for a user
+
+### Frontend Components
+- **SettingsScreen**: Toggle + interest prompt input
+- **DailyFeedScreen**: Calendar date navigation + article cards with "Read More" links
+- **BottomNavBar**: 📰 "Feed" tab
+
+### Environment Variables
+- `TAVILY_API_KEY`: Required to enable the Daily Feed feature

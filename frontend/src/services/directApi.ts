@@ -268,3 +268,54 @@ export const learningClient = {
         );
     },
 };
+
+// ============================================
+// Feed Service Client (Daily AI Feed)
+// ============================================
+import {
+    UpdateFeedPreferencesRequest,
+    FeedPreferencesResponse,
+    GetDailyFeedRequest, GetDailyFeedResponse,
+    GetFeedCalendarStatusRequest, GetFeedCalendarStatusResponse
+} from '../../proto/backend/proto/feed/feed';
+
+export const feedClient = {
+    async getFeedPreferences(): Promise<FeedPreferencesResponse> {
+        return grpcRequest(
+            '/feed.FeedService/GetFeedPreferences',
+            {},
+            () => new Uint8Array(0), // Empty request
+            (data) => FeedPreferencesResponse.decode(data),
+        );
+    },
+
+    async updateFeedPreferences(request: Partial<UpdateFeedPreferencesRequest>): Promise<Empty> {
+        const req = UpdateFeedPreferencesRequest.fromPartial(request);
+        return grpcRequest(
+            '/feed.FeedService/UpdateFeedPreferences',
+            req,
+            (r) => UpdateFeedPreferencesRequest.encode(r).finish(),
+            (data) => Empty.decode(data),
+        );
+    },
+
+    async getDailyFeed(request: Partial<GetDailyFeedRequest>): Promise<GetDailyFeedResponse> {
+        const req = GetDailyFeedRequest.fromPartial(request);
+        return grpcRequest(
+            '/feed.FeedService/GetDailyFeed',
+            req,
+            (r) => GetDailyFeedRequest.encode(r).finish(),
+            (data) => GetDailyFeedResponse.decode(data),
+        );
+    },
+
+    async getFeedCalendarStatus(request: Partial<GetFeedCalendarStatusRequest>): Promise<GetFeedCalendarStatusResponse> {
+        const req = GetFeedCalendarStatusRequest.fromPartial(request);
+        return grpcRequest(
+            '/feed.FeedService/GetFeedCalendarStatus',
+            req,
+            (r) => GetFeedCalendarStatusRequest.encode(r).finish(),
+            (data) => GetFeedCalendarStatusResponse.decode(data),
+        );
+    },
+};

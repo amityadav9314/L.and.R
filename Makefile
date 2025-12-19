@@ -110,11 +110,11 @@ proto:
 	@echo "Generating Go proto files..."
 	@protoc --go_out=backend --go_opt=module=github.com/amityadav/landr \
 	--go-grpc_out=backend --go-grpc_opt=module=github.com/amityadav/landr \
-	backend/proto/auth/*.proto backend/proto/learning/*.proto
+	backend/proto/auth/*.proto backend/proto/learning/*.proto backend/proto/feed/*.proto
 	@echo "Generating TypeScript proto files..."
 	@protoc --plugin=./frontend/node_modules/.bin/protoc-gen-ts_proto \
 	--ts_proto_out=./frontend/proto/backend \
 	--ts_proto_opt=esModuleInterop=true,outputServices=nice-grpc,env=browser,useExactTypes=false \
 	--proto_path=./backend \
-	backend/proto/auth/auth.proto backend/proto/learning/learning.proto
+	backend/proto/auth/auth.proto backend/proto/learning/learning.proto backend/proto/feed/feed.proto
 	@echo "Proto generation complete!"

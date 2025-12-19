@@ -9,11 +9,12 @@ import { Platform } from 'react-native';
 // Conditional export based on platform
 let authClient: any;
 let learningClient: any;
+let feedClient: any;
 
 if (Platform.OS === 'web') {
     // Web: Use nice-grpc-web
     const { createChannel, createClientFactory, ClientError, Status, Metadata, FetchTransport } = require('nice-grpc-web');
-    const { AuthServiceDefinition, LearningServiceDefinition } = require('./definitions');
+    const { AuthServiceDefinition, LearningServiceDefinition, FeedServiceDefinition } = require('./definitions');
     const { API_URL } = require('../utils/config');
 
     const channel = createChannel(API_URL, FetchTransport());
@@ -36,11 +37,13 @@ if (Platform.OS === 'web') {
 
     authClient = clientFactory.create(AuthServiceDefinition, channel);
     learningClient = clientFactory.create(LearningServiceDefinition, channel);
+    feedClient = clientFactory.create(FeedServiceDefinition, channel);
 } else {
     // Native: Use direct API client (bypasses nice-grpc-web)
     const directApi = require('./directApi');
     authClient = directApi.authClient;
     learningClient = directApi.learningClient;
+    feedClient = directApi.feedClient;
 }
 
-export { authClient, learningClient };
+export { authClient, learningClient, feedClient };

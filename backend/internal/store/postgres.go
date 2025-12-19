@@ -466,3 +466,167 @@ func (s *PostgresStore) UpdateMaterialSummary(ctx context.Context, materialID, s
 	log.Printf("[Store.UpdateMaterialSummary] Summary updated successfully")
 	return nil
 }
+
+// =======================
+// Feed Methods
+// =======================
+
+// FeedPreferences represents user's feed configuration
+type FeedPreferences struct {
+	InterestPrompt string
+	FeedEnabled    bool
+}
+
+// GetFeedPreferences fetches the user's feed preferences
+func (s *PostgresStore) GetFeedPreferences(ctx context.Context, userID string) (*FeedPreferences, error) {
+	log.Printf("[Store.GetFeedPreferences] Fetching for userID: %s", userID)
+	query := `SELECT COALESCE(interest_prompt, ''), COALESCE(feed_enabled, FALSE) FROM users WHERE id = $1`
+	var prefs FeedPreferences
+	err := s.db.QueryRow(ctx, query, userID).Scan(&prefs.InterestPrompt, &prefs.FeedEnabled)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get feed preferences: %w", err)
+	}
+	return &prefs, nil
+}
+
+// UpdateFeedPreferences updates the user's feed preferences
+func (s *PostgresStore) UpdateFeedPreferences(ctx context.Context, userID, interestPrompt string, feedEnabled bool) error {
+	log.Printf("[Store.UpdateFeedPreferences] Updating for userID: %s, enabled: %v", userID, feedEnabled)
+	query := `UPDATE users SET interest_prompt = $1, feed_enabled = $2, updated_at = NOW() WHERE id = $3`
+	_, err := s.db.Exec(ctx, query, interestPrompt, feedEnabled, userID)
+	if err != nil {
+		return fmt.Errorf("failed to update feed preferences: %w", err)
+	}
+	return nil
+}
+
+// DailyArticle represents an article recommended to a user
+type DailyArticle struct {
+	ID             string
+	Title          string
+	URL            string
+	Snippet        string
+	RelevanceScore float64
+	SuggestedDate  time.Time
+	CreatedAt      time.Time
+}
+
+// StoreDailyArticle stores a single daily article for a user
+func (s *PostgresStore) StoreDailyArticle(ctx context.Context, userID string, article *DailyArticle) error {
+	log.Printf("[Store.StoreDailyArticle] Storing article: %s for user: %s", article.Title, userID)
+	query := `
+		INSERT INTO daily_articles (user_id, title, url, snippet, suggested_date, relevance_score)
+		VALUES ($1, $2, $3, $4, $5, $6)
+	`
+	_, err := s.db.Exec(ctx, query, userID, article.Title, article.URL, article.Snippet, article.SuggestedDate, article.RelevanceScore)
+	if err != nil {
+		return fmt.Errorf("failed to store daily article: %w", err)
+	}
+	return nil
+}
+
+// GetDailyArticles fetches articles for a specific date
+func (s *PostgresStore) GetDailyArticles(ctx context.Context, userID string, date time.Time) ([]*DailyArticle, error) {
+	log.Printf("[Store.GetDailyArticles] Fetching for userID: %s, date: %s", userID, date.Format("2006-01-02"))
+	query := `
+		SELECT id, title, url, snippet, relevance_score, suggested_date, created_at
+		FROM daily_articles
+		WHERE user_id = $1 AND suggested_date = $2
+		ORDER BY relevance_score DESC
+	`
+	rows, err := s.db.Query(ctx, query, userID, date)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query daily articles: %w", err)
+	}
+	defer rows.Close()
+
+	var articles []*DailyArticle
+	for rows.Next() {
+		var a DailyArticle
+		if err := rows.Scan(&a.ID, &a.Title, &a.URL, &a.Snippet, &a.RelevanceScore, &a.SuggestedDate, &a.CreatedAt); err != nil {
+			return nil, fmt.Errorf("failed to scan article: %w", err)
+		}
+		articles = append(articles, &a)
+	}
+	log.Printf("[Store.GetDailyArticles] Found %d articles", len(articles))
+	return articles, nil
+}
+
+// CalendarDay represents a day with article count for the calendar view
+type CalendarDay struct {
+	Date         time.Time
+	ArticleCount int32
+}
+
+// GetFeedCalendarStatus fetches dates that have articles for a given month
+func (s *PostgresStore) GetFeedCalendarStatus(ctx context.Context, userID string, year, month int) ([]*CalendarDay, error) {
+	log.Printf("[Store.GetFeedCalendarStatus] Fetching for userID: %s, %d-%02d", userID, year, month)
+	query := `
+		SELECT suggested_date, COUNT(id) as article_count
+		FROM daily_articles
+		WHERE user_id = $1 AND EXTRACT(YEAR FROM suggested_date) = $2 AND EXTRACT(MONTH FROM suggested_date) = $3
+		GROUP BY suggested_date
+		ORDER BY suggested_date
+	`
+	rows, err := s.db.Query(ctx, query, userID, year, month)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query calendar status: %w", err)
+	}
+	defer rows.Close()
+
+	var days []*CalendarDay
+	for rows.Next() {
+		var d CalendarDay
+		if err := rows.Scan(&d.Date, &d.ArticleCount); err != nil {
+			return nil, fmt.Errorf("failed to scan calendar day: %w", err)
+		}
+		days = append(days, &d)
+	}
+	log.Printf("[Store.GetFeedCalendarStatus] Found %d days with articles", len(days))
+	return days, nil
+}
+
+// GetUsersWithFeedEnabled fetches all user IDs with feed enabled
+func (s *PostgresStore) GetUsersWithFeedEnabled(ctx context.Context) ([]string, error) {
+	log.Printf("[Store.GetUsersWithFeedEnabled] Fetching users...")
+	query := `SELECT id FROM users WHERE feed_enabled = TRUE AND interest_prompt IS NOT NULL AND interest_prompt != ''`
+	rows, err := s.db.Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query users with feed enabled: %w", err)
+	}
+	defer rows.Close()
+
+	var userIDs []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		userIDs = append(userIDs, id)
+	}
+	log.Printf("[Store.GetUsersWithFeedEnabled] Found %d users", len(userIDs))
+	return userIDs, nil
+}
+
+// GetUserByEmail fetches a user ID by email address
+func (s *PostgresStore) GetUserByEmail(ctx context.Context, email string) (string, error) {
+	log.Printf("[Store.GetUserByEmail] Looking up user by email: %s", email)
+	query := `SELECT id FROM users WHERE email = $1`
+	var userID string
+	err := s.db.QueryRow(ctx, query, email).Scan(&userID)
+	if err != nil {
+		return "", fmt.Errorf("user not found: %w", err)
+	}
+	return userID, nil
+}
+
+// ArticleURLExists checks if an article URL already exists for this user
+func (s *PostgresStore) ArticleURLExists(ctx context.Context, userID, url string) (bool, error) {
+	query := `SELECT EXISTS(SELECT 1 FROM daily_articles WHERE user_id = $1 AND url = $2)`
+	var exists bool
+	err := s.db.QueryRow(ctx, query, userID, url).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("failed to check article existence: %w", err)
+	}
+	return exists, nil
+}

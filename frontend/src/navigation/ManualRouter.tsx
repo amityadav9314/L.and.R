@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
 import { Platform, BackHandler } from 'react-native';
 
-type ScreenName = 'Login' | 'Home' | 'AddMaterial' | 'MaterialDetail' | 'Review' | 'Summary' | 'Settings';
+type ScreenName = 'Login' | 'Home' | 'AddMaterial' | 'MaterialDetail' | 'Review' | 'Summary' | 'Settings' | 'DailyFeed';
 
 interface NavigationContextType {
     currentScreen: ScreenName;
