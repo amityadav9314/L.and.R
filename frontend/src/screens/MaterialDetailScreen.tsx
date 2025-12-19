@@ -13,6 +13,7 @@ import {
     Modal,
     TextInput,
     KeyboardAvoidingView,
+    ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -314,166 +315,179 @@ export const MaterialDetailScreen = () => {
     }
 
     return (
-        <View style={[styles.container, { paddingBottom: insets.bottom }]}>
-            <AppHeader />
-            <View style={styles.contentContainer}>
-                <View style={styles.headerRow}>
-                    <Text style={styles.headerTitle} numberOfLines={1}>{displayTitle}</Text>
-                    <TouchableOpacity onPress={handleEdit} style={styles.editButton}>
-                        <Text style={styles.editButtonText}>✎</Text>
-                    </TouchableOpacity>
-                </View>
-                {renderProgressDots()}
-
-                <Modal
-                    visible={isEditing}
-                    animationType="slide"
-                    transparent={true}
-                    onRequestClose={() => setIsEditing(false)}
-                >
-                    <KeyboardAvoidingView
-                        behavior={Platform.OS === "ios" ? "padding" : "height"}
-                        style={styles.modalContainer}
-                    >
-                        <View style={styles.modalContent}>
-                            <Text style={styles.modalTitle}>Edit Flashcard</Text>
-
-                            <Text style={styles.inputLabel}>Question</Text>
-                            <TextInput
-                                style={styles.input}
-                                value={editQuestion}
-                                onChangeText={setEditQuestion}
-                                multiline
-                            />
-
-                            <Text style={styles.inputLabel}>Answer</Text>
-                            <TextInput
-                                style={styles.input}
-                                value={editAnswer}
-                                onChangeText={setEditAnswer}
-                                multiline
-                            />
-
-                            <View style={styles.modalButtons}>
-                                <TouchableOpacity
-                                    style={[styles.modalButton, styles.cancelButton]}
-                                    onPress={() => setIsEditing(false)}
-                                >
-                                    <Text style={styles.modalButtonText}>Cancel</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={[styles.modalButton, styles.saveButton]}
-                                    onPress={handleSaveEdit}
-                                >
-                                    <Text style={styles.modalButtonText}>Save</Text>
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-                    </KeyboardAvoidingView>
-                </Modal>
-
-                <View style={styles.cardStackContainer}>
-                    {currentIndex < flashcards.length - 1 && <View style={[styles.stackCard, styles.stackCard2]} />}
-                    {currentIndex < flashcards.length - 2 && <View style={[styles.stackCard, styles.stackCard3]} />}
-
-                    <Animated.View
-                        style={[styles.cardContainer, { transform: [{ translateX: position }] }]}
-                        onTouchStart={handleTouchStart as any}
-                        onTouchMove={handleTouchMove as any}
-                        onTouchEnd={handleTouchEnd}
-                        // @ts-ignore
-                        onMouseDown={Platform.OS === 'web' ? handleTouchStart as any : undefined}
-                        onMouseMove={Platform.OS === 'web' ? handleTouchMove as any : undefined}
-                        onMouseUp={Platform.OS === 'web' ? handleTouchEnd : undefined}
-                        onMouseLeave={Platform.OS === 'web' ? handleTouchEnd : undefined}
-                    >
-                        <TouchableOpacity activeOpacity={0.95} onPress={handleCardPress} style={styles.cardTouchable}>
-                            <Animated.View style={[styles.card, styles.cardFront, frontAnimatedStyle]}>
-                                <View style={styles.cardHeader}>
-                                    <View style={styles.cardTypeIndicator}><Text style={styles.cardTypeText}>Q</Text></View>
-                                    <View style={styles.stageBadge}><Text style={styles.stageText}>Stage {currentCard?.stage || 0}</Text></View>
-                                </View>
-                                <View style={styles.cardContent}><Text style={styles.questionText}>{currentCard?.question}</Text></View>
-                                <View style={styles.cardFooter}><Text style={styles.tapHint}>👆 Tap to reveal answer</Text></View>
-                            </Animated.View>
-
-                            <Animated.View style={[styles.card, styles.cardBack, backAnimatedStyle]}>
-                                <View style={styles.cardHeader}>
-                                    <View style={[styles.cardTypeIndicator, styles.cardTypeAnswer]}><Text style={styles.cardTypeText}>A</Text></View>
-                                    <View style={styles.stageBadge}><Text style={styles.stageText}>Stage {currentCard?.stage || 0}</Text></View>
-                                </View>
-                                <View style={styles.cardContent}><Text style={styles.answerText}>{currentCard?.answer}</Text></View>
-                                <View style={styles.cardFooter}><Text style={styles.tapHint}>👆 Tap for question</Text></View>
-                            </Animated.View>
+        <View style={[styles.container, { paddingBottom: insets.bottom + 80 }]}>
+            <ScrollView contentContainerStyle={styles.mainScrollContent}>
+                <AppHeader />
+                <View style={styles.contentContainer}>
+                    <View style={styles.headerRow}>
+                        <Text style={styles.headerTitle} numberOfLines={1}>{displayTitle}</Text>
+                        <TouchableOpacity onPress={handleEdit} style={styles.editButton}>
+                            <Text style={styles.editButtonText}>✎</Text>
                         </TouchableOpacity>
-                    </Animated.View>
-                </View>
+                    </View>
+                    {renderProgressDots()}
 
-                <View style={styles.swipeHintContainer}>
-                    <Text style={styles.swipeHint}>
-                        {currentIndex > 0 && '← Swipe right for previous'}
-                        {currentIndex > 0 && currentIndex < flashcards.length - 1 && '  •  '}
-                        {currentIndex < flashcards.length - 1 && 'Swipe left for next →'}
-                    </Text>
-                </View>
+                    <Modal
+                        visible={isEditing}
+                        animationType="slide"
+                        transparent={true}
+                        onRequestClose={() => setIsEditing(false)}
+                    >
+                        <KeyboardAvoidingView
+                            behavior={Platform.OS === "ios" ? "padding" : "height"}
+                            style={styles.modalContainer}
+                        >
+                            <View style={styles.modalContent}>
+                                <Text style={styles.modalTitle}>Edit Flashcard</Text>
 
-                <View style={styles.navigationContainer}>
-                    <TouchableOpacity style={[styles.navButton, currentIndex === 0 && styles.navButtonDisabled]} onPress={goPrev} disabled={currentIndex === 0}>
-                        <Text style={[styles.navButtonText, currentIndex === 0 && styles.navButtonTextDisabled]}>←</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={[styles.navButton, currentIndex === flashcards.length - 1 && styles.navButtonDisabled]} onPress={goNext} disabled={currentIndex === flashcards.length - 1}>
-                        <Text style={[styles.navButtonText, currentIndex === flashcards.length - 1 && styles.navButtonTextDisabled]}>→</Text>
-                    </TouchableOpacity>
-                </View>
+                                <Text style={styles.inputLabel}>Question</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    value={editQuestion}
+                                    onChangeText={setEditQuestion}
+                                    multiline
+                                />
 
-                <View style={styles.actionButtonsContainer}>
-                    <TouchableOpacity style={[styles.wrongButton, isReviewing && styles.buttonDisabled]} onPress={handleFailReview} disabled={isReviewing}>
-                        <Text style={styles.wrongButtonText}>✗ Wrong</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={[styles.correctButton, isReviewing && styles.buttonDisabled]} onPress={handleCompleteReview} disabled={isReviewing}>
-                        {isReviewing ? <ActivityIndicator size="small" color={colors.textInverse} /> : <Text style={styles.correctButtonText}>✓ Got It</Text>}
-                    </TouchableOpacity>
+                                <Text style={styles.inputLabel}>Answer</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    value={editAnswer}
+                                    onChangeText={setEditAnswer}
+                                    multiline
+                                />
+
+                                <View style={styles.modalButtons}>
+                                    <TouchableOpacity
+                                        style={[styles.modalButton, styles.cancelButton]}
+                                        onPress={() => setIsEditing(false)}
+                                    >
+                                        <Text style={styles.modalButtonText}>Cancel</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={[styles.modalButton, styles.saveButton]}
+                                        onPress={handleSaveEdit}
+                                    >
+                                        <Text style={styles.modalButtonText}>Save</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        </KeyboardAvoidingView>
+                    </Modal>
+
+                    <View style={styles.cardStackContainer}>
+                        {currentIndex < flashcards.length - 1 && <View style={[styles.stackCard, styles.stackCard2]} />}
+                        {currentIndex < flashcards.length - 2 && <View style={[styles.stackCard, styles.stackCard3]} />}
+
+                        <Animated.View
+                            style={[styles.cardContainer, { transform: [{ translateX: position }] }]}
+                            onTouchStart={handleTouchStart as any}
+                            onTouchMove={handleTouchMove as any}
+                            onTouchEnd={handleTouchEnd}
+                            // @ts-ignore
+                            onMouseDown={Platform.OS === 'web' ? handleTouchStart as any : undefined}
+                            onMouseMove={Platform.OS === 'web' ? handleTouchMove as any : undefined}
+                            onMouseUp={Platform.OS === 'web' ? handleTouchEnd : undefined}
+                            onMouseLeave={Platform.OS === 'web' ? handleTouchEnd : undefined}
+                        >
+                            <TouchableOpacity activeOpacity={0.95} onPress={handleCardPress} style={styles.cardTouchable}>
+                                <Animated.View style={[styles.card, styles.cardFront, frontAnimatedStyle]}>
+                                    <View style={styles.cardHeader}>
+                                        <View style={styles.cardTypeIndicator}><Text style={styles.cardTypeText}>Q</Text></View>
+                                        <View style={styles.stageBadge}><Text style={styles.stageText}>Stage {currentCard?.stage || 0}</Text></View>
+                                    </View>
+                                    <ScrollView style={styles.cardContentScroll} contentContainerStyle={styles.cardContent}>
+                                        <Text style={styles.questionText}>{currentCard?.question}</Text>
+                                    </ScrollView>
+                                    <View style={styles.cardFooter}><Text style={styles.tapHint}>👆 Tap to reveal answer</Text></View>
+                                </Animated.View>
+
+                                <Animated.View style={[styles.card, styles.cardBack, backAnimatedStyle]}>
+                                    <View style={styles.cardHeader}>
+                                        <View style={[styles.cardTypeIndicator, styles.cardTypeAnswer]}><Text style={styles.cardTypeText}>A</Text></View>
+                                        <View style={styles.stageBadge}><Text style={styles.stageText}>Stage {currentCard?.stage || 0}</Text></View>
+                                    </View>
+                                    <ScrollView style={styles.cardContentScroll} contentContainerStyle={styles.cardContent}>
+                                        <Text style={styles.answerText}>{currentCard?.answer}</Text>
+                                    </ScrollView>
+                                    <View style={styles.cardFooter}><Text style={styles.tapHint}>👆 Tap for question</Text></View>
+                                </Animated.View>
+                            </TouchableOpacity>
+                        </Animated.View>
+                    </View>
+
+                    <View style={styles.swipeHintContainer}>
+                        <Text style={styles.swipeHint}>
+                            {currentIndex > 0 && '← Swipe right for previous'}
+                            {currentIndex > 0 && currentIndex < flashcards.length - 1 && '  •  '}
+                            {currentIndex < flashcards.length - 1 && 'Swipe left for next →'}
+                        </Text>
+                    </View>
+
+                    <View style={styles.navigationContainer}>
+                        <TouchableOpacity style={[styles.navButton, currentIndex === 0 && styles.navButtonDisabled]} onPress={goPrev} disabled={currentIndex === 0}>
+                            <Text style={[styles.navButtonText, currentIndex === 0 && styles.navButtonTextDisabled]}>←</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[styles.navButton, currentIndex === flashcards.length - 1 && styles.navButtonDisabled]} onPress={goNext} disabled={currentIndex === flashcards.length - 1}>
+                            <Text style={[styles.navButtonText, currentIndex === flashcards.length - 1 && styles.navButtonTextDisabled]}>→</Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.actionButtonsContainer}>
+                        <TouchableOpacity style={[styles.wrongButton, isReviewing && styles.buttonDisabled]} onPress={handleFailReview} disabled={isReviewing}>
+                            <Text style={styles.wrongButtonText}>✗ Wrong</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[styles.correctButton, isReviewing && styles.buttonDisabled]} onPress={handleCompleteReview} disabled={isReviewing}>
+                            {isReviewing ? <ActivityIndicator size="small" color={colors.textInverse} /> : <Text style={styles.correctButtonText}>✓ Got It</Text>}
+                        </TouchableOpacity>
+                    </View>
                 </View>
-            </View>
+            </ScrollView>
         </View>
     );
 };
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
-    contentContainer: { flex: 1, padding: 20, paddingTop: 16 },
-    headerTitle: { fontSize: 22, fontWeight: '700', color: colors.textPrimary, textAlign: 'center', marginBottom: 16 },
-    progressContainer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 20, gap: 8 },
-    progressDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.border },
-    progressDotActive: { backgroundColor: colors.primary, width: 12, height: 12, borderRadius: 6 },
-    progressTextContainer: { alignItems: 'center', marginBottom: 20 },
-    progressText: { fontSize: 16, fontWeight: '600', color: colors.primary },
-    cardStackContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', maxHeight: 420 },
+    mainScrollContent: { flexGrow: 1 },
+    contentContainer: {
+        flex: 1,
+        paddingHorizontal: 3,
+        paddingTop: 0,
+        paddingBottom: 16,
+    },
+    headerTitle: { fontSize: 20, fontWeight: '700', color: colors.textPrimary, textAlign: 'center', marginBottom: 8, paddingTop: 12 },
+    progressContainer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 12, gap: 8 },
+    progressDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.border },
+    progressDotActive: { backgroundColor: colors.primary, width: 10, height: 10, borderRadius: 5 },
+    progressTextContainer: { alignItems: 'center', marginBottom: 12 },
+    progressText: { fontSize: 14, fontWeight: '600', color: colors.primary },
+    cardStackContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', maxHeight: 360 },
     stackCard: { position: 'absolute', width: CARD_WIDTH - 16, height: '92%', backgroundColor: colors.card, borderRadius: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 },
     stackCard2: { top: 8, transform: [{ scale: 0.96 }], opacity: 0.7 },
     stackCard3: { top: 16, transform: [{ scale: 0.92 }], opacity: 0.4 },
-    cardContainer: { width: CARD_WIDTH, height: '100%', maxHeight: 380 },
+    cardContainer: { width: CARD_WIDTH, height: '100%', maxHeight: 320 },
     cardTouchable: { flex: 1 },
-    card: { position: 'absolute', width: '100%', height: '100%', backgroundColor: colors.card, borderRadius: 20, padding: 24, backfaceVisibility: 'hidden', shadowColor: colors.primary, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 16, elevation: 8 },
+    card: { position: 'absolute', width: '100%', height: '100%', backgroundColor: colors.card, borderRadius: 20, padding: 20, backfaceVisibility: 'hidden', shadowColor: colors.primary, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 16, elevation: 8 },
     cardFront: { borderTopWidth: 4, borderTopColor: colors.primary },
     cardBack: { borderTopWidth: 4, borderTopColor: colors.success },
-    cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+    cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
     cardTypeIndicator: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' },
     cardTypeAnswer: { backgroundColor: colors.success },
     cardTypeText: { color: colors.textInverse, fontSize: 18, fontWeight: '700' },
     stageBadge: { backgroundColor: colors.cardAlt, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },
     stageText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
-    cardContent: { flex: 1, justifyContent: 'center' },
+    cardContentScroll: { flex: 1 },
+    cardContent: { flexGrow: 1, justifyContent: 'center' },
     questionText: { fontSize: 20, fontWeight: '600', color: colors.textPrimary, lineHeight: 30, textAlign: 'center' },
     answerText: { fontSize: 18, color: colors.textPrimary, lineHeight: 28, textAlign: 'center' },
-    cardFooter: { alignItems: 'center', paddingTop: 16 },
-    tapHint: { fontSize: 14, color: colors.textSecondary, fontStyle: 'italic' },
-    swipeHintContainer: { alignItems: 'center', marginTop: 16, marginBottom: 8 },
-    swipeHint: { fontSize: 13, color: colors.textSecondary },
-    navigationContainer: { flexDirection: 'row', justifyContent: 'center', gap: 20, marginBottom: 20 },
-    navButton: { width: 50, height: 50, borderRadius: 25, backgroundColor: colors.card, justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 },
+    cardFooter: { alignItems: 'center', paddingTop: 12 },
+    tapHint: { fontSize: 13, color: colors.textSecondary, fontStyle: 'italic' },
+    swipeHintContainer: { alignItems: 'center', marginTop: 12, marginBottom: 8 },
+    swipeHint: { fontSize: 12, color: colors.textSecondary },
+    navigationContainer: { flexDirection: 'row', justifyContent: 'center', gap: 20, marginBottom: 12 },
+    navButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.card, justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 },
     navButtonDisabled: { backgroundColor: colors.cardAlt, shadowOpacity: 0, elevation: 0 },
-    navButtonText: { fontSize: 24, color: colors.primary, fontWeight: '600' },
+    navButtonText: { fontSize: 20, color: colors.primary, fontWeight: '600' },
     navButtonTextDisabled: { color: colors.border },
     completeButton: { backgroundColor: colors.success, paddingVertical: 16, borderRadius: 14, alignItems: 'center', shadowColor: colors.success, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
     completeButtonDisabled: { backgroundColor: colors.paginationDisabledBg, shadowOpacity: 0 },

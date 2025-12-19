@@ -79,7 +79,7 @@ export const SummaryScreen = () => {
     }
 
     return (
-        <View style={[styles.container, { paddingBottom: insets.bottom }]}>
+        <View style={[styles.container, { paddingBottom: insets.bottom + 80 }]}>
             <AppHeader />
             <View style={styles.contentContainer}>
                 <Text style={styles.headerTitle} numberOfLines={2}>{displayTitle}</Text>
@@ -115,8 +115,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     },
     contentContainer: {
         flex: 1,
-        padding: 20,
-        paddingTop: 16
+        paddingHorizontal: 3,
+        paddingVertical: 16
     },
     headerTitle: {
         fontSize: 22,

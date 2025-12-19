@@ -11,6 +11,7 @@ import { AppHeader } from '../components/AppHeader';
 import { useTheme, ThemeColors } from '../utils/theme';
 import { ScrollView } from 'react-native';
 import { SearchHeader } from '../components/SearchHeader';
+import { useFilterStore } from '../store/filterStore';
 
 export const HomeScreen = () => {
     const navigation = useNavigation();
@@ -19,16 +20,16 @@ export const HomeScreen = () => {
     const queryClient = useQueryClient();
     const insets = useSafeAreaInsets();
 
-    // Filter states
-    const [inputValue, setInputValue] = useState(''); // Local input state
-    const [searchQuery, setSearchQuery] = useState(''); // API query state
-    const [selectedTags, setSelectedTags] = useState<string[]>([]);
-    const [onlyDue, setOnlyDue] = useState(true); // Default to ONLY showing due materials
+    const {
+        onlyDue, setOnlyDue,
+        searchQuery, setSearchQuery,
+        inputValue, setInputValue,
+        selectedTags, setSelectedTags
+    } = useFilterStore();
 
     const handleSearch = useCallback(() => {
         setSearchQuery(inputValue); // Trigger API search
-        // Optionally dismiss keyboard here
-    }, [inputValue]);
+    }, [inputValue, setSearchQuery]);
 
     const deleteMutation = useMutation({
         mutationFn: async (materialId: string) => {
@@ -155,14 +156,13 @@ export const HomeScreen = () => {
                 ? prev.filter(t => t !== tag)
                 : [...prev, tag]
         );
-    }, []);
+    }, [setSelectedTags]);
 
     const clearFilters = useCallback(() => {
         setInputValue('');
         setSearchQuery('');
         setSelectedTags([]);
-        // We don't clear onlyDue by default, as that's a view mode
-    }, []);
+    }, [setInputValue, setSearchQuery, setSelectedTags]);
 
     const handleRefresh = useCallback(async () => {
         await queryClient.resetQueries({ queryKey: ['dueMaterials'] });
@@ -257,23 +257,10 @@ export const HomeScreen = () => {
 
     const headerElement = useMemo(() => (
         <React.Fragment>
+            <AppHeader />
             <SearchHeader
-                user={user}
-                dueFlashcardsCount={dueFlashcardsCount}
-                searchQuery={searchQuery}
-                inputValue={inputValue}
-                setInputValue={setInputValue}
-                onSearch={handleSearch}
-                selectedTags={selectedTags}
-                toggleTag={toggleTag}
-                allTags={allTags}
-                clearFilters={clearFilters}
-                hasActiveFilters={searchQuery.trim() !== '' || selectedTags.length > 0}
                 resultsText={resultsText}
                 isFetchingPreviousPage={isFetchingPreviousPage}
-                onAddMaterial={() => navigation.navigate('AddMaterial')}
-                onlyDue={onlyDue}
-                setOnlyDue={setOnlyDue}
                 colors={colors}
                 styles={styles}
             />
@@ -295,9 +282,7 @@ export const HomeScreen = () => {
     );
 
     return (
-        <View style={[styles.container, { paddingBottom: insets.bottom }]}>
-            <AppHeader />
-
+        <View style={[styles.container, { paddingBottom: insets.bottom + 65 }]}>
             {isLoading ? (
                 <View style={styles.loadingContainer}>
                     <ActivityIndicator size="large" color={colors.primary} />
@@ -345,8 +330,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         backgroundColor: colors.background,
     },
     listContent: {
-        paddingHorizontal: 20,
-        paddingTop: 20,
+        paddingHorizontal: 3,
         paddingBottom: 20,
         flexGrow: 1,
     },

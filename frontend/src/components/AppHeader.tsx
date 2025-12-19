@@ -6,15 +6,18 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '../navigation/ManualRouter';
 import { useAuthStore } from '../store/authStore';
 import { useTheme } from '../utils/theme';
+import { useFilterStore } from '../store/filterStore';
 import { APP_NAME } from '../utils/constants';
 
 export const AppHeader = () => {
-    const { navigate, goBack, canGoBack } = useNavigation();
-    const { logout } = useAuthStore();
-    const { isDark, colors, toggleTheme } = useTheme();
+    const { goBack, canGoBack, navigate } = useNavigation();
+    const { colors, toggleTheme, isDark } = useTheme();
+    const { user } = useAuthStore();
+    const { resetAll } = useFilterStore();
     const insets = useSafeAreaInsets();
 
-    const handleHomePress = () => {
+    const handleLogoPress = () => {
+        resetAll();
         navigate('Home');
     };
 
@@ -24,34 +27,34 @@ export const AppHeader = () => {
             {
                 backgroundColor: colors.headerBg,
                 borderBottomColor: colors.headerBorder,
-                paddingTop: insets.top + 10, // Add safe area inset + extra padding
+                paddingTop: insets.top + 5,
             }
         ]}>
-            <View style={styles.leftContainer}>
-                {canGoBack && (
-                    <TouchableOpacity onPress={goBack} style={styles.iconButton}>
-                        <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
-                    </TouchableOpacity>
-                )}
-                <TouchableOpacity onPress={handleHomePress} style={styles.iconButton}>
-                    <Text style={{ fontSize: 24 }}>🏠</Text>
+            <View style={styles.content}>
+                <TouchableOpacity
+                    style={styles.leftSection}
+                    onPress={handleLogoPress}
+                    activeOpacity={0.7}
+                >
+                    {canGoBack && (
+                        <TouchableOpacity onPress={goBack} style={styles.backButton}>
+                            <Ionicons name="arrow-back" size={20} color={colors.textPrimary} />
+                        </TouchableOpacity>
+                    )}
+                    <Text style={[styles.logo, { color: colors.primary }]}>{APP_NAME}</Text>
+                    {user && (
+                        <Text style={[styles.welcomeText, { color: colors.textSecondary }]}>
+                            Welcome, {user.name.split(' ')[0]}
+                        </Text>
+                    )}
                 </TouchableOpacity>
-            </View>
 
-            <TouchableOpacity onPress={handleHomePress} style={styles.centerContainer}>
-                <Text style={[styles.logo, { color: colors.primary }]}>{APP_NAME}</Text>
-            </TouchableOpacity>
-
-            <View style={styles.rightContainer}>
-                <TouchableOpacity onPress={toggleTheme} style={styles.iconButton}>
+                <TouchableOpacity onPress={toggleTheme} style={styles.themeToggle}>
                     <Ionicons
                         name={isDark ? "sunny" : "moon"}
-                        size={22}
+                        size={20}
                         color={colors.textPrimary}
                     />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={logout} style={styles.logoutButton}>
-                    <Text style={[styles.logout, { color: colors.error }]}>Logout</Text>
                 </TouchableOpacity>
             </View>
         </View>
@@ -60,43 +63,37 @@ export const AppHeader = () => {
 
 const styles = StyleSheet.create({
     headerContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingTop: 10,
-        paddingBottom: 15,
-        paddingHorizontal: 15,
+        paddingBottom: 4,
+        paddingHorizontal: 3,
         borderBottomWidth: 1,
     },
-    leftContainer: {
+    content: {
         flexDirection: 'row',
         alignItems: 'center',
-        flex: 1,
+        justifyContent: 'space-between',
+        height: 36,
     },
-    centerContainer: {
-        flex: 2,
-        alignItems: 'center',
-    },
-    rightContainer: {
-        flex: 1,
+    leftSection: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'flex-end',
+        gap: 8,
     },
-    iconButton: {
-        padding: 8,
-        marginRight: 5,
+    backButton: {
+        padding: 4,
+        marginRight: 2,
     },
     logo: {
-        fontSize: 24,
+        fontSize: 26,
         fontWeight: 'bold',
         letterSpacing: -0.5,
     },
-    logoutButton: {
-        padding: 8,
-    },
-    logout: {
-        fontWeight: '600',
+    welcomeText: {
         fontSize: 14,
+        fontWeight: '500',
+        marginLeft: 4,
+        marginTop: 6, // Align slightly with large logo
+    },
+    themeToggle: {
+        padding: 6,
     },
 });

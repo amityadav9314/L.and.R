@@ -1,54 +1,76 @@
 import React, { memo } from 'react';
 import { View, Text, TouchableOpacity, TextInput, ScrollView, StyleSheet } from 'react-native';
 import { ThemeColors } from '../utils/theme';
+import { useFilterStore } from '../store/filterStore';
+import { useAuthStore } from '../store/authStore';
+import { useQuery } from '@tanstack/react-query';
+import { learningClient } from '../services/api';
 
 interface SearchHeaderProps {
-    user: any;
-    dueFlashcardsCount: number;
-    searchQuery: string;
-    inputValue: string;
-    setInputValue: (text: string) => void;
-    onSearch: () => void;
-    selectedTags: string[];
-    toggleTag: (tag: string) => void;
-    allTags: string[];
-    clearFilters: () => void;
-    hasActiveFilters: boolean;
     resultsText: string;
     isFetchingPreviousPage: boolean;
-    onAddMaterial: () => void;
-    onlyDue: boolean;
-    setOnlyDue: (val: boolean) => void;
     colors: ThemeColors;
     styles: any;
 }
 
 export const SearchHeader = memo(({
-    user,
-    dueFlashcardsCount,
-    searchQuery, // Used for showing active filter state if needed, or remove if unused
-    inputValue,
-    setInputValue,
-    onSearch,
-    selectedTags,
-    toggleTag,
-    allTags,
-    clearFilters,
-    hasActiveFilters,
     resultsText,
     isFetchingPreviousPage,
-    onAddMaterial,
-    onlyDue,
-    setOnlyDue,
     colors,
     styles
 }: SearchHeaderProps) => {
+    const {
+        onlyDue,
+        inputValue, setInputValue,
+        searchQuery, setSearchQuery,
+        selectedTags, setSelectedTags,
+    } = useFilterStore();
+
+    const { user } = useAuthStore();
+
+    const onSearch = () => setSearchQuery(inputValue);
+    const clearFilters = () => {
+        setInputValue('');
+        setSearchQuery('');
+        setSelectedTags([]);
+    };
+    const toggleTag = (tag: string) => {
+        setSelectedTags((prev: string[]) =>
+            prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+        );
+    };
+    const hasActiveFilters = searchQuery.trim() !== '' || selectedTags.length > 0;
+
+    // Fetch tags
+    const { data: tagsData } = useQuery({
+        queryKey: ['allTags'],
+        queryFn: async () => {
+            try {
+                const response = await learningClient.getAllTags({});
+                return response.tags || [];
+            } catch (err) {
+                return [];
+            }
+        },
+    });
+    const allTags = tagsData || [];
+
+    // Fetch notification status
+    const { data: notificationData } = useQuery({
+        queryKey: ['notificationStatus'],
+        queryFn: async () => {
+            try {
+                return await learningClient.getNotificationStatus({});
+            } catch (err) {
+                return { dueFlashcardsCount: 0, hasDueMaterials: false };
+            }
+        },
+        refetchInterval: 60000,
+    });
+    const dueFlashcardsCount = notificationData?.dueFlashcardsCount || 0;
+
     return (
         <View>
-            <View style={styles.header}>
-                <Text style={styles.title}>Welcome, {user?.name}</Text>
-            </View>
-
             <View style={styles.titleRow}>
                 <View style={styles.titleWithBadge}>
                     <Text style={styles.mainTitle}>{onlyDue ? 'Due for Review' : 'All Materials'}</Text>
@@ -57,22 +79,6 @@ export const SearchHeader = memo(({
                             <Text style={styles.notificationBadgeText}>{dueFlashcardsCount}</Text>
                         </View>
                     )}
-                </View>
-                <View style={{ flexDirection: 'row', gap: 10 }}>
-                    <TouchableOpacity
-                        style={[styles.toggleButton, !onlyDue && styles.toggleButtonActive]}
-                        onPress={() => setOnlyDue(!onlyDue)}
-                    >
-                        <Text style={[styles.toggleButtonText, !onlyDue && styles.toggleButtonTextActive]}>
-                            {onlyDue ? 'View All' : 'Show Due'}
-                        </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={styles.addButton}
-                        onPress={onAddMaterial}
-                    >
-                        <Text style={styles.addButtonText}>+ Add</Text>
-                    </TouchableOpacity>
                 </View>
             </View>
 

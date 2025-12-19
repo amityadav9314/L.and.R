@@ -103,9 +103,9 @@ export const AddMaterialScreen = () => {
     const styles = createStyles(colors);
 
     return (
-        <View style={[styles.container, { paddingBottom: insets.bottom }]}>
-            <AppHeader />
+        <View style={[styles.container, { paddingBottom: insets.bottom + 65 }]}>
             <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
+                <AppHeader />
                 <Text style={styles.title}>Add New Material</Text>
 
                 {/* Type Selector */}
@@ -211,8 +211,8 @@ export const AddMaterialScreen = () => {
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
     scrollView: { flex: 1 },
-    contentContainer: { padding: 20, backgroundColor: colors.card, flexGrow: 1 },
-    title: { fontSize: 24, fontWeight: 'bold', marginBottom: 20, color: colors.textPrimary },
+    contentContainer: { paddingHorizontal: 3, paddingBottom: 20, flexGrow: 1 },
+    title: { fontSize: 24, fontWeight: 'bold', marginBottom: 20, color: colors.textPrimary, paddingTop: 16 },
     typeContainer: {
         flexDirection: 'row',
         marginBottom: 20,

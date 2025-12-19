@@ -13,10 +13,12 @@ import { AddMaterialScreen } from './src/screens/AddMaterialScreen';
 import { MaterialDetailScreen } from './src/screens/MaterialDetailScreen';
 import { ReviewScreen } from './src/screens/ReviewScreen';
 import { SummaryScreen } from './src/screens/SummaryScreen';
+import { SettingsScreen } from './src/screens/SettingsScreen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { NavigationProvider, useNavigation } from './src/navigation/ManualRouter';
 import { ThemeProvider, useTheme } from './src/utils/theme';
+import { BottomNavBar } from './src/components/BottomNavBar';
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -63,6 +65,7 @@ const ScreenRenderer = () => {
             {currentScreen === 'MaterialDetail' && <MaterialDetailScreen />}
             {currentScreen === 'Review' && <ReviewScreen />}
             {currentScreen === 'Summary' && <SummaryScreen />}
+            {currentScreen === 'Settings' && <SettingsScreen />}
           </View>
         )}
       </View>
@@ -95,7 +98,10 @@ function AppContent() {
       <GestureHandlerRootView style={{ flex: 1 }}>
         {user ? (
           <NavigationProvider>
-            <ScreenRenderer />
+            <View style={{ flex: 1 }}>
+              <ScreenRenderer />
+              <BottomNavBar />
+            </View>
           </NavigationProvider>
         ) : (
           <LoginScreen />
