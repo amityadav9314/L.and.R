@@ -32,6 +32,48 @@ type ProviderConfig struct {
 	MaxContentLen int
 }
 
+// Internal types for AI API communication
+type chatRequest struct {
+	Model    string        `json:"model"`
+	Messages []interface{} `json:"messages"`
+}
+
+type textMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
+type visionMessage struct {
+	Role    string          `json:"role"`
+	Content []visionContent `json:"content"`
+}
+
+type visionContent struct {
+	Type     string    `json:"type"`
+	Text     string    `json:"text,omitempty"`
+	ImageURL *imageURL `json:"image_url,omitempty"`
+}
+
+type imageURL struct {
+	URL string `json:"url"`
+}
+
+type chatResponse struct {
+	Choices []choice `json:"choices"`
+}
+
+type choice struct {
+	Message textMessage `json:"message"`
+}
+
+func cleanJSON(s string) string {
+	s = strings.TrimSpace(s)
+	s = strings.TrimPrefix(s, "```json")
+	s = strings.TrimPrefix(s, "```")
+	s = strings.TrimSuffix(s, "```")
+	return strings.TrimSpace(s)
+}
+
 // BaseProvider implements common functionality for OpenAI-compatible APIs
 type BaseProvider struct {
 	config ProviderConfig
