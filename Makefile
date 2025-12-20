@@ -34,7 +34,9 @@ start-backend:
 # ============================================
 # FRONTEND
 # ============================================
-start-frontend:
+
+# Expo Go (no native modules - faster, but Firebase/Google Sign-in won't work)
+start-expo-dev:
 	@echo "🛑 Stopping previous frontend..."
 	@lsof -ti:8081 | xargs -r kill -9 2>/dev/null || true
 	@echo "🔍 Type checking TypeScript..."
@@ -42,8 +44,17 @@ start-frontend:
 	@echo "🧹 Clearing Metro cache..."
 	@rm -rf $(FRONTEND_DIR)/.expo 2>/dev/null || true
 	@rm -rf $(FRONTEND_DIR)/node_modules/.cache 2>/dev/null || true
-	@echo "🚀 Starting frontend..."
+	@echo "🚀 Starting Expo Go (no native modules)..."
 	@cd $(FRONTEND_DIR) && npx expo start --clear
+
+# Native Android build with hot-reload (includes Firebase, Google Sign-in)
+start-native-android:
+	@echo "🛑 Stopping previous frontend..."
+	@lsof -ti:8081 | xargs -r kill -9 2>/dev/null || true
+	@echo "🔍 Type checking TypeScript..."
+	@cd $(FRONTEND_DIR) && npm run tsc
+	@echo "🚀 Building & running native Android (with hot-reload)..."
+	@cd $(FRONTEND_DIR) && npx expo run:android
 
 # ============================================
 # APK BUILD

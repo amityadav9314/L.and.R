@@ -3,3 +3,6 @@ backend/.env
 backend/bin/
 *.log
 .DS_Store
+# Firebase credentials (DO NOT COMMIT)
+backend/firebase/service-account.json
+frontend/google-services.json

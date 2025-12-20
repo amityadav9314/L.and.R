@@ -9,7 +9,8 @@ import {
     GetDueFlashcardsRequest,
     GetAllTagsResponse,
     NotificationStatusResponse,
-    GetMaterialSummaryRequest, GetMaterialSummaryResponse
+    GetMaterialSummaryRequest, GetMaterialSummaryResponse,
+    RegisterPushTokenRequest,
 } from '../../proto/backend/proto/learning/learning';
 import { Empty } from '../../proto/backend/google/protobuf/empty';
 
@@ -109,6 +110,14 @@ export const LearningServiceDefinition = {
             requestType: GetMaterialSummaryRequest,
             requestStream: false,
             responseType: GetMaterialSummaryResponse,
+            responseStream: false,
+            options: {},
+        },
+        registerPushToken: {
+            name: 'RegisterPushToken',
+            requestType: RegisterPushTokenRequest,
+            requestStream: false,
+            responseType: Empty,
             responseStream: false,
             options: {},
         },

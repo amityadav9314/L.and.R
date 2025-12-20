@@ -30,6 +30,7 @@ const (
 	LearningService_GetNotificationStatus_FullMethodName = "/learning.LearningService/GetNotificationStatus"
 	LearningService_GetMaterialSummary_FullMethodName    = "/learning.LearningService/GetMaterialSummary"
 	LearningService_UpdateFlashcard_FullMethodName       = "/learning.LearningService/UpdateFlashcard"
+	LearningService_RegisterPushToken_FullMethodName     = "/learning.LearningService/RegisterPushToken"
 )
 
 // LearningServiceClient is the client API for LearningService service.
@@ -46,6 +47,7 @@ type LearningServiceClient interface {
 	GetNotificationStatus(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*NotificationStatusResponse, error)
 	GetMaterialSummary(ctx context.Context, in *GetMaterialSummaryRequest, opts ...grpc.CallOption) (*GetMaterialSummaryResponse, error)
 	UpdateFlashcard(ctx context.Context, in *UpdateFlashcardRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	RegisterPushToken(ctx context.Context, in *RegisterPushTokenRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type learningServiceClient struct {
@@ -156,6 +158,16 @@ func (c *learningServiceClient) UpdateFlashcard(ctx context.Context, in *UpdateF
 	return out, nil
 }
 
+func (c *learningServiceClient) RegisterPushToken(ctx context.Context, in *RegisterPushTokenRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, LearningService_RegisterPushToken_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // LearningServiceServer is the server API for LearningService service.
 // All implementations must embed UnimplementedLearningServiceServer
 // for forward compatibility.
@@ -170,6 +182,7 @@ type LearningServiceServer interface {
 	GetNotificationStatus(context.Context, *emptypb.Empty) (*NotificationStatusResponse, error)
 	GetMaterialSummary(context.Context, *GetMaterialSummaryRequest) (*GetMaterialSummaryResponse, error)
 	UpdateFlashcard(context.Context, *UpdateFlashcardRequest) (*emptypb.Empty, error)
+	RegisterPushToken(context.Context, *RegisterPushTokenRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedLearningServiceServer()
 }
 
@@ -209,6 +222,9 @@ func (UnimplementedLearningServiceServer) GetMaterialSummary(context.Context, *G
 }
 func (UnimplementedLearningServiceServer) UpdateFlashcard(context.Context, *UpdateFlashcardRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateFlashcard not implemented")
+}
+func (UnimplementedLearningServiceServer) RegisterPushToken(context.Context, *RegisterPushTokenRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method RegisterPushToken not implemented")
 }
 func (UnimplementedLearningServiceServer) mustEmbedUnimplementedLearningServiceServer() {}
 func (UnimplementedLearningServiceServer) testEmbeddedByValue()                         {}
@@ -411,6 +427,24 @@ func _LearningService_UpdateFlashcard_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _LearningService_RegisterPushToken_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RegisterPushTokenRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(LearningServiceServer).RegisterPushToken(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: LearningService_RegisterPushToken_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(LearningServiceServer).RegisterPushToken(ctx, req.(*RegisterPushTokenRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // LearningService_ServiceDesc is the grpc.ServiceDesc for LearningService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -457,6 +491,10 @@ var LearningService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateFlashcard",
 			Handler:    _LearningService_UpdateFlashcard_Handler,
+		},
+		{
+			MethodName: "RegisterPushToken",
+			Handler:    _LearningService_RegisterPushToken_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

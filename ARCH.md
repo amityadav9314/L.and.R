@@ -58,12 +58,74 @@ LandR is a SaaS application for learning and revision, allowing users to convert
 -   **User -> Tags**: One-to-Many
 -   **Material <-> Tags**: Many-to-Many (via `material_tags`)
 
+
 ## Backend Architecture
 Follows **Clean Architecture** principles:
-1.  **Transport Layer (`internal/service`)**: gRPC handlers (`LearningService`). Handles request/response mapping.
-2.  **Business Logic (`internal/core`)**: Core application logic (`LearningCore`). Orchestrates AI generation and DB operations.
-3.  **Data Access (`internal/store`)**: Database implementations (`PostgresStore`). Executes SQL queries.
-4.  **External Services (`internal/ai`)**: Clients for external APIs (`GroqClient`).
+
+```mermaid
+graph TB
+    subgraph "Transport Layer"
+        GRPC[gRPC Server :50051]
+        REST[REST API :8080]
+    end
+    
+    subgraph "Services"
+        AUTH[AuthService]
+        LEARN[LearningService]
+        FEED[FeedService]
+    end
+    
+    subgraph "Business Logic"
+        LCORE[LearningCore]
+        FCORE[FeedCore]
+        ACORE[AuthCore]
+    end
+    
+    subgraph "Background Workers"
+        WORKER[notifications.Worker]
+        CRON1[6 AM: Feed Generation]
+        CRON2[9 AM: Push Notifications]
+    end
+    
+    subgraph "External Services"
+        AI[AI Provider - Groq]
+        TAVILY[Tavily Search API]
+        FCM[Firebase Cloud Messaging]
+    end
+    
+    subgraph "Data Layer"
+        STORE[PostgresStore]
+        DB[(PostgreSQL)]
+    end
+    
+    GRPC --> AUTH & LEARN & FEED
+    REST --> FEED
+    AUTH --> ACORE
+    LEARN --> LCORE
+    FEED --> FCORE
+    LCORE --> AI
+    FCORE --> TAVILY
+    WORKER --> CRON1 & CRON2
+    CRON1 --> FCORE
+    CRON2 --> LCORE & FCM
+    LCORE & FCORE & ACORE --> STORE --> DB
+```
+
+### Layer Responsibilities
+
+| Layer | Location | Purpose |
+|-------|----------|---------|
+| **Transport** | `internal/service/` | gRPC handlers, REST endpoints, request/response mapping |
+| **Business Logic** | `internal/core/` | Core application logic, orchestrates AI and DB operations |
+| **Data Access** | `internal/store/` | Database implementations, SQL queries |
+| **Background Workers** | `internal/notifications/` | Scheduled cron jobs (async, rate-limited) |
+| **External Clients** | `internal/ai/`, `internal/tavily/`, `internal/firebase/` | Third-party API integrations |
+
+### Key Entry Point
+`cmd/server/main.go` - Initializes all components, wires dependencies, and starts:
+- gRPC server on port 50051
+- gRPC-Web + REST server on port 8080
+- Background worker with daily cron jobs
 
 ## Frontend Architecture
 
@@ -153,3 +215,44 @@ Provides users with personalized daily article recommendations. **Disabled by de
 
 ### Environment Variables
 - `TAVILY_API_KEY`: Required to enable the Daily Feed feature
+
+## Push Notifications (Firebase Cloud Messaging)
+
+### Overview
+Server-side push notifications for daily "due materials" reminders. Uses Firebase Cloud Messaging (FCM) for reliable delivery.
+
+### Database Tables
+- **`device_tokens`**: Stores FCM tokens with `user_id`, `token`, `platform` (android/ios)
+
+### Backend Components
+- **`firebase.Sender`** (`internal/firebase/sender.go`): Firebase Admin SDK wrapper for sending push notifications
+- **`notifications.Worker`** (`internal/notifications/worker.go`): Unified scheduler for all daily jobs
+- **`RegisterPushToken`** RPC: Stores device FCM tokens on login
+
+### Frontend Components
+- **`firebaseMessaging.ts`**: FCM token registration and permission handling
+- Uses `@react-native-firebase/messaging` for native FCM integration
+
+### Notification Format
+```
+Title: L.and.R - Review Due! 📚
+Body: "Introduction to ML" and 2 others are due for revision.
+```
+
+### Environment Variables
+- `FIREBASE_SERVICE_ACCOUNT`: Path to Firebase service account JSON (default: `firebase/service-account.json`)
+
+## Daily Scheduled Jobs
+
+All jobs run in **IST timezone** and are managed by `notifications.Worker`.
+
+| Job | Schedule | Description | Rate Limit |
+|-----|----------|-------------|------------|
+| **Feed Generation** | 6:00 AM IST | Fetches personalized articles via Tavily API | 2s between users |
+| **Push Notifications** | 9:00 AM IST | Sends due material reminders via FCM | 500ms between users |
+
+### Technical Details
+- All jobs run **asynchronously** (in goroutines) to not block the main application
+- **Rate limiting** prevents overwhelming external APIs (Tavily, FCM)
+- **Panic recovery middleware** prevents crashes from unhandled errors
+- Jobs continue processing remaining users if one fails

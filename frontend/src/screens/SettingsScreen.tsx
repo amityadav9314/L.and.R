@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Switch, ActivityIndicator, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../store/authStore';
 import { useTheme, ThemeColors } from '../utils/theme';
 import { AppHeader } from '../components/AppHeader';
@@ -10,6 +11,7 @@ export const SettingsScreen = () => {
     const { user, logout } = useAuthStore();
     const { colors, isDark, toggleTheme } = useTheme();
     const insets = useSafeAreaInsets();
+    const queryClient = useQueryClient();
     const styles = createStyles(colors);
 
     // Feed Preferences State
@@ -97,6 +99,8 @@ export const SettingsScreen = () => {
                                                     feedEnabled: value,
                                                     interestPrompt,
                                                 });
+                                                // Invalidate cache so DailyFeedScreen refetches
+                                                queryClient.invalidateQueries({ queryKey: ['feedPreferences'] });
                                                 Alert.alert(
                                                     value ? 'Feed Enabled ✅' : 'Feed Disabled',
                                                     value ? 'Daily articles will be generated based on your interests.' : 'Daily feed has been turned off.'

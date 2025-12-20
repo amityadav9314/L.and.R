@@ -630,3 +630,69 @@ func (s *PostgresStore) ArticleURLExists(ctx context.Context, userID, url string
 	}
 	return exists, nil
 }
+
+// ============================================
+// Device Tokens (FCM Push Notifications)
+// ============================================
+
+// SaveDeviceToken stores or updates a device token for push notifications
+func (s *PostgresStore) SaveDeviceToken(ctx context.Context, userID, token, platform string) error {
+	query := `
+		INSERT INTO device_tokens (user_id, token, platform, updated_at)
+		VALUES ($1, $2, $3, NOW())
+		ON CONFLICT (user_id, token) DO UPDATE SET updated_at = NOW()
+	`
+	_, err := s.db.Exec(ctx, query, userID, token, platform)
+	if err != nil {
+		return fmt.Errorf("failed to save device token: %w", err)
+	}
+	log.Printf("[Store.SaveDeviceToken] Saved token for user %s (platform: %s)", userID, platform)
+	return nil
+}
+
+// GetDeviceTokens returns all device tokens for a user
+func (s *PostgresStore) GetDeviceTokens(ctx context.Context, userID string) ([]string, error) {
+	query := `SELECT token FROM device_tokens WHERE user_id = $1`
+	rows, err := s.db.Query(ctx, query, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get device tokens: %w", err)
+	}
+	defer rows.Close()
+
+	var tokens []string
+	for rows.Next() {
+		var token string
+		if err := rows.Scan(&token); err != nil {
+			continue
+		}
+		tokens = append(tokens, token)
+	}
+	return tokens, nil
+}
+
+// GetAllUsersWithTokens returns user IDs that have registered device tokens
+func (s *PostgresStore) GetAllUsersWithTokens(ctx context.Context) ([]string, error) {
+	query := `SELECT DISTINCT user_id FROM device_tokens`
+	rows, err := s.db.Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get users with tokens: %w", err)
+	}
+	defer rows.Close()
+
+	var userIDs []string
+	for rows.Next() {
+		var userID string
+		if err := rows.Scan(&userID); err != nil {
+			continue
+		}
+		userIDs = append(userIDs, userID)
+	}
+	return userIDs, nil
+}
+
+// DeleteDeviceToken removes a device token (for logout)
+func (s *PostgresStore) DeleteDeviceToken(ctx context.Context, userID, token string) error {
+	query := `DELETE FROM device_tokens WHERE user_id = $1 AND token = $2`
+	_, err := s.db.Exec(ctx, query, userID, token)
+	return err
+}

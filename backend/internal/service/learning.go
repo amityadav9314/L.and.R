@@ -6,6 +6,7 @@ import (
 
 	"github.com/amityadav/landr/internal/core"
 	"github.com/amityadav/landr/internal/middleware"
+	"github.com/amityadav/landr/internal/store"
 	"github.com/amityadav/landr/pkg/pb/learning"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -14,12 +15,14 @@ import (
 
 type LearningService struct {
 	learning.UnimplementedLearningServiceServer
-	core *core.LearningCore
+	core  *core.LearningCore
+	store *store.PostgresStore
 }
 
-func NewLearningService(c *core.LearningCore) *LearningService {
+func NewLearningService(c *core.LearningCore, s *store.PostgresStore) *LearningService {
 	return &LearningService{
-		core: c,
+		core:  c,
+		store: s,
 	}
 }
 
@@ -230,4 +233,22 @@ func (s *LearningService) GetMaterialSummary(ctx context.Context, req *learning.
 		Summary: summary,
 		Title:   title,
 	}, nil
+}
+
+func (s *LearningService) RegisterPushToken(ctx context.Context, req *learning.RegisterPushTokenRequest) (*emptypb.Empty, error) {
+	userID, err := middleware.GetUserID(ctx)
+	if err != nil {
+		log.Printf("[RegisterPushToken] ERROR: Failed to get user ID: %v", err)
+		return nil, err
+	}
+
+	log.Printf("[RegisterPushToken] Registering token for userID: %s, platform: %s", userID, req.Platform)
+
+	if err := s.store.SaveDeviceToken(ctx, userID, req.Token, req.Platform); err != nil {
+		log.Printf("[RegisterPushToken] ERROR: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to register push token: %v", err)
+	}
+
+	log.Printf("[RegisterPushToken] SUCCESS")
+	return &emptypb.Empty{}, nil
 }

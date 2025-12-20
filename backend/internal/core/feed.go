@@ -195,21 +195,32 @@ func (c *FeedCore) GenerateDailyFeedForUser(ctx context.Context, userID string) 
 }
 
 // GenerateDailyFeedForAllUsers runs the feed generation for all enabled users
+// Processes users sequentially with rate limiting to avoid overwhelming external APIs
 func (c *FeedCore) GenerateDailyFeedForAllUsers(ctx context.Context) error {
-	log.Printf("[FeedCore.GenerateDailyFeedForAllUsers] Starting daily feed generation...")
+	log.Printf("[FeedCore] Starting daily feed generation...")
 
 	userIDs, err := c.store.GetUsersWithFeedEnabled(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get users with feed enabled: %w", err)
 	}
 
-	for _, userID := range userIDs {
+	log.Printf("[FeedCore] Processing %d users with feed enabled...", len(userIDs))
+
+	successCount := 0
+	for i, userID := range userIDs {
+		// Rate limit: 2 second delay between users (to respect Tavily API limits)
+		if i > 0 {
+			time.Sleep(2 * time.Second)
+		}
+
 		if err := c.GenerateDailyFeedForUser(ctx, userID); err != nil {
-			log.Printf("[FeedCore.GenerateDailyFeedForAllUsers] Error for user %s: %v", userID, err)
+			log.Printf("[FeedCore] Error for user %s: %v", userID, err)
 			// Continue with other users
+		} else {
+			successCount++
 		}
 	}
 
-	log.Printf("[FeedCore.GenerateDailyFeedForAllUsers] Completed for %d users", len(userIDs))
+	log.Printf("[FeedCore] Feed generation completed. Success: %d/%d users", successCount, len(userIDs))
 	return nil
 }

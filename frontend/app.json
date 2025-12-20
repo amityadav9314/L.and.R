@@ -26,6 +26,8 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": true,
       "package": "com.amityadav.landr",
+      "googleServicesFile": "./google-services.json",
+      "usesCleartextTraffic": true,
       "permissions": [
         "RECEIVE_BOOT_COMPLETED",
         "WAKE_LOCK"
@@ -43,16 +45,8 @@
     },
     "plugins": [
       "@react-native-google-signin/google-signin",
-      [
-        "expo-notifications",
-        {
-          "icon": "./assets/icon.png",
-          "color": "#4285F4",
-          "defaultChannel": "default"
-        }
-      ],
-      "expo-background-fetch",
-      "expo-task-manager"
+      "@react-native-firebase/app",
+      "@react-native-firebase/messaging"
     ],
     "web": {
       "favicon": "./assets/favicon.png"

@@ -959,6 +959,58 @@ func (x *UpdateFlashcardRequest) GetAnswer() string {
 	return ""
 }
 
+type RegisterPushTokenRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Token         string                 `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"`
+	Platform      string                 `protobuf:"bytes,2,opt,name=platform,proto3" json:"platform,omitempty"` // "android" or "ios"
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RegisterPushTokenRequest) Reset() {
+	*x = RegisterPushTokenRequest{}
+	mi := &file_backend_proto_learning_learning_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RegisterPushTokenRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RegisterPushTokenRequest) ProtoMessage() {}
+
+func (x *RegisterPushTokenRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_backend_proto_learning_learning_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RegisterPushTokenRequest.ProtoReflect.Descriptor instead.
+func (*RegisterPushTokenRequest) Descriptor() ([]byte, []int) {
+	return file_backend_proto_learning_learning_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *RegisterPushTokenRequest) GetToken() string {
+	if x != nil {
+		return x.Token
+	}
+	return ""
+}
+
+func (x *RegisterPushTokenRequest) GetPlatform() string {
+	if x != nil {
+		return x.Platform
+	}
+	return ""
+}
+
 var File_backend_proto_learning_learning_proto protoreflect.FileDescriptor
 
 const file_backend_proto_learning_learning_proto_rawDesc = "" +
@@ -1033,7 +1085,10 @@ const file_backend_proto_learning_learning_proto_rawDesc = "" +
 	"\x16UpdateFlashcardRequest\x12!\n" +
 	"\fflashcard_id\x18\x01 \x01(\tR\vflashcardId\x12\x1a\n" +
 	"\bquestion\x18\x02 \x01(\tR\bquestion\x12\x16\n" +
-	"\x06answer\x18\x03 \x01(\tR\x06answer2\xa7\x06\n" +
+	"\x06answer\x18\x03 \x01(\tR\x06answer\"L\n" +
+	"\x18RegisterPushTokenRequest\x12\x14\n" +
+	"\x05token\x18\x01 \x01(\tR\x05token\x12\x1a\n" +
+	"\bplatform\x18\x02 \x01(\tR\bplatform2\xf8\x06\n" +
 	"\x0fLearningService\x12J\n" +
 	"\vAddMaterial\x12\x1c.learning.AddMaterialRequest\x1a\x1d.learning.AddMaterialResponse\x12I\n" +
 	"\x0eDeleteMaterial\x12\x1f.learning.DeleteMaterialRequest\x1a\x16.google.protobuf.Empty\x12V\n" +
@@ -1046,7 +1101,8 @@ const file_backend_proto_learning_learning_proto_rawDesc = "" +
 	"GetAllTags\x12\x16.google.protobuf.Empty\x1a\x1c.learning.GetAllTagsResponse\x12U\n" +
 	"\x15GetNotificationStatus\x12\x16.google.protobuf.Empty\x1a$.learning.NotificationStatusResponse\x12_\n" +
 	"\x12GetMaterialSummary\x12#.learning.GetMaterialSummaryRequest\x1a$.learning.GetMaterialSummaryResponse\x12K\n" +
-	"\x0fUpdateFlashcard\x12 .learning.UpdateFlashcardRequest\x1a\x16.google.protobuf.EmptyB,Z*github.com/amityadav/landr/pkg/pb/learningb\x06proto3"
+	"\x0fUpdateFlashcard\x12 .learning.UpdateFlashcardRequest\x1a\x16.google.protobuf.Empty\x12O\n" +
+	"\x11RegisterPushToken\x12\".learning.RegisterPushTokenRequest\x1a\x16.google.protobuf.EmptyB,Z*github.com/amityadav/landr/pkg/pb/learningb\x06proto3"
 
 var (
 	file_backend_proto_learning_learning_proto_rawDescOnce sync.Once
@@ -1060,7 +1116,7 @@ func file_backend_proto_learning_learning_proto_rawDescGZIP() []byte {
 	return file_backend_proto_learning_learning_proto_rawDescData
 }
 
-var file_backend_proto_learning_learning_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
+var file_backend_proto_learning_learning_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_backend_proto_learning_learning_proto_goTypes = []any{
 	(*AddMaterialRequest)(nil),         // 0: learning.AddMaterialRequest
 	(*AddMaterialResponse)(nil),        // 1: learning.AddMaterialResponse
@@ -1078,12 +1134,13 @@ var file_backend_proto_learning_learning_proto_goTypes = []any{
 	(*GetMaterialSummaryRequest)(nil),  // 13: learning.GetMaterialSummaryRequest
 	(*GetMaterialSummaryResponse)(nil), // 14: learning.GetMaterialSummaryResponse
 	(*UpdateFlashcardRequest)(nil),     // 15: learning.UpdateFlashcardRequest
-	(*timestamppb.Timestamp)(nil),      // 16: google.protobuf.Timestamp
-	(*emptypb.Empty)(nil),              // 17: google.protobuf.Empty
+	(*RegisterPushTokenRequest)(nil),   // 16: learning.RegisterPushTokenRequest
+	(*timestamppb.Timestamp)(nil),      // 17: google.protobuf.Timestamp
+	(*emptypb.Empty)(nil),              // 18: google.protobuf.Empty
 }
 var file_backend_proto_learning_learning_proto_depIdxs = []int32{
 	3,  // 0: learning.GetDueMaterialsResponse.materials:type_name -> learning.MaterialSummary
-	16, // 1: learning.Flashcard.next_review_at:type_name -> google.protobuf.Timestamp
+	17, // 1: learning.Flashcard.next_review_at:type_name -> google.protobuf.Timestamp
 	7,  // 2: learning.FlashcardList.flashcards:type_name -> learning.Flashcard
 	0,  // 3: learning.LearningService.AddMaterial:input_type -> learning.AddMaterialRequest
 	2,  // 4: learning.LearningService.DeleteMaterial:input_type -> learning.DeleteMaterialRequest
@@ -1091,22 +1148,24 @@ var file_backend_proto_learning_learning_proto_depIdxs = []int32{
 	6,  // 6: learning.LearningService.GetDueFlashcards:input_type -> learning.GetDueFlashcardsRequest
 	9,  // 7: learning.LearningService.CompleteReview:input_type -> learning.CompleteReviewRequest
 	10, // 8: learning.LearningService.FailReview:input_type -> learning.FailReviewRequest
-	17, // 9: learning.LearningService.GetAllTags:input_type -> google.protobuf.Empty
-	17, // 10: learning.LearningService.GetNotificationStatus:input_type -> google.protobuf.Empty
+	18, // 9: learning.LearningService.GetAllTags:input_type -> google.protobuf.Empty
+	18, // 10: learning.LearningService.GetNotificationStatus:input_type -> google.protobuf.Empty
 	13, // 11: learning.LearningService.GetMaterialSummary:input_type -> learning.GetMaterialSummaryRequest
 	15, // 12: learning.LearningService.UpdateFlashcard:input_type -> learning.UpdateFlashcardRequest
-	1,  // 13: learning.LearningService.AddMaterial:output_type -> learning.AddMaterialResponse
-	17, // 14: learning.LearningService.DeleteMaterial:output_type -> google.protobuf.Empty
-	5,  // 15: learning.LearningService.GetDueMaterials:output_type -> learning.GetDueMaterialsResponse
-	8,  // 16: learning.LearningService.GetDueFlashcards:output_type -> learning.FlashcardList
-	17, // 17: learning.LearningService.CompleteReview:output_type -> google.protobuf.Empty
-	17, // 18: learning.LearningService.FailReview:output_type -> google.protobuf.Empty
-	11, // 19: learning.LearningService.GetAllTags:output_type -> learning.GetAllTagsResponse
-	12, // 20: learning.LearningService.GetNotificationStatus:output_type -> learning.NotificationStatusResponse
-	14, // 21: learning.LearningService.GetMaterialSummary:output_type -> learning.GetMaterialSummaryResponse
-	17, // 22: learning.LearningService.UpdateFlashcard:output_type -> google.protobuf.Empty
-	13, // [13:23] is the sub-list for method output_type
-	3,  // [3:13] is the sub-list for method input_type
+	16, // 13: learning.LearningService.RegisterPushToken:input_type -> learning.RegisterPushTokenRequest
+	1,  // 14: learning.LearningService.AddMaterial:output_type -> learning.AddMaterialResponse
+	18, // 15: learning.LearningService.DeleteMaterial:output_type -> google.protobuf.Empty
+	5,  // 16: learning.LearningService.GetDueMaterials:output_type -> learning.GetDueMaterialsResponse
+	8,  // 17: learning.LearningService.GetDueFlashcards:output_type -> learning.FlashcardList
+	18, // 18: learning.LearningService.CompleteReview:output_type -> google.protobuf.Empty
+	18, // 19: learning.LearningService.FailReview:output_type -> google.protobuf.Empty
+	11, // 20: learning.LearningService.GetAllTags:output_type -> learning.GetAllTagsResponse
+	12, // 21: learning.LearningService.GetNotificationStatus:output_type -> learning.NotificationStatusResponse
+	14, // 22: learning.LearningService.GetMaterialSummary:output_type -> learning.GetMaterialSummaryResponse
+	18, // 23: learning.LearningService.UpdateFlashcard:output_type -> google.protobuf.Empty
+	18, // 24: learning.LearningService.RegisterPushToken:output_type -> google.protobuf.Empty
+	14, // [14:25] is the sub-list for method output_type
+	3,  // [3:14] is the sub-list for method input_type
 	3,  // [3:3] is the sub-list for extension type_name
 	3,  // [3:3] is the sub-list for extension extendee
 	0,  // [0:3] is the sub-list for field type_name
@@ -1123,7 +1182,7 @@ func file_backend_proto_learning_learning_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_backend_proto_learning_learning_proto_rawDesc), len(file_backend_proto_learning_learning_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   16,
+			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

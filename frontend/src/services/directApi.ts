@@ -13,7 +13,8 @@ import {
     GetDueMaterialsRequest, GetDueMaterialsResponse,
     GetDueFlashcardsRequest, FlashcardList,
     CompleteReviewRequest, FailReviewRequest, UpdateFlashcardRequest, GetAllTagsResponse, NotificationStatusResponse,
-    GetMaterialSummaryRequest, GetMaterialSummaryResponse
+    GetMaterialSummaryRequest, GetMaterialSummaryResponse,
+    RegisterPushTokenRequest,
 } from '../../proto/backend/proto/learning/learning';
 import { Empty } from '../../proto/backend/google/protobuf/empty';
 import { API_URL } from '../utils/config';
@@ -265,6 +266,16 @@ export const learningClient = {
             req,
             (r) => GetMaterialSummaryRequest.encode(r).finish(),
             (data) => GetMaterialSummaryResponse.decode(data),
+        );
+    },
+
+    async registerPushToken(request: Partial<RegisterPushTokenRequest>): Promise<void> {
+        const req = RegisterPushTokenRequest.fromPartial(request);
+        await grpcRequest(
+            '/learning.LearningService/RegisterPushToken',
+            req,
+            (r) => RegisterPushTokenRequest.encode(r).finish(),
+            () => undefined,
         );
     },
 };

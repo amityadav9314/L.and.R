@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity, ScrollView,
     FlatList, Linking, ActivityIndicator
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useQuery } from '@tanstack/react-query';
 import { useTheme, ThemeColors } from '../utils/theme';
 import { AppHeader } from '../components/AppHeader';
 import { feedClient } from '../services/api';
@@ -18,42 +19,30 @@ export const DailyFeedScreen = () => {
 
     // State
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]); // YYYY-MM-DD
-    const [articles, setArticles] = useState<Article[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [feedEnabled, setFeedEnabled] = useState<boolean | null>(null); // null = loading
 
-    // Check if feed is enabled
-    useEffect(() => {
-        const checkFeedEnabled = async () => {
-            try {
-                const prefs = await feedClient.getFeedPreferences();
-                setFeedEnabled(prefs.feedEnabled);
-            } catch (error) {
-                console.log('Failed to check feed preferences:', error);
-                setFeedEnabled(false);
-            }
-        };
-        checkFeedEnabled();
-    }, []);
+    // React Query: Feed preferences (cached but refetches on invalidation)
+    const { data: feedPrefs, isLoading: prefsLoading } = useQuery({
+        queryKey: ['feedPreferences'],
+        queryFn: () => feedClient.getFeedPreferences(),
+        staleTime: 0, // Always refetch when navigating back after invalidation
+        gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes for background
+        refetchOnMount: 'always', // Force refetch every time screen mounts
+        retry: 1,
+    });
 
-    // Load articles for selected date (only if feed is enabled)
-    useEffect(() => {
-        if (feedEnabled !== true) return;
+    const feedEnabled = feedPrefs?.feedEnabled ?? null;
 
-        const loadArticles = async () => {
-            setLoading(true);
-            try {
-                const response = await feedClient.getDailyFeed({ date: selectedDate });
-                setArticles(response.articles || []);
-            } catch (error) {
-                console.log('Failed to load articles:', error);
-                setArticles([]);
-            } finally {
-                setLoading(false);
-            }
-        };
-        loadArticles();
-    }, [selectedDate, feedEnabled]);
+    // React Query: Daily articles (cached per date)
+    const { data: feedData, isLoading: articlesLoading } = useQuery({
+        queryKey: ['dailyFeed', selectedDate],
+        queryFn: () => feedClient.getDailyFeed({ date: selectedDate }),
+        enabled: feedEnabled === true, // Only fetch if feed is enabled
+        staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+        retry: 1,
+    });
+
+    const articles: Article[] = feedData?.articles || [];
+    const loading = prefsLoading || (feedEnabled === true && articlesLoading);
 
     // Generate last 7 days for quick navigation
     const getLast7Days = () => {

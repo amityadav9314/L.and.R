@@ -107,6 +107,12 @@ export interface UpdateFlashcardRequest {
   answer: string;
 }
 
+export interface RegisterPushTokenRequest {
+  token: string;
+  /** "android" or "ios" */
+  platform: string;
+}
+
 function createBaseAddMaterialRequest(): AddMaterialRequest {
   return { type: "", content: "", existingTags: [], imageData: "" };
 }
@@ -1525,6 +1531,82 @@ export const UpdateFlashcardRequest: MessageFns<UpdateFlashcardRequest> = {
   },
 };
 
+function createBaseRegisterPushTokenRequest(): RegisterPushTokenRequest {
+  return { token: "", platform: "" };
+}
+
+export const RegisterPushTokenRequest: MessageFns<RegisterPushTokenRequest> = {
+  encode(message: RegisterPushTokenRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.token !== "") {
+      writer.uint32(10).string(message.token);
+    }
+    if (message.platform !== "") {
+      writer.uint32(18).string(message.platform);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RegisterPushTokenRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRegisterPushTokenRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.token = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.platform = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RegisterPushTokenRequest {
+    return {
+      token: isSet(object.token) ? globalThis.String(object.token) : "",
+      platform: isSet(object.platform) ? globalThis.String(object.platform) : "",
+    };
+  },
+
+  toJSON(message: RegisterPushTokenRequest): unknown {
+    const obj: any = {};
+    if (message.token !== "") {
+      obj.token = message.token;
+    }
+    if (message.platform !== "") {
+      obj.platform = message.platform;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<RegisterPushTokenRequest>): RegisterPushTokenRequest {
+    return RegisterPushTokenRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<RegisterPushTokenRequest>): RegisterPushTokenRequest {
+    const message = createBaseRegisterPushTokenRequest();
+    message.token = object.token ?? "";
+    message.platform = object.platform ?? "";
+    return message;
+  },
+};
+
 export interface LearningServiceImplementation<CallContextExt = {}> {
   addMaterial(
     request: AddMaterialRequest,
@@ -1551,6 +1633,10 @@ export interface LearningServiceImplementation<CallContextExt = {}> {
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<GetMaterialSummaryResponse>>;
   updateFlashcard(request: UpdateFlashcardRequest, context: CallContext & CallContextExt): Promise<DeepPartial<Empty>>;
+  registerPushToken(
+    request: RegisterPushTokenRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<Empty>>;
 }
 
 export interface LearningServiceClient<CallOptionsExt = {}> {
@@ -1579,6 +1665,10 @@ export interface LearningServiceClient<CallOptionsExt = {}> {
     options?: CallOptions & CallOptionsExt,
   ): Promise<GetMaterialSummaryResponse>;
   updateFlashcard(request: DeepPartial<UpdateFlashcardRequest>, options?: CallOptions & CallOptionsExt): Promise<Empty>;
+  registerPushToken(
+    request: DeepPartial<RegisterPushTokenRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<Empty>;
 }
 
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;

@@ -6,10 +6,13 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"runtime/debug"
 
 	"github.com/amityadav/landr/internal/ai"
 	"github.com/amityadav/landr/internal/core"
+	"github.com/amityadav/landr/internal/firebase"
 	"github.com/amityadav/landr/internal/middleware"
+	"github.com/amityadav/landr/internal/notifications"
 	"github.com/amityadav/landr/internal/scraper"
 	"github.com/amityadav/landr/internal/service"
 	"github.com/amityadav/landr/internal/store"
@@ -79,7 +82,7 @@ func main() {
 		log.Fatal("No AI provider configured. Set GROQ_API_KEY or CEREBRAS_API_KEY")
 	}
 	learningCore := core.NewLearningCore(st, scr, aiProvider)
-	learningSvc := service.NewLearningService(learningCore)
+	learningSvc := service.NewLearningService(learningCore, st)
 
 	// Feed Service (requires Tavily API key)
 	var feedSvc *service.FeedService
@@ -91,6 +94,26 @@ func main() {
 		feedSvc = service.NewFeedService(feedCore)
 	} else {
 		log.Printf("Daily Feed feature disabled (no TAVILY_API_KEY)")
+	}
+
+	// Firebase Push Notifications (optional)
+	var notifWorker *notifications.Worker
+	firebaseServiceAccountPath := "firebase/service-account.json"
+	if _, err := os.Stat(firebaseServiceAccountPath); err == nil {
+		fcmSender, err := firebase.NewSender(firebaseServiceAccountPath)
+		if err != nil {
+			log.Printf("WARNING: Failed to initialize Firebase: %v", err)
+		} else {
+			notifWorker = notifications.NewWorker(st, learningCore, fcmSender)
+			// Add feedCore for daily article generation (6 AM IST)
+			if feedCore != nil {
+				notifWorker.SetFeedCore(feedCore)
+			}
+			notifWorker.Start()
+			log.Printf("Worker started (Feed: 6 AM, Notifications: 9 AM IST)")
+		}
+	} else {
+		log.Printf("Push notifications disabled (no firebase/service-account.json)")
 	}
 
 	// 4. Auth Interceptor
@@ -213,23 +236,94 @@ func main() {
 			return
 		}
 
+		// Test notification endpoint
+		if r.URL.Path == "/api/notification/test" && r.Method == "POST" {
+			authHeader := r.Header.Get("X-API-Key")
+			if feedAPIKey == "" || authHeader != feedAPIKey {
+				http.Error(w, `{"error": "unauthorized"}`, http.StatusUnauthorized)
+				return
+			}
+
+			if notifWorker == nil {
+				http.Error(w, `{"error": "Push notifications not enabled"}`, http.StatusServiceUnavailable)
+				return
+			}
+
+			email := r.URL.Query().Get("email")
+			if email == "" {
+				http.Error(w, `{"error": "email query parameter is required"}`, http.StatusBadRequest)
+				return
+			}
+
+			userID, err := st.GetUserByEmail(r.Context(), email)
+			if err != nil {
+				http.Error(w, `{"error": "user not found"}`, http.StatusNotFound)
+				return
+			}
+
+			if err := notifWorker.SendTestNotification(r.Context(), userID); err != nil {
+				log.Printf("[REST] Test notification failed: %v", err)
+				http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusInternalServerError)
+				return
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"status": "success", "message": "Test notification sent"}`))
+			return
+		}
+
+		// Trigger daily notification job manually (checks due materials for all users)
+		if r.URL.Path == "/api/notification/daily" && r.Method == "POST" {
+			authHeader := r.Header.Get("X-API-Key")
+			if feedAPIKey == "" || authHeader != feedAPIKey {
+				http.Error(w, `{"error": "unauthorized"}`, http.StatusUnauthorized)
+				return
+			}
+
+			if notifWorker == nil {
+				http.Error(w, `{"error": "Push notifications not enabled"}`, http.StatusServiceUnavailable)
+				return
+			}
+
+			log.Println("[REST] Manually triggering daily notification job...")
+			go notifWorker.SendDailyNotifications() // Run async
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"status": "success", "message": "Daily notification job triggered"}`))
+			return
+		}
+
 		http.NotFound(w, r)
 	})
 
 	// Combined handler: REST API routes or gRPC-Web
 	combinedHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/feed/refresh" {
+		if r.URL.Path == "/api/feed/refresh" || r.URL.Path == "/api/notification/test" || r.URL.Path == "/api/notification/daily" {
 			restHandler.ServeHTTP(w, r)
 			return
 		}
 		httpHandler.ServeHTTP(w, r)
 	})
 
+	// Recovery middleware to prevent panics from crashing the server
+	recoveryHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if err := recover(); err != nil {
+				log.Printf("[PANIC RECOVERED] %v\n%s", err, debug.Stack())
+				w.Header().Set("Content-Type", "application/json")
+				http.Error(w, `{"error": "internal server error"}`, http.StatusInternalServerError)
+			}
+		}()
+		combinedHandler.ServeHTTP(w, r)
+	})
+
 	log.Printf("Server listening on :50051")
 	// Run gRPC-Web on separate port
 	go func() {
 		log.Printf("gRPC-Web + REST API listening on :8080")
-		if err := http.ListenAndServe(":8080", combinedHandler); err != nil {
+		if err := http.ListenAndServe(":8080", recoveryHandler); err != nil {
 			log.Fatalf("failed to serve grpc-web: %v", err)
 		}
 	}()

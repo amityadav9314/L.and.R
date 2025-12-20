@@ -112,6 +112,19 @@ curl -X POST "http://localhost:8080/api/feed/refresh?email=user@example.com" \
 
 > **Note**: Set `FEED_API_KEY` in your `.env` file. This same key must be passed in the `X-API-Key` header.
 
+### REST API: Test Push Notification
+Send a test push notification to a user's registered devices:
+
+```bash
+curl -X POST "http://localhost:8080/api/notification/test?email=user@example.com" \
+  -H "X-API-Key: your-secret-api-key"
+```
+
+**Response:**
+```json
+{"status": "success", "message": "Test notification sent"}
+```
+
 The generated TypeScript client lives in `frontend/proto/...` and is used via `nice-grpc-web`.
 
 ## Running the Application
