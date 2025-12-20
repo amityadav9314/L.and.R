@@ -17,7 +17,7 @@ export const NavigationProvider = ({ children }: { children: ReactNode }) => {
     const [stack, setStack] = useState<{ screen: ScreenName; params: any }[]>([{ screen: 'Home', params: {} }]);
     const stackRef = useRef(stack);
 
-    // Keep ref in sync with state
+    // Keep the Ref in sync with the latest stack state
     useEffect(() => {
         stackRef.current = stack;
     }, [stack]);
@@ -26,22 +26,40 @@ export const NavigationProvider = ({ children }: { children: ReactNode }) => {
     const canGoBack = stack.length > 1;
 
     // Handle Android Hardware Back Button
+    // We use a persistent listener with a Ref to avoid potential race conditions 
+    // or missing events on specific hardware like iQOO/Funtouch OS.
     useEffect(() => {
         if (Platform.OS === 'android') {
+            console.log('[ManualRouter] Registering persistent BackHandler listener.');
+
             const onBackPress = () => {
-                // Use ref to get current stack value (avoids stale closure)
-                if (stackRef.current.length > 1) {
-                    // If we can go back in our navigation stack, do so
-                    setStack(prev => prev.slice(0, -1));
-                    return true; // Prevent default behavior (exit app)
+                const currentStack = stackRef.current;
+                console.log('[ManualRouter] Hardware Back Event Caught. Stack state:', {
+                    stackSize: currentStack.length,
+                    currentScreen: currentStack[currentStack.length - 1].screen
+                });
+
+                if (currentStack.length > 1) {
+                    setStack(prev => {
+                        const newStack = prev.slice(0, -1);
+                        console.log('[ManualRouter] Popping stack. New top:', newStack[newStack.length - 1].screen);
+                        return newStack;
+                    });
+                    console.log('[ManualRouter] Returning true (intercepting back event)');
+                    return true;
                 }
-                return false; // Let default behavior happen (exit app)
+
+                console.log('[ManualRouter] Stack is at root. Returning false (letting OS handle it)');
+                return false;
             };
 
             const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
-            return () => subscription.remove();
+            return () => {
+                console.log('[ManualRouter] Removing BackHandler listener.');
+                subscription.remove();
+            };
         }
-    }, []); // Empty deps - only set up once
+    }, []); // Register only once
 
     // Handle Browser Back Button (Web only)
     useEffect(() => {

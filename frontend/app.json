@@ -24,13 +24,14 @@
     },
     "android": {
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": true,
+      "predictiveBackGestureEnabled": false,
       "package": "com.amityadav.landr",
       "googleServicesFile": "./google-services.json",
       "usesCleartextTraffic": true,
       "permissions": [
         "RECEIVE_BOOT_COMPLETED",
-        "WAKE_LOCK"
+        "WAKE_LOCK",
+        "POST_NOTIFICATIONS"
       ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
