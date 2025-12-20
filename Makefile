@@ -1,15 +1,19 @@
-.PHONY: help start-backend start-frontend apk stop db-start db-stop migrate-up proto
+.PHONY: help start-backend start-frontend desktop deploy-desktop apk stop db-start db-stop migrate-up proto
 
 # Variables
 BACKEND_DIR := backend
 FRONTEND_DIR := frontend
+DESKTOP_DIR := frontend/desktop
+DEPLOY_DIR := /var/www/landr/desktop
 
 # Default target
 help:
 	@echo "LandR - Development Commands"
 	@echo ""
 	@echo "  make start-backend   - Stop, build, and start backend"
-	@echo "  make start-frontend  - Stop, clear cache, and start frontend"
+	@echo "  make start-frontend  - Stop, clear cache, and start mobile frontend (Expo)"
+	@echo "  make desktop         - Type check and start desktop frontend (Vite dev server)"
+	@echo "  make deploy-desktop  - Build and deploy desktop to production (/var/www/landr/desktop)"
 	@echo "  make apk             - Build release APK"
 	@echo "  make android         - Rebuild debug APK and install (use after adding Expo packages)"
 	@echo "  make android-debug   - Build debug APK only"
@@ -56,6 +60,25 @@ start-native-android:
 	@echo "🚀 Building & running native Android (with hot-reload)..."
 	@cd $(FRONTEND_DIR) && npx expo run:android
 
+desktop:
+	@echo "🛑 Stopping previous desktop frontend..."
+	@lsof -ti:5173 | xargs -r kill -9 2>/dev/null || true
+	@echo "🔍 Type checking Desktop frontend..."
+	@cd $(DESKTOP_DIR) && npx tsc -p tsconfig.app.json --noEmit
+	@echo "🚀 Starting Desktop frontend..."
+	@cd $(DESKTOP_DIR) && npm run dev
+
+deploy-desktop:
+	@echo "🏗️  Building Desktop for production..."
+	@cd $(DESKTOP_DIR) && npm run build
+	@echo "📦 Deploying to $(DEPLOY_DIR)..."
+	@sudo mkdir -p $(DEPLOY_DIR)
+	@sudo rm -rf $(DEPLOY_DIR)/*
+	@sudo cp -r $(DESKTOP_DIR)/dist/* $(DEPLOY_DIR)/
+	@sudo chown -R www-data:www-data $(DEPLOY_DIR)
+	@echo "✅ Desktop deployed successfully!"
+	@echo "🌐 Access at: https://43.205.81.60.nip.io (from desktop browser)"
+
 # ============================================
 # APK BUILD
 # ============================================
@@ -95,6 +118,8 @@ stop:
 	@echo "Stopping all servers..."
 	@lsof -ti:8080 | xargs -r kill -9 2>/dev/null || true
 	@lsof -ti:50051 | xargs -r kill -9 2>/dev/null || true
+	@lsof -ti:5173 | xargs -r kill -9 2>/dev/null || true
+	@lsof -ti:8081 | xargs -r kill -9 2>/dev/null || true
 	@echo "All servers stopped."
 
 # ============================================

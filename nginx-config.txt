@@ -1,3 +1,7 @@
+# L.and.R Production Nginx Configuration with Smart Device Detection
+# Automatically serves desktop or mobile frontend based on User-Agent
+
+# HTTP to HTTPS redirect
 server {
     listen 80;
     listen [::]:80;
@@ -5,6 +9,7 @@ server {
     return 301 https://$host$request_uri;
 }
 
+# Main HTTPS server with smart routing
 server {
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
@@ -15,34 +20,60 @@ server {
     include /etc/letsencrypt/options-ssl-nginx.conf;
     ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
 
-    # FRONTEND
+    # Detect mobile devices
+    set $is_mobile 0;
+    if ($http_user_agent ~* (mobile|android|iphone|ipad|ipod|blackberry|iemobile|kindle|silk|opera mini)) {
+        set $is_mobile 1;
+    }
+
+    # FRONTEND - Smart routing based on device
     location / {
-        proxy_pass http://localhost:8081;
+        # Mobile devices: proxy to Expo web (port 8081)
+        if ($is_mobile = 1) {
+            proxy_pass http://localhost:8081;
+            break;
+        }
+
+        # Desktop devices: serve static React build
+        root /var/www/landr/desktop;
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Static assets caching (for desktop build)
+    location ~* \.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot)$ {
+        root /var/www/landr/desktop;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # REST API
+    location /api/ {
+        proxy_pass http://localhost:8080;
+        proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-    }
+    }   
 
     # BACKEND - gRPC-Web (let Go handle CORS)
-    location ~ ^/(auth\.|learning\.) {
+    location ~ ^/(auth\.|learning\.|feed\.) {
         proxy_pass http://localhost:8080;
         proxy_http_version 1.1;
-        
+
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header Origin $http_origin;
-        
+
         # Disable buffering for gRPC
         proxy_buffering off;
         proxy_request_buffering off;
-        
+
         # Timeouts
         proxy_connect_timeout 300s;
         proxy_send_timeout 300s;
         proxy_read_timeout 300s;
     }
 }
-
