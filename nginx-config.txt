@@ -20,22 +20,23 @@ server {
     include /etc/letsencrypt/options-ssl-nginx.conf;
     ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
 
-    # Detect mobile devices
-    set $is_mobile 0;
-    if ($http_user_agent ~* (mobile|android|iphone|ipad|ipod|blackberry|iemobile|kindle|silk|opera mini)) {
-        set $is_mobile 1;
+    # Detect mobile devices using regex
+    set $mobile_request "";
+    if ($http_user_agent ~* "(mobile|android|iphone|ipad|ipod|blackberry|iemobile|kindle|silk|opera mini)") {
+        set $mobile_request "1";
     }
 
     # FRONTEND - Smart routing based on device
     location / {
         # Mobile devices: proxy to Expo web (port 8081)
-        if ($is_mobile = 1) {
+        if ($mobile_request = "1") {
             proxy_pass http://localhost:8081;
             break;
         }
 
         # Desktop devices: serve static React build
         root /var/www/landr/desktop;
+        index index.html;
         try_files $uri $uri/ /index.html;
     }
 

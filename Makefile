@@ -69,6 +69,8 @@ desktop:
 	@cd $(DESKTOP_DIR) && npm run dev
 
 deploy-desktop:
+	@echo "📦 Installing Desktop dependencies..."
+	@cd $(DESKTOP_DIR) && npm install
 	@echo "🏗️  Building Desktop for production..."
 	@cd $(DESKTOP_DIR) && npm run build
 	@echo "📦 Deploying to $(DEPLOY_DIR)..."
