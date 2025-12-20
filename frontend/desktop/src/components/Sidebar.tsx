@@ -35,22 +35,21 @@ const Sidebar = () => {
                 ))}
             </Nav>
             <hr />
-            <div className="dropdown">
-                <div
-                    className="d-flex align-items-center link-dark text-decoration-none dropdown-toggle cursor-pointer"
-                    id="dropdownUser2"
-                    data-bs-toggle="dropdown"
-                    aria-expanded="false"
-                >
-                    <img src={user?.picture || 'https://via.placeholder.com/32'} alt="" width="32" height="32" className="rounded-circle me-2" />
-                    <div className="d-flex flex-column text-truncate" style={{ maxWidth: '180px' }}>
-                        <strong className="text-truncate">{user?.name}</strong>
-                        <span className="small text-muted text-truncate">{user?.email}</span>
+            <div className="d-flex flex-column gap-2">
+                <div className="d-flex align-items-center gap-2 px-2">
+                    <img src={user?.picture || 'https://via.placeholder.com/32'} alt="" width="40" height="40" className="rounded-circle" />
+                    <div className="d-flex flex-column text-truncate flex-grow-1">
+                        <strong className="text-truncate small">{user?.name}</strong>
+                        <span className="small text-muted text-truncate" style={{ fontSize: '0.75rem' }}>{user?.email}</span>
                     </div>
                 </div>
-                <ul className="dropdown-menu text-small shadow" aria-labelledby="dropdownUser2">
-                    <li><a className="dropdown-item d-flex align-items-center gap-2" onClick={() => logout()} href="#"><LogOut size={16} /> Sign out</a></li>
-                </ul>
+                <button
+                    className="btn btn-outline-danger btn-sm d-flex align-items-center justify-content-center gap-2 w-100"
+                    onClick={() => logout()}
+                >
+                    <LogOut size={16} />
+                    <span>Sign Out</span>
+                </button>
             </div>
         </div>
     );
