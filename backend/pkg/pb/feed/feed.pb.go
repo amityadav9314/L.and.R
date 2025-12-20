@@ -180,6 +180,8 @@ type Article struct {
 	Snippet        string                 `protobuf:"bytes,4,opt,name=snippet,proto3" json:"snippet,omitempty"`
 	RelevanceScore float32                `protobuf:"fixed32,5,opt,name=relevance_score,json=relevanceScore,proto3" json:"relevance_score,omitempty"`
 	CreatedAt      *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	Provider       string                 `protobuf:"bytes,7,opt,name=provider,proto3" json:"provider,omitempty"`
+	IsAdded        bool                   `protobuf:"varint,8,opt,name=is_added,json=isAdded,proto3" json:"is_added,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -254,6 +256,20 @@ func (x *Article) GetCreatedAt() *timestamppb.Timestamp {
 		return x.CreatedAt
 	}
 	return nil
+}
+
+func (x *Article) GetProvider() string {
+	if x != nil {
+		return x.Provider
+	}
+	return ""
+}
+
+func (x *Article) GetIsAdded() bool {
+	if x != nil {
+		return x.IsAdded
+	}
+	return false
 }
 
 type GetDailyFeedResponse struct {
@@ -461,7 +477,7 @@ const file_backend_proto_feed_feed_proto_rawDesc = "" +
 	"\x0finterest_prompt\x18\x01 \x01(\tR\x0einterestPrompt\x12!\n" +
 	"\ffeed_enabled\x18\x02 \x01(\bR\vfeedEnabled\")\n" +
 	"\x13GetDailyFeedRequest\x12\x12\n" +
-	"\x04date\x18\x01 \x01(\tR\x04date\"\xbf\x01\n" +
+	"\x04date\x18\x01 \x01(\tR\x04date\"\xf6\x01\n" +
 	"\aArticle\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x10\n" +
@@ -469,7 +485,9 @@ const file_backend_proto_feed_feed_proto_rawDesc = "" +
 	"\asnippet\x18\x04 \x01(\tR\asnippet\x12'\n" +
 	"\x0frelevance_score\x18\x05 \x01(\x02R\x0erelevanceScore\x129\n" +
 	"\n" +
-	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"U\n" +
+	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12\x1a\n" +
+	"\bprovider\x18\a \x01(\tR\bprovider\x12\x19\n" +
+	"\bis_added\x18\b \x01(\bR\aisAdded\"U\n" +
 	"\x14GetDailyFeedResponse\x12\x12\n" +
 	"\x04date\x18\x01 \x01(\tR\x04date\x12)\n" +
 	"\barticles\x18\x02 \x03(\v2\r.feed.ArticleR\barticles\"4\n" +

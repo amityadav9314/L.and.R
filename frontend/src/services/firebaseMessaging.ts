@@ -33,7 +33,28 @@ const getMessaging = async () => {
     }
 };
 
+let onNotificationOpened: ((remoteMessage: any) => void) | null = null;
+
 export const FirebaseMessagingService = {
+    /**
+     * Register a callback to be called when a notification is opened
+     */
+    registerNotificationHandler(handler: (remoteMessage: any) => void) {
+        onNotificationOpened = handler;
+
+        // Handle initial notification if app was opened from a quit state
+        getMessaging().then(msg => {
+            if (msg) {
+                msg().getInitialNotification().then((remoteMessage: any) => {
+                    if (remoteMessage && onNotificationOpened) {
+                        console.log('[FCM] Opened app from quit state:', remoteMessage);
+                        onNotificationOpened(remoteMessage);
+                    }
+                });
+            }
+        });
+    },
+
     /**
      * Request notification permissions and get FCM token
      */
@@ -59,6 +80,14 @@ export const FirebaseMessagingService = {
             } else {
                 console.log('[FCM] Permission denied');
             }
+
+            // Handle notification clicks from background state
+            msg().onNotificationOpenedApp((remoteMessage: any) => {
+                console.log('[FCM] Notification caused app to open from background state:', remoteMessage);
+                if (onNotificationOpened) {
+                    onNotificationOpened(remoteMessage);
+                }
+            });
 
             // Listen for token refresh
             msg().onTokenRefresh(async () => {

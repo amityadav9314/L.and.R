@@ -34,6 +34,8 @@ export interface Article {
   snippet: string;
   relevanceScore: number;
   createdAt: Date | undefined;
+  provider: string;
+  isAdded: boolean;
 }
 
 export interface GetDailyFeedResponse {
@@ -266,7 +268,16 @@ export const GetDailyFeedRequest: MessageFns<GetDailyFeedRequest> = {
 };
 
 function createBaseArticle(): Article {
-  return { id: "", title: "", url: "", snippet: "", relevanceScore: 0, createdAt: undefined };
+  return {
+    id: "",
+    title: "",
+    url: "",
+    snippet: "",
+    relevanceScore: 0,
+    createdAt: undefined,
+    provider: "",
+    isAdded: false,
+  };
 }
 
 export const Article: MessageFns<Article> = {
@@ -288,6 +299,12 @@ export const Article: MessageFns<Article> = {
     }
     if (message.createdAt !== undefined) {
       Timestamp.encode(toTimestamp(message.createdAt), writer.uint32(50).fork()).join();
+    }
+    if (message.provider !== "") {
+      writer.uint32(58).string(message.provider);
+    }
+    if (message.isAdded !== false) {
+      writer.uint32(64).bool(message.isAdded);
     }
     return writer;
   },
@@ -347,6 +364,22 @@ export const Article: MessageFns<Article> = {
           message.createdAt = fromTimestamp(Timestamp.decode(reader, reader.uint32()));
           continue;
         }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.provider = reader.string();
+          continue;
+        }
+        case 8: {
+          if (tag !== 64) {
+            break;
+          }
+
+          message.isAdded = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -364,6 +397,8 @@ export const Article: MessageFns<Article> = {
       snippet: isSet(object.snippet) ? globalThis.String(object.snippet) : "",
       relevanceScore: isSet(object.relevanceScore) ? globalThis.Number(object.relevanceScore) : 0,
       createdAt: isSet(object.createdAt) ? fromJsonTimestamp(object.createdAt) : undefined,
+      provider: isSet(object.provider) ? globalThis.String(object.provider) : "",
+      isAdded: isSet(object.isAdded) ? globalThis.Boolean(object.isAdded) : false,
     };
   },
 
@@ -387,6 +422,12 @@ export const Article: MessageFns<Article> = {
     if (message.createdAt !== undefined) {
       obj.createdAt = message.createdAt.toISOString();
     }
+    if (message.provider !== "") {
+      obj.provider = message.provider;
+    }
+    if (message.isAdded !== false) {
+      obj.isAdded = message.isAdded;
+    }
     return obj;
   },
 
@@ -401,6 +442,8 @@ export const Article: MessageFns<Article> = {
     message.snippet = object.snippet ?? "";
     message.relevanceScore = object.relevanceScore ?? 0;
     message.createdAt = object.createdAt ?? undefined;
+    message.provider = object.provider ?? "";
+    message.isAdded = object.isAdded ?? false;
     return message;
   },
 };

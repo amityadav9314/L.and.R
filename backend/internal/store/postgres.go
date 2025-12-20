@@ -56,21 +56,31 @@ func (s *PostgresStore) GetUserByGoogleID(ctx context.Context, googleID string) 
 	return &user, nil
 }
 
-func (s *PostgresStore) CreateMaterial(ctx context.Context, userID, matType, content, title string) (string, error) {
+func (s *PostgresStore) CreateMaterial(ctx context.Context, userID, matType, content, title, sourceURL string) (string, error) {
 	log.Printf("[Store.CreateMaterial] Inserting material - UserID: %s, Type: %s, Title: %s", userID, matType, title)
 	query := `
-        INSERT INTO materials (user_id, type, content, title)
-        VALUES ($1, $2, $3, $4)
+        INSERT INTO materials (user_id, type, content, title, source_url)
+        VALUES ($1, $2, $3, $4, $5)
         RETURNING id;
     `
 	var materialID string
-	err := s.db.QueryRow(ctx, query, userID, matType, content, title).Scan(&materialID)
+	err := s.db.QueryRow(ctx, query, userID, matType, content, title, sourceURL).Scan(&materialID)
 	if err != nil {
 		log.Printf("[Store.CreateMaterial] Insert failed: %v", err)
 		return "", fmt.Errorf("failed to insert material: %w", err)
 	}
 	log.Printf("[Store.CreateMaterial] Material created with ID: %s", materialID)
 	return materialID, nil
+}
+
+func (s *PostgresStore) GetMaterialBySourceURL(ctx context.Context, userID, sourceURL string) (string, error) {
+	query := `SELECT id FROM materials WHERE user_id = $1 AND source_url = $2 AND is_deleted = FALSE LIMIT 1;`
+	var id string
+	err := s.db.QueryRow(ctx, query, userID, sourceURL).Scan(&id)
+	if err != nil {
+		return "", err
+	}
+	return id, nil
 }
 
 func (s *PostgresStore) SoftDeleteMaterial(ctx context.Context, userID, materialID string) error {
@@ -509,16 +519,17 @@ type DailyArticle struct {
 	RelevanceScore float64
 	SuggestedDate  time.Time
 	CreatedAt      time.Time
+	Provider       string
 }
 
 // StoreDailyArticle stores a single daily article for a user
 func (s *PostgresStore) StoreDailyArticle(ctx context.Context, userID string, article *DailyArticle) error {
-	log.Printf("[Store.StoreDailyArticle] Storing article: %s for user: %s", article.Title, userID)
+	log.Printf("[Store.StoreDailyArticle] Storing article: %s for user: %s (provider: %s)", article.Title, userID, article.Provider)
 	query := `
-		INSERT INTO daily_articles (user_id, title, url, snippet, suggested_date, relevance_score)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO daily_articles (user_id, title, url, snippet, suggested_date, relevance_score, provider)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 	`
-	_, err := s.db.Exec(ctx, query, userID, article.Title, article.URL, article.Snippet, article.SuggestedDate, article.RelevanceScore)
+	_, err := s.db.Exec(ctx, query, userID, article.Title, article.URL, article.Snippet, article.SuggestedDate, article.RelevanceScore, article.Provider)
 	if err != nil {
 		return fmt.Errorf("failed to store daily article: %w", err)
 	}
@@ -529,7 +540,7 @@ func (s *PostgresStore) StoreDailyArticle(ctx context.Context, userID string, ar
 func (s *PostgresStore) GetDailyArticles(ctx context.Context, userID string, date time.Time) ([]*DailyArticle, error) {
 	log.Printf("[Store.GetDailyArticles] Fetching for userID: %s, date: %s", userID, date.Format("2006-01-02"))
 	query := `
-		SELECT id, title, url, snippet, relevance_score, suggested_date, created_at
+		SELECT id, title, url, snippet, relevance_score, suggested_date, created_at, provider
 		FROM daily_articles
 		WHERE user_id = $1 AND suggested_date = $2
 		ORDER BY relevance_score DESC
@@ -543,7 +554,7 @@ func (s *PostgresStore) GetDailyArticles(ctx context.Context, userID string, dat
 	var articles []*DailyArticle
 	for rows.Next() {
 		var a DailyArticle
-		if err := rows.Scan(&a.ID, &a.Title, &a.URL, &a.Snippet, &a.RelevanceScore, &a.SuggestedDate, &a.CreatedAt); err != nil {
+		if err := rows.Scan(&a.ID, &a.Title, &a.URL, &a.Snippet, &a.RelevanceScore, &a.SuggestedDate, &a.CreatedAt, &a.Provider); err != nil {
 			return nil, fmt.Errorf("failed to scan article: %w", err)
 		}
 		articles = append(articles, &a)

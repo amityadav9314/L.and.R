@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/amityadav/landr/internal/ai"
+	"github.com/amityadav/landr/internal/serpapi"
 	"github.com/amityadav/landr/internal/store"
 	"github.com/amityadav/landr/internal/tavily"
 	"github.com/amityadav/landr/pkg/pb/feed"
@@ -15,17 +16,19 @@ import (
 
 // FeedCore handles the business logic for the Daily Feed feature
 type FeedCore struct {
-	store        *store.PostgresStore
-	tavilyClient *tavily.Client
-	aiProvider   ai.Provider
+	store         *store.PostgresStore
+	tavilyClient  *tavily.Client
+	serpapiClient *serpapi.Client
+	aiProvider    ai.Provider
 }
 
 // NewFeedCore creates a new FeedCore instance
-func NewFeedCore(st *store.PostgresStore, tavilyClient *tavily.Client, aiProvider ai.Provider) *FeedCore {
+func NewFeedCore(st *store.PostgresStore, tavilyClient *tavily.Client, serpapiClient *serpapi.Client, aiProvider ai.Provider) *FeedCore {
 	return &FeedCore{
-		store:        st,
-		tavilyClient: tavilyClient,
-		aiProvider:   aiProvider,
+		store:         st,
+		tavilyClient:  tavilyClient,
+		serpapiClient: serpapiClient,
+		aiProvider:    aiProvider,
 	}
 }
 
@@ -60,6 +63,11 @@ func (c *FeedCore) GetDailyFeed(ctx context.Context, userID, dateStr string) (*f
 
 	pbArticles := make([]*feed.Article, len(articles))
 	for i, a := range articles {
+		isAdded := false
+		if matID, err := c.store.GetMaterialBySourceURL(ctx, userID, a.URL); err == nil && matID != "" {
+			isAdded = true
+		}
+
 		pbArticles[i] = &feed.Article{
 			Id:             a.ID,
 			Title:          a.Title,
@@ -67,6 +75,8 @@ func (c *FeedCore) GetDailyFeed(ctx context.Context, userID, dateStr string) (*f
 			Snippet:        a.Snippet,
 			RelevanceScore: float32(a.RelevanceScore),
 			CreatedAt:      timestamppb.New(a.CreatedAt),
+			Provider:       a.Provider,
+			IsAdded:        isAdded,
 		}
 	}
 
@@ -122,21 +132,30 @@ func (c *FeedCore) GenerateDailyFeedForUser(ctx context.Context, userID string) 
 		return nil
 	}
 
-	// 2. Check if articles already exist for today (caching)
+	// 2. Check existing articles to avoid duplicate API calls
 	today := time.Now().Truncate(24 * time.Hour)
 	existingArticles, err := c.store.GetDailyArticles(ctx, userID, today)
 	if err != nil {
 		log.Printf("[FeedCore.GenerateDailyFeedForUser] Error checking existing articles: %v", err)
-		// Continue anyway
 	}
 
-	if len(existingArticles) > 0 {
-		log.Printf("[FeedCore.GenerateDailyFeedForUser] Articles already exist for today (%d found), skipping Tavily call", len(existingArticles))
-		return nil // Cache hit - don't call Tavily
+	hasGoogle := false
+	hasTavily := false
+	for _, a := range existingArticles {
+		if a.Provider == "google" {
+			hasGoogle = true
+		} else if a.Provider == "tavily" || a.Provider == "" {
+			hasTavily = true
+		}
+	}
+
+	if hasGoogle && hasTavily {
+		log.Printf("[FeedCore.GenerateDailyFeedForUser] Articles exist for both providers today, skipping search calls")
+		return nil
 	}
 
 	// 3. Use LLM to optimize the search query
-	log.Printf("[FeedCore.GenerateDailyFeedForUser] Optimizing search query with LLM...")
+	log.Printf("[FeedCore.GenerateDailyFeedForUser] Optimizing search query with LLM (Google missing: %v, Tavily missing: %v)...", !hasGoogle, !hasTavily)
 	optimizedQuery, err := c.aiProvider.OptimizeSearchQuery(prefs.InterestPrompt)
 	if err != nil {
 		log.Printf("[FeedCore.GenerateDailyFeedForUser] Query optimization failed, using original: %v", err)
@@ -144,54 +163,78 @@ func (c *FeedCore) GenerateDailyFeedForUser(ctx context.Context, userID string) 
 	}
 	log.Printf("[FeedCore.GenerateDailyFeedForUser] Original: %q -> Optimized: %q", prefs.InterestPrompt, optimizedQuery)
 
-	// 4. Call Tavily with recency filtering (news topic, last 3 days)
-	log.Printf("[FeedCore.GenerateDailyFeedForUser] Calling Tavily API with news filter...")
-	searchResp, err := c.tavilyClient.SearchWithOptions(optimizedQuery, tavily.SearchOptions{
-		MaxResults: 15, // Fetch more since we'll filter duplicates
-		NewsOnly:   true,
-		Days:       3, // Only articles from last 3 days
-	})
-	if err != nil {
-		return fmt.Errorf("tavily search failed: %w", err)
-	}
+	// 4. Call Search Providers
+	var storedCount, skippedCount int
 
-	if len(searchResp.Results) == 0 {
-		log.Printf("[FeedCore.GenerateDailyFeedForUser] No search results for user %s", userID)
-		return nil
-	}
-
-	// 5. Store articles, skipping duplicates (URLs already in DB)
-	storedCount := 0
-	skippedCount := 0
-	for _, result := range searchResp.Results {
-		// Check if URL already exists for this user (prevents duplicates across days)
-		exists, err := c.store.ArticleURLExists(ctx, userID, result.URL)
+	// 4a. SerpApi (Google)
+	if c.serpapiClient != nil && !hasGoogle {
+		log.Printf("[FeedCore.GenerateDailyFeedForUser] Calling SerpApi...")
+		serpResp, err := c.serpapiClient.Search(optimizedQuery)
 		if err != nil {
-			log.Printf("[FeedCore.GenerateDailyFeedForUser] Error checking URL: %v", err)
-			// Continue anyway
-		}
-		if exists {
-			skippedCount++
-			continue // Skip duplicate
-		}
-
-		article := &store.DailyArticle{
-			Title:          result.Title,
-			URL:            result.URL,
-			Snippet:        result.Content,
-			RelevanceScore: result.Score,
-			SuggestedDate:  today,
-		}
-		if err := c.store.StoreDailyArticle(ctx, userID, article); err != nil {
-			log.Printf("[FeedCore.GenerateDailyFeedForUser] Failed to store article: %v", err)
-			// Continue with other articles
+			log.Printf("[FeedCore.GenerateDailyFeedForUser] SerpApi search failed: %v", err)
 		} else {
-			storedCount++
+			for _, result := range serpResp.Results {
+				if err := c.storeArticle(ctx, userID, result.Title, result.URL, result.Snippet, result.Score, "google", today); err != nil {
+					if err.Error() == "skipped" {
+						skippedCount++
+					}
+				} else {
+					storedCount++
+				}
+			}
 		}
+	} else if hasGoogle {
+		log.Printf("[FeedCore.GenerateDailyFeedForUser] Skipping SerpApi (already has Google results for today)")
 	}
 
-	log.Printf("[FeedCore.GenerateDailyFeedForUser] Stored %d articles (skipped %d duplicates) for user %s", storedCount, skippedCount, userID)
+	// 4b. Tavily
+	if c.tavilyClient != nil && !hasTavily {
+		log.Printf("[FeedCore.GenerateDailyFeedForUser] Calling Tavily...")
+		tavilyResp, err := c.tavilyClient.SearchWithOptions(optimizedQuery, tavily.SearchOptions{
+			MaxResults: 15,
+			NewsOnly:   true,
+			Days:       3,
+		})
+		if err != nil {
+			log.Printf("[FeedCore.GenerateDailyFeedForUser] Tavily search failed: %v", err)
+		} else {
+			for _, result := range tavilyResp.Results {
+				if err := c.storeArticle(ctx, userID, result.Title, result.URL, result.Content, result.Score, "tavily", today); err != nil {
+					if err.Error() == "skipped" {
+						skippedCount++
+					}
+				} else {
+					storedCount++
+				}
+			}
+		}
+	} else if hasTavily {
+		log.Printf("[FeedCore.GenerateDailyFeedForUser] Skipping Tavily (already has Tavily results for today)")
+	}
+
+	log.Printf("[FeedCore.GenerateDailyFeedForUser] Completed. Stored: %d, Skipped (duplicate): %d", storedCount, skippedCount)
 	return nil
+}
+
+// storeArticle is a helper to check existence and store a daily article
+func (c *FeedCore) storeArticle(ctx context.Context, userID, title, url, snippet string, score float64, provider string, date time.Time) error {
+	exists, err := c.store.ArticleURLExists(ctx, userID, url)
+	if err != nil {
+		log.Printf("[FeedCore.storeArticle] Error checking URL: %v", err)
+	}
+	if exists {
+		return fmt.Errorf("skipped")
+	}
+
+	article := &store.DailyArticle{
+		Title:          title,
+		URL:            url,
+		Snippet:        snippet,
+		RelevanceScore: score,
+		SuggestedDate:  date,
+		Provider:       provider,
+	}
+	return c.store.StoreDailyArticle(ctx, userID, article)
 }
 
 // GenerateDailyFeedForAllUsers runs the feed generation for all enabled users
@@ -208,9 +251,10 @@ func (c *FeedCore) GenerateDailyFeedForAllUsers(ctx context.Context) error {
 
 	successCount := 0
 	for i, userID := range userIDs {
-		// Rate limit: 2 second delay between users (to respect Tavily API limits)
+		// Rate limit: 2 minute delay between users as requested
 		if i > 0 {
-			time.Sleep(2 * time.Second)
+			log.Printf("[FeedCore] Rate limiting: waiting 2 minutes before processing user %d/%d...", i+1, len(userIDs))
+			time.Sleep(2 * time.Minute)
 		}
 
 		if err := c.GenerateDailyFeedForUser(ctx, userID); err != nil {

@@ -14,7 +14,8 @@ type Store interface {
 	GetUserByGoogleID(ctx context.Context, googleID string) (*auth.UserProfile, error)
 
 	// Material
-	CreateMaterial(ctx context.Context, userID, matType, content, title string) (string, error)
+	CreateMaterial(ctx context.Context, userID, matType, content, title, sourceURL string) (string, error)
+	GetMaterialBySourceURL(ctx context.Context, userID, sourceURL string) (string, error)
 	SoftDeleteMaterial(ctx context.Context, userID, materialID string) error
 
 	// Tags
@@ -36,6 +37,12 @@ type Store interface {
 	// Material Summary
 	GetMaterialContent(ctx context.Context, userID, materialID string) (content string, summary string, title string, err error)
 	UpdateMaterialSummary(ctx context.Context, materialID, summary string) error
+
+	// Daily Feed
+	StoreDailyArticle(ctx context.Context, userID string, article *DailyArticle) error
+	GetDailyArticles(ctx context.Context, userID string, date time.Time) ([]*DailyArticle, error)
+	GetFeedCalendarStatus(ctx context.Context, userID string, year, month int) ([]*CalendarDay, error)
+	GetUsersWithFeedEnabled(ctx context.Context) ([]string, error)
 
 	// General
 	Close()

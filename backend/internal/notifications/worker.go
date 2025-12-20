@@ -100,9 +100,10 @@ func (w *Worker) SendDailyNotifications() {
 
 	sentCount := 0
 	for i, userID := range userIDs {
-		// Rate limit: 500ms delay between users (2 users/second max)
+		// Rate limit: 2 minute delay between users as requested
 		if i > 0 {
-			time.Sleep(500 * time.Millisecond)
+			log.Printf("[Worker] Rate limiting: waiting 2 minutes before processing user %d/%d...", i+1, len(userIDs))
+			time.Sleep(2 * time.Minute)
 		}
 
 		// Check if user has due materials

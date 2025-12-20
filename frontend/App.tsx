@@ -75,6 +75,19 @@ const ScreenRenderer = () => {
   );
 };
 
+const NotificationHandler = () => {
+  const { navigate } = useNavigation();
+
+  useEffect(() => {
+    FirebaseMessagingService.registerNotificationHandler((remoteMessage) => {
+      console.log('[App] Notification clicked, navigating to Home:', remoteMessage);
+      navigate('Home');
+    });
+  }, []);
+
+  return null;
+};
+
 function AppContent() {
   const { user, restoreSession, isLoading } = useAuthStore();
 
@@ -101,6 +114,7 @@ function AppContent() {
         {user ? (
           <NavigationProvider>
             <View style={{ flex: 1 }}>
+              <NotificationHandler />
               <ScreenRenderer />
               <BottomNavBar />
             </View>

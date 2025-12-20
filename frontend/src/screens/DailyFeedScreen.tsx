@@ -3,15 +3,17 @@ import {
     View, Text, StyleSheet, TouchableOpacity, ScrollView,
     FlatList, Linking, ActivityIndicator
 } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTheme, ThemeColors } from '../utils/theme';
 import { AppHeader } from '../components/AppHeader';
-import { feedClient } from '../services/api';
+import { feedClient, learningClient } from '../services/api';
 import { Article } from '../../proto/backend/proto/feed/feed';
 import { useNavigation } from '../navigation/ManualRouter';
 
 export const DailyFeedScreen = () => {
+    const queryClient = useQueryClient();
     const { colors } = useTheme();
     const insets = useSafeAreaInsets();
     const { navigate } = useNavigation();
@@ -19,6 +21,9 @@ export const DailyFeedScreen = () => {
 
     // State
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]); // YYYY-MM-DD
+    const [activeTab, setActiveTab] = useState<'google' | 'tavily'>('google');
+    const [addingToRevise, setAddingToRevise] = useState<Record<string, boolean>>({});
+    const [readArticles, setReadArticles] = useState<Record<string, boolean>>({});
 
     // React Query: Feed preferences (cached but refetches on invalidation)
     const { data: feedPrefs, isLoading: prefsLoading } = useQuery({
@@ -41,7 +46,10 @@ export const DailyFeedScreen = () => {
         retry: 1,
     });
 
-    const articles: Article[] = feedData?.articles || [];
+    // Filter articles by provider
+    const allArticles: Article[] = feedData?.articles || [];
+    const articles = allArticles.filter(a => (a.provider || 'tavily') === activeTab);
+
     const loading = prefsLoading || (feedEnabled === true && articlesLoading);
 
     // Generate last 7 days for quick navigation
@@ -65,8 +73,44 @@ export const DailyFeedScreen = () => {
         return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
     };
 
-    const openArticle = (url: string) => {
-        Linking.openURL(url);
+    const openArticle = async (url: string) => {
+        try {
+            await WebBrowser.openBrowserAsync(url, {
+                toolbarColor: colors.primary,
+                enableBarCollapsing: true,
+                showTitle: true,
+            });
+            // Mark as read after browser is closed
+            setReadArticles((prev: Record<string, boolean>) => ({ ...prev, [url]: true }));
+        } catch (error) {
+            console.error('Failed to open browser:', error);
+            Linking.openURL(url);
+        }
+    };
+
+    const handleAddForRevise = async (url: string, title: string) => {
+        setAddingToRevise((prev: Record<string, boolean>) => ({ ...prev, [url]: true }));
+        try {
+            await learningClient.addMaterial({
+                type: 'LINK',
+                content: url,
+                existingTags: ['daily-feed'],
+                imageData: '',
+            });
+            // Success - keep loading as false, but maybe we could show a checkmark later
+            alert(`Added "${title}" for revision! 📚`);
+            setReadArticles((prev: Record<string, boolean>) => ({ ...prev, [url]: true })); // Ensure it stays "read"
+
+            // Invalidate feed query to show updated "isAdded" status next time
+            queryClient.invalidateQueries({ queryKey: ['dailyFeed'] });
+
+            navigate('Home');
+        } catch (error) {
+            console.error('Failed to add for revise:', error);
+            alert('Failed to add material. Please try again.');
+        } finally {
+            setAddingToRevise((prev: Record<string, boolean>) => ({ ...prev, [url]: false }));
+        }
     };
 
     const renderArticle = ({ item }: { item: Article }) => (
@@ -74,10 +118,36 @@ export const DailyFeedScreen = () => {
             <Text style={styles.articleTitle}>{item.title}</Text>
             <Text style={styles.articleSnippet} numberOfLines={3}>{item.snippet}</Text>
             <View style={styles.articleFooter}>
-                <Text style={styles.articleScore}>
-                    Relevance: {Math.round((item.relevanceScore || 0) * 100)}%
-                </Text>
-                <Text style={styles.readMore}>Read More →</Text>
+                <View style={styles.footerLeft}>
+                    <Text style={styles.articleScore}>
+                        {Math.round((item.relevanceScore || 0) * 100)}% match
+                    </Text>
+                    {item.isAdded ? (
+                        <View style={[styles.reviseButton, styles.reviseButtonDisabled]}>
+                            <Text style={styles.reviseButtonText}>Added ✅</Text>
+                        </View>
+                    ) : (
+                        <TouchableOpacity
+                            style={[
+                                styles.reviseButton,
+                                (addingToRevise[item.url] || !readArticles[item.url]) && styles.reviseButtonDisabled
+                            ]}
+                            onPress={() => handleAddForRevise(item.url, item.title)}
+                            disabled={addingToRevise[item.url] || !readArticles[item.url]}
+                        >
+                            {addingToRevise[item.url] ? (
+                                <ActivityIndicator size="small" color="#fff" />
+                            ) : (
+                                <Text style={styles.reviseButtonText}>
+                                    {readArticles[item.url] ? 'Revise 📚' : 'Read first'}
+                                </Text>
+                            )}
+                        </TouchableOpacity>
+                    )}
+                </View>
+                <TouchableOpacity onPress={() => openArticle(item.url)}>
+                    <Text style={styles.readMore}>Read More →</Text>
+                </TouchableOpacity>
             </View>
         </TouchableOpacity>
     );
@@ -141,10 +211,30 @@ export const DailyFeedScreen = () => {
                             </ScrollView>
                         </View>
 
+                        {/* Provider Tabs */}
+                        <View style={styles.tabContainer}>
+                            <TouchableOpacity
+                                style={[styles.tab, activeTab === 'google' && styles.activeTab]}
+                                onPress={() => setActiveTab('google')}
+                            >
+                                <Text style={[styles.tabText, activeTab === 'google' && styles.activeTabText]}>
+                                    Google
+                                </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.tab, activeTab === 'tavily' && styles.activeTab]}
+                                onPress={() => setActiveTab('tavily')}
+                            >
+                                <Text style={[styles.tabText, activeTab === 'tavily' && styles.activeTabText]}>
+                                    Tavily
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+
                         {/* Articles List */}
                         <View style={styles.articlesSection}>
                             <Text style={styles.sectionTitle}>
-                                Articles for {formatDateLabel(selectedDate)}
+                                {activeTab === 'google' ? 'Google' : 'Tavily'} Results - {formatDateLabel(selectedDate)}
                             </Text>
 
                             {loading ? (
@@ -152,9 +242,9 @@ export const DailyFeedScreen = () => {
                             ) : articles.length === 0 ? (
                                 <View style={styles.emptyState}>
                                     <Text style={styles.emptyIcon}>📭</Text>
-                                    <Text style={styles.emptyText}>No articles for this date</Text>
+                                    <Text style={styles.emptyText}>No articles from {activeTab === 'google' ? 'Google' : 'Tavily'}</Text>
                                     <Text style={styles.emptyHint}>
-                                        Enable Daily Feed in Settings and configure your interests to get personalized articles.
+                                        Try refreshing or checking another date. Make sure your interests are set in Settings.
                                     </Text>
                                 </View>
                             ) : (
@@ -185,12 +275,12 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         fontSize: 28,
         fontWeight: 'bold',
         color: colors.textPrimary,
-        marginBottom: 16,
+        marginBottom: 10,
         paddingTop: 16,
     },
     dateScrollerContainer: {
         height: 50,
-        marginBottom: 20,
+        marginBottom: 4,
     },
     dateScroller: {
         flexGrow: 0,
@@ -220,6 +310,38 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     dateButtonTextActive: {
         color: '#fff',
     },
+    tabContainer: {
+        flexDirection: 'row',
+        backgroundColor: colors.card,
+        borderRadius: 12,
+        padding: 4,
+        marginBottom: 12,
+        marginHorizontal: 10,
+        borderWidth: 1,
+        borderColor: colors.border,
+    },
+    tab: {
+        flex: 1,
+        paddingVertical: 10,
+        alignItems: 'center',
+        borderRadius: 10,
+    },
+    activeTab: {
+        backgroundColor: colors.primary,
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 1,
+    },
+    tabText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: colors.textSecondary,
+    },
+    activeTabText: {
+        color: '#fff',
+    },
     articlesSection: {
         flex: 1,
     },
@@ -227,7 +349,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
         color: colors.textPrimary,
-        marginBottom: 12,
+        marginBottom: 8,
     },
     articleCard: {
         backgroundColor: colors.card,
@@ -256,10 +378,32 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
+        marginTop: 4,
+    },
+    footerLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
     },
     articleScore: {
         fontSize: 12,
         color: colors.textSecondary,
+        marginRight: 12,
+    },
+    reviseButton: {
+        backgroundColor: colors.primary,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 15,
+        minWidth: 80,
+        alignItems: 'center',
+    },
+    reviseButtonDisabled: {
+        opacity: 0.7,
+    },
+    reviseButtonText: {
+        color: '#fff',
+        fontSize: 12,
+        fontWeight: 'bold',
     },
     readMore: {
         fontSize: 13,

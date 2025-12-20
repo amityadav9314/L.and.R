@@ -14,6 +14,7 @@ import (
 	"github.com/amityadav/landr/internal/middleware"
 	"github.com/amityadav/landr/internal/notifications"
 	"github.com/amityadav/landr/internal/scraper"
+	"github.com/amityadav/landr/internal/serpapi"
 	"github.com/amityadav/landr/internal/service"
 	"github.com/amityadav/landr/internal/store"
 	"github.com/amityadav/landr/internal/tavily"
@@ -46,6 +47,7 @@ func main() {
 	groqAPIKey := os.Getenv("GROQ_API_KEY")
 	cerebrasAPIKey := os.Getenv("CEREBRAS_API_KEY")
 	tavilyAPIKey := os.Getenv("TAVILY_API_KEY")
+	serpapiAPIKey := os.Getenv("SERPAPI_API_KEY")
 	feedAPIKey := os.Getenv("FEED_API_KEY")
 
 	// 2. Database
@@ -84,16 +86,26 @@ func main() {
 	learningCore := core.NewLearningCore(st, scr, aiProvider)
 	learningSvc := service.NewLearningService(learningCore, st)
 
-	// Feed Service (requires Tavily API key)
+	// Feed Service (requires Tavily or SerpApi API key)
 	var feedSvc *service.FeedService
 	var feedCore *core.FeedCore
-	if tavilyAPIKey != "" {
-		log.Printf("Daily Feed feature enabled (Tavily API key found)")
-		tavilyClient := tavily.NewClient(tavilyAPIKey)
-		feedCore = core.NewFeedCore(st, tavilyClient, aiProvider)
+	if tavilyAPIKey != "" || serpapiAPIKey != "" {
+		log.Printf("Daily Feed feature enabled")
+		var tavilyClient *tavily.Client
+		if tavilyAPIKey != "" {
+			log.Printf("  - Tavily search enabled")
+			tavilyClient = tavily.NewClient(tavilyAPIKey)
+		}
+		var serpapiClient *serpapi.Client
+		if serpapiAPIKey != "" {
+			log.Printf("  - SerpApi (Google) search enabled")
+			serpapiClient = serpapi.NewClient(serpapiAPIKey)
+		}
+
+		feedCore = core.NewFeedCore(st, tavilyClient, serpapiClient, aiProvider)
 		feedSvc = service.NewFeedService(feedCore)
 	} else {
-		log.Printf("Daily Feed feature disabled (no TAVILY_API_KEY)")
+		log.Printf("Daily Feed feature disabled (no TAVILY_API_KEY or SERPAPI_API_KEY)")
 	}
 
 	// Firebase Push Notifications (optional)

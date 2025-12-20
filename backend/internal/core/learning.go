@@ -32,6 +32,23 @@ func NewLearningCore(s store.Store, scraper *scraper.Scraper, aiProvider ai.Prov
 func (c *LearningCore) AddMaterial(ctx context.Context, userID, matType, content, imageData string, existingTags []string) (string, int32, string, []string, error) {
 	log.Printf("[Core.AddMaterial] Starting - UserID: %s, Type: %s", userID, matType)
 
+	// 0. Check for duplicates if it's a LINK
+	sourceURL := ""
+	if matType == "LINK" {
+		sourceURL = content
+		existingID, err := c.store.GetMaterialBySourceURL(ctx, userID, sourceURL)
+		if err == nil && existingID != "" {
+			log.Printf("[Core.AddMaterial] Duplicate detected: %s. Returning existing material.", existingID)
+			// We still need to return the title and tags, let's fetch them
+			_, _, title, err := c.store.GetMaterialContent(ctx, userID, existingID)
+			if err != nil {
+				return existingID, 0, "", nil, nil
+			}
+			tags, _ := c.store.GetMaterialTags(ctx, existingID)
+			return existingID, 0, title, tags, nil
+		}
+	}
+
 	// 1. Process Content based on type
 	finalContent := content
 
@@ -135,7 +152,7 @@ func (c *LearningCore) AddMaterial(ctx context.Context, userID, matType, content
 
 	// 4. Save Material with Title
 	log.Printf("[Core.AddMaterial] Saving material to database...")
-	materialID, err := c.store.CreateMaterial(saveCtx, userID, matType, finalContent, title)
+	materialID, err := c.store.CreateMaterial(saveCtx, userID, matType, finalContent, title, sourceURL)
 	if err != nil {
 		log.Printf("[Core.AddMaterial] Failed to save material: %v", err)
 		return "", 0, "", nil, fmt.Errorf("failed to create material: %w", err)
