@@ -9,8 +9,9 @@ const DailyFeed = () => {
     const navigate = useNavigate();
     const queryClient = useQueryClient();
     const [provider, setProvider] = useState<'google' | 'tavily'>('google');
-    // Today's date in YYYY-MM-DD
-    const today = new Date().toISOString().split('T')[0];
+
+    // Date state
+    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
 
     const { data: prefs, isLoading: isLoadingPrefs } = useQuery({
         queryKey: ['feedPreferences'],
@@ -18,8 +19,8 @@ const DailyFeed = () => {
     });
 
     const { data: feedData, isLoading: isLoadingFeed } = useQuery({
-        queryKey: ['dailyFeed', today, provider],
-        queryFn: () => feedClient.getDailyFeed({ date: today }),
+        queryKey: ['dailyFeed', selectedDate, provider],
+        queryFn: () => feedClient.getDailyFeed({ date: selectedDate }),
         enabled: !!prefs?.feedEnabled
     });
 
@@ -42,12 +43,28 @@ const DailyFeed = () => {
         }
     });
 
+    // Format date for display
+    const formatDisplayDate = (dateStr: string) => {
+        const date = new Date(dateStr);
+        const today = new Date();
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+
+        if (dateStr === today.toISOString().split('T')[0]) {
+            return 'Today';
+        } else if (dateStr === yesterday.toISOString().split('T')[0]) {
+            return 'Yesterday';
+        } else {
+            return date.toLocaleDateString('en-US', { weekday: 'short' });
+        }
+    };
+
     return (
         <div>
             <div className="d-flex justify-content-between align-items-center mb-4">
                 <div>
                     <h1 className="h3 fw-bold mb-1">Daily AI Feed</h1>
-                    <p className="text-muted mb-0">Personalized articles for {today}</p>
+                    <p className="text-muted mb-0">Personalized articles</p>
                 </div>
                 <ButtonGroup className="shadow-sm rounded-pill overflow-hidden">
                     <Button
@@ -65,6 +82,34 @@ const DailyFeed = () => {
                         Tavily AI
                     </Button>
                 </ButtonGroup>
+            </div>
+
+            {/* Date Navigation - Last 7 Days */}
+            <div className="mb-4">
+                <div className="d-flex gap-2 overflow-auto pb-2 hide-scrollbar flex-nowrap justify-content-center">
+                    {Array.from({ length: 7 }, (_, i) => {
+                        const date = new Date();
+                        date.setDate(date.getDate() - i); // Reversed: Today first, then older days
+                        const dateStr = date.toISOString().split('T')[0];
+                        const isSelected = dateStr === selectedDate;
+                        const dayLabel = formatDisplayDate(dateStr);
+
+                        return (
+                            <Button
+                                key={dateStr}
+                                variant={isSelected ? 'primary' : 'white'}
+                                className="rounded-pill px-4 py-2 shadow-sm d-flex flex-column align-items-center"
+                                onClick={() => setSelectedDate(dateStr)}
+                                style={{ minWidth: '100px', fontWeight: 500 }}
+                            >
+                                <span className="small">{dayLabel}</span>
+                                <span className="text-xs opacity-75" style={{ fontSize: '0.7rem' }}>
+                                    {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                </span>
+                            </Button>
+                        );
+                    })}
+                </div>
             </div>
 
             {isLoading ? (
