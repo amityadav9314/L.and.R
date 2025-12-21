@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useState, useEffect, useRef } from 'react';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { Button, Card, Col, Row, Badge, Modal, Form, Spinner } from 'react-bootstrap';
 import { useLocation } from 'react-router-dom';
 import { learningClient } from '../services/api.ts';
@@ -11,6 +11,7 @@ const Dashboard = () => {
     const [showAddModal, setShowAddModal] = useState(false);
     const [showReviseModal, setShowReviseModal] = useState(false);
     const [selectedMaterialId, setSelectedMaterialId] = useState<string | null>(null);
+    const [searchInput, setSearchInput] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
@@ -22,12 +23,35 @@ const Dashboard = () => {
         setOnlyDue(!isVault);
     }, [location.pathname, isVault]);
 
-    const { data, isLoading, refetch } = useQuery({
-        queryKey: ['materials', onlyDue],
-        queryFn: () => learningClient.getDueMaterials({ onlyDue })
+    const PAGE_SIZE = 12;
+
+    const {
+        data,
+        isLoading,
+        fetchNextPage,
+        hasNextPage,
+        isFetchingNextPage,
+        refetch
+    } = useInfiniteQuery({
+        queryKey: ['materials', onlyDue, searchQuery, selectedTags],
+        queryFn: ({ pageParam = 1 }) => learningClient.getDueMaterials({
+            onlyDue,
+            page: pageParam,
+            pageSize: PAGE_SIZE,
+            searchQuery,
+            tags: selectedTags
+        }),
+        getNextPageParam: (lastPage) => {
+            if (lastPage.page < lastPage.totalPages) {
+                return lastPage.page + 1;
+            }
+            return undefined;
+        },
+        initialPageParam: 1
     });
 
-    const materials = data?.materials || [];
+    // Flatten all pages into a single array
+    const materials = data?.pages.flatMap(page => page.materials) || [];
 
     // Extract unique tags from all materials
     const allTags = Array.from(new Set(materials.flatMap(m => m.tags || []))).sort();
@@ -40,17 +64,34 @@ const Dashboard = () => {
         );
     };
 
-    const filteredMaterials = materials.filter(m => {
-        const query = searchQuery.toLowerCase();
-        const titleMatch = (m.title || '').toLowerCase().includes(query);
-        const searchTagsMatch = (m.tags || []).some(t => t.toLowerCase().includes(query));
+    // Infinite scroll observer
+    const loadMoreRef = useRef<HTMLDivElement>(null);
 
-        // Combined with multi-tag filter
-        const tagFilterMatch = selectedTags.length === 0 ||
-            selectedTags.every(tag => (m.tags || []).includes(tag));
+    useEffect(() => {
+        if (!loadMoreRef.current || !hasNextPage || isFetchingNextPage) return;
 
-        return (titleMatch || searchTagsMatch) && tagFilterMatch;
-    });
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries[0].isIntersecting) {
+                    fetchNextPage();
+                }
+            },
+            { threshold: 0.1 }
+        );
+
+        observer.observe(loadMoreRef.current);
+        return () => observer.disconnect();
+    }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+    const handleSearch = () => {
+        setSearchQuery(searchInput);
+    };
+
+    const handleSearchKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') {
+            handleSearch();
+        }
+    };
 
     const handleReview = (materialId: string) => {
         console.log('[Dashboard] Starting review for material:', materialId);
@@ -66,15 +107,25 @@ const Dashboard = () => {
                     <p className="text-muted mb-0">Manage and review your materials</p>
                 </div>
                 <div className="d-flex gap-3 align-items-center">
-                    <div className="position-relative" style={{ width: '300px' }}>
-                        <Search className="position-absolute top-50 translate-middle-y ms-3 text-muted" size={18} />
-                        <Form.Control
-                            type="text"
-                            placeholder="Search title or tags..."
-                            className="rounded-pill ps-5 bg-white border-0 shadow-sm"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                        />
+                    <div className="position-relative d-flex gap-2" style={{ width: '350px' }}>
+                        <div className="position-relative flex-grow-1">
+                            <Search className="position-absolute top-50 translate-middle-y ms-3 text-muted" size={18} />
+                            <Form.Control
+                                type="text"
+                                placeholder="Search title or tags..."
+                                className="rounded-pill ps-5 bg-white border-0 shadow-sm"
+                                value={searchInput}
+                                onChange={(e) => setSearchInput(e.target.value)}
+                                onKeyDown={handleSearchKeyDown}
+                            />
+                        </div>
+                        <Button
+                            variant="primary"
+                            className="rounded-pill px-4"
+                            onClick={handleSearch}
+                        >
+                            Search
+                        </Button>
                     </div>
                     <div className="d-flex gap-2">
                         <Button
@@ -145,7 +196,8 @@ const Dashboard = () => {
             {/* Materials Status Line */}
             <div className="mb-3 px-1">
                 <p className="text-muted small mb-0 fw-medium opacity-75">
-                    Materials {filteredMaterials.length > 0 ? `1-${filteredMaterials.length}` : '0'} ({filteredMaterials.length} of {materials.length} total)
+                    {materials.length > 0 ? `Showing ${materials.length} materials` : 'No materials'}
+                    {data?.pages[0]?.totalCount && ` (${data.pages[0].totalCount} total)`}
                 </p>
             </div>
 
@@ -153,7 +205,7 @@ const Dashboard = () => {
                 <div className="d-flex justify-content-center py-5">
                     <Spinner animation="border" variant="primary" />
                 </div>
-            ) : filteredMaterials.length === 0 ? (
+            ) : materials.length === 0 ? (
                 <Card className="text-center py-5 bg-white border-0 shadow-sm rounded-4">
                     <div className="py-4">
                         <div className="bg-light d-inline-block p-4 rounded-circle mb-3">
@@ -176,8 +228,8 @@ const Dashboard = () => {
                     </div>
                 </Card>
             ) : (
-                <Row xs={1} md={2} lg={3} className="g-4">
-                    {filteredMaterials.map((m) => (
+                <Row xs={1} sm={1} md={2} lg={2} xl={3} className="g-3 g-lg-4">
+                    {materials.map((m: any) => (
                         <Col key={m.id}>
                             <Card className="h-100 border-0 shadow-sm rounded-4 hover-shadow transition-all">
                                 <Card.Body className="d-flex flex-column">
@@ -194,7 +246,7 @@ const Dashboard = () => {
                                     <div className="mt-auto">
                                         <div className="mb-3 overflow-hidden">
                                             <div className="d-flex gap-1 overflow-auto pb-1 flex-nowrap hide-scrollbar" style={{ whiteSpace: 'nowrap' }}>
-                                                {m.tags.map(t => (
+                                                {m.tags.map((t: string) => (
                                                     <Badge key={t} bg="light" text="dark" className="border flex-shrink-0" style={{ fontSize: '0.7rem' }}>#{t}</Badge>
                                                 ))}
                                             </div>
@@ -221,6 +273,13 @@ const Dashboard = () => {
                         </Col>
                     ))}
                 </Row>
+            )}
+
+            {/* Infinite Scroll Sentinel */}
+            {hasNextPage && (
+                <div ref={loadMoreRef} className="d-flex justify-content-center py-4">
+                    {isFetchingNextPage && <Spinner animation="border" variant="primary" size="sm" />}
+                </div>
             )}
 
             {/* Modals */}

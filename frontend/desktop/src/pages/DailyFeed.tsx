@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Button, Card, Col, Row, Badge, Spinner, ButtonGroup } from 'react-bootstrap';
+import { Button, Card, Badge, Spinner, ButtonGroup } from 'react-bootstrap';
 import { ExternalLink, Check, BookOpen, Newspaper } from 'lucide-react';
 import { feedClient, learningClient } from '../services/api.ts';
 import { useNavigate } from 'react-router-dom';
@@ -25,7 +25,9 @@ const DailyFeed = () => {
 
     const isLoading = isLoadingPrefs || (prefs?.feedEnabled && isLoadingFeed);
 
-    const articles = feedData?.articles || [];
+    // Filter articles by selected provider
+    const allArticles = feedData?.articles || [];
+    const articles = allArticles.filter(article => article.provider === provider);
 
     const addMutation = useMutation({
         mutationFn: (url: string) => learningClient.addMaterial({
@@ -96,11 +98,11 @@ const DailyFeed = () => {
                     </div>
                 </Card>
             ) : (
-                <Row xs={1} md={2} className="g-4">
-                    {articles.map((article) => (
-                        <Col key={article.id}>
-                            <Card className="h-100 border-0 shadow-sm rounded-4 overflow-hidden hover-shadow transition-all">
-                                <Card.Body className="p-4 d-flex flex-column">
+                <div className="mx-auto" style={{ maxWidth: '800px' }}>
+                    <div className="d-flex flex-column gap-4">
+                        {articles.map((article) => (
+                            <Card key={article.id} className="border-0 shadow-sm rounded-4 overflow-hidden hover-shadow transition-all">
+                                <Card.Body className="p-4">
                                     <div className="d-flex justify-content-between align-items-start mb-3">
                                         <Badge bg="light" text="primary" className="border text-uppercase small px-3 py-2">
                                             {article.provider === 'google' ? 'Google' : 'Tavily'} Article
@@ -110,13 +112,13 @@ const DailyFeed = () => {
                                         </Badge>
                                     </div>
 
-                                    <h4 className="fw-bold mb-3">{article.title}</h4>
-                                    <p className="text-muted mb-4 line-clamp-4">{article.snippet}</p>
+                                    <h4 className="fw-bold mb-3 lh-base">{article.title}</h4>
+                                    <p className="text-muted mb-4 lh-lg" style={{ fontSize: '0.95rem' }}>{article.snippet}</p>
 
-                                    <div className="mt-auto d-flex gap-2">
+                                    <div className="d-flex gap-3 flex-wrap">
                                         <Button
                                             variant="primary"
-                                            className="flex-grow-1 rounded-pill d-flex align-items-center justify-content-center gap-2"
+                                            className="rounded-pill px-4 d-flex align-items-center gap-2 shadow-sm"
                                             onClick={() => window.open(article.url, '_blank')}
                                         >
                                             <ExternalLink size={18} />
@@ -126,29 +128,34 @@ const DailyFeed = () => {
                                         {article.isAdded ? (
                                             <Button variant="outline-success" className="rounded-pill px-4" disabled>
                                                 <Check size={18} className="me-2" />
-                                                Added
+                                                Added to Vault
                                             </Button>
                                         ) : (
                                             <Button
                                                 variant="outline-primary"
-                                                className="rounded-pill px-4"
+                                                className="rounded-pill px-4 d-flex align-items-center gap-2"
                                                 onClick={() => addMutation.mutate(article.url)}
                                                 disabled={addMutation.isPending && addMutation.variables === article.url}
                                             >
                                                 {addMutation.isPending && addMutation.variables === article.url ? (
-                                                    <Spinner size="sm" className="me-2" />
+                                                    <>
+                                                        <Spinner size="sm" />
+                                                        Saving...
+                                                    </>
                                                 ) : (
-                                                    <BookOpen size={18} className="me-2" />
+                                                    <>
+                                                        <BookOpen size={18} />
+                                                        Add to Vault
+                                                    </>
                                                 )}
-                                                {addMutation.isPending && addMutation.variables === article.url ? 'Saving...' : 'Revise 📚'}
                                             </Button>
                                         )}
                                     </div>
                                 </Card.Body>
                             </Card>
-                        </Col>
-                    ))}
-                </Row>
+                        ))}
+                    </div>
+                </div>
             )}
         </div>
     );
