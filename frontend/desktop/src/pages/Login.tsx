@@ -35,9 +35,7 @@ const Login = () => {
 
                 <div className="text-center py-4 bg-light rounded-3 mb-4 border border-dashed">
                     <div className="d-flex justify-content-center mb-3">
-                        <div className="bg-primary text-white p-3 rounded-circle shadow-sm">
-                            <span className="fs-3">💡</span>
-                        </div>
+                        <img src="/logo.png" alt="L.and.R" width="60" height="60" className="rounded-3 shadow-sm" />
                     </div>
                     <h5>Welcome Back</h5>
                     <p className="small text-muted px-4">Sign in with your Google account to access your materials and flashcards.</p>

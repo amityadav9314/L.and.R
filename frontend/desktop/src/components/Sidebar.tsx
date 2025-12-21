@@ -15,8 +15,12 @@ const Sidebar = () => {
 
     return (
         <div className="d-flex flex-column flex-shrink-0 p-3 bg-white border-end shadow-sm" style={{ width: '280px', height: '100vh', position: 'fixed' }}>
-            <NavLink to="/" className="d-flex align-items-center mb-4 mb-md-0 me-md-auto link-dark text-decoration-none">
-                <span className="fs-4 fw-bold text-primary">L.and.R <span className="text-secondary small">Desktop</span></span>
+            <NavLink to="/" className="d-flex align-items-center mb-4 mb-md-0 me-md-auto link-dark text-decoration-none gap-2">
+                <img src="/logo.png" alt="L.and.R" width="40" height="40" className="rounded" />
+                <div className="d-flex flex-column">
+                    <span className="fs-5 fw-bold text-primary">L.and.R</span>
+                    <span className="text-secondary" style={{ fontSize: '0.7rem' }}>Desktop</span>
+                </div>
             </NavLink>
             <hr />
             <Nav variant="pills" className="flex-column mb-auto">
