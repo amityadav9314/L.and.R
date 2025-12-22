@@ -13,8 +13,11 @@ interface RevisionModalProps {
 const RevisionModal = ({ show, onHide, materialId, onComplete }: RevisionModalProps) => {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isFlipped, setIsFlipped] = useState(false);
+    const [viewingState, setViewingState] = useState<'summary' | 'flashcards'>('summary');
 
     const [flashcards, setFlashcards] = useState<any[]>([]);
+    const [summary, setSummary] = useState<string>('');
+    const [materialTitle, setMaterialTitle] = useState<string>('');
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
@@ -22,14 +25,22 @@ const RevisionModal = ({ show, onHide, materialId, onComplete }: RevisionModalPr
             console.log('[RevisionModal] Opening session for material:', materialId);
             setCurrentIndex(0);
             setIsFlipped(false);
+            setViewingState('summary'); // Always start with summary
             setIsLoading(true);
-            learningClient.getDueFlashcards({ materialId })
-                .then(data => {
-                    console.log('[RevisionModal] Flashcards loaded:', data.flashcards?.length || 0);
-                    setFlashcards(data.flashcards || []);
+
+            // Fetch both flashcards and summary
+            Promise.all([
+                learningClient.getDueFlashcards({ materialId }),
+                learningClient.getMaterialSummary({ materialId })
+            ])
+                .then(([flashcardsData, summaryData]) => {
+                    console.log('[RevisionModal] Flashcards loaded:', flashcardsData.flashcards?.length || 0);
+                    setFlashcards(flashcardsData.flashcards || []);
+                    setSummary(summaryData.summary || '');
+                    setMaterialTitle(summaryData.title || 'Material');
                 })
                 .catch(err => {
-                    console.error('[RevisionModal] Failed to fetch flashcards:', err);
+                    console.error('[RevisionModal] Failed to fetch data:', err);
                 })
                 .finally(() => setIsLoading(false));
         }
@@ -139,6 +150,35 @@ const RevisionModal = ({ show, onHide, materialId, onComplete }: RevisionModalPr
                         <h3 className="fw-bold">All caught up!</h3>
                         <p className="text-muted">No cards due for review in this material.</p>
                         <Button variant="primary" className="rounded-pill px-4" onClick={onHide}>Close</Button>
+                    </div>
+                ) : viewingState === 'summary' ? (
+                    <div className="text-center py-4">
+                        <div className="mb-4 p-4 bg-light rounded-4 border">
+                            <div className="d-flex align-items-center justify-content-center gap-2 mb-3">
+                                <Badge bg="info" className="rounded-pill px-3 py-2">📝 Material Summary</Badge>
+                            </div>
+                            <h4 className="fw-bold mb-3 text-primary">{materialTitle}</h4>
+                            <div
+                                className="text-start text-muted lh-lg"
+                                style={{
+                                    fontSize: '0.95rem',
+                                    maxHeight: '400px',
+                                    overflow: 'auto',
+                                    whiteSpace: 'pre-wrap',
+                                    wordWrap: 'break-word'
+                                }}
+                            >
+                                {summary || 'No summary available for this material.'}
+                            </div>
+                        </div>
+                        <Button
+                            variant="primary"
+                            size="lg"
+                            className="rounded-pill px-5 shadow-sm"
+                            onClick={() => setViewingState('flashcards')}
+                        >
+                            Continue to Questions ({flashcards.length} cards)
+                        </Button>
                     </div>
                 ) : (
                     <>

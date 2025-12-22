@@ -34,7 +34,7 @@ const Settings = () => {
     });
 
     return (
-        <div style={{ maxWidth: '800px' }}>
+        <div className="mx-auto" style={{ maxWidth: '800px' }}>
             <div className="mb-4">
                 <h1 className="h3 fw-bold mb-1">Settings</h1>
                 <p className="text-muted">Manage your account and preferences</p>

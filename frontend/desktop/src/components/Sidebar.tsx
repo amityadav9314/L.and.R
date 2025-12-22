@@ -1,13 +1,22 @@
-import { Nav } from 'react-bootstrap';
+import { useQuery } from '@tanstack/react-query';
+import { Nav, Badge } from 'react-bootstrap';
 import { NavLink } from 'react-router-dom';
 import { Home, Database, Newspaper, Settings, LogOut } from 'lucide-react';
 import { useAuthStore } from '../store/authStore.ts';
+import { learningClient } from '../services/api.ts';
 
 const Sidebar = () => {
     const { logout, user } = useAuthStore();
 
+    // Fetch notification status for due count
+    const { data: notificationStatus } = useQuery({
+        queryKey: ['notificationStatus'],
+        queryFn: () => learningClient.getNotificationStatus({}),
+        refetchInterval: 60000 // Refresh every minute
+    });
+
     const navItems = [
-        { name: 'Due for Revise', path: '/', icon: Home },
+        { name: 'Due for Revise', path: '/', icon: Home, count: notificationStatus?.dueFlashcardsCount },
         { name: 'Vault', path: '/vault', icon: Database },
         { name: 'Daily Feed', path: '/feed', icon: Newspaper },
         { name: 'Settings', path: '/settings', icon: Settings },
@@ -29,11 +38,16 @@ const Sidebar = () => {
                         <NavLink
                             to={item.path}
                             className={({ isActive }) =>
-                                `d-flex align-items-center gap-3 py-2 px-3 rounded-3 text-decoration-none transition-all ${isActive ? 'bg-primary text-white shadow-sm' : 'text-dark hover-bg-light'}`
+                                `d-flex align-items-center justify-content-between gap-3 py-2 px-3 rounded-3 text-decoration-none transition-all ${isActive ? 'bg-primary text-white shadow-sm' : 'text-dark hover-bg-light'}`
                             }
                         >
-                            <item.icon size={20} />
-                            <span>{item.name}</span>
+                            <div className="d-flex align-items-center gap-3">
+                                <item.icon size={20} />
+                                <span>{item.name}</span>
+                            </div>
+                            {item.count !== undefined && item.count > 0 && (
+                                <Badge bg="danger" className="rounded-pill">{item.count}</Badge>
+                            )}
                         </NavLink>
                     </Nav.Item>
                 ))}

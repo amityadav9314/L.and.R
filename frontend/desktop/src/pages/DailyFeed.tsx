@@ -61,35 +61,16 @@ const DailyFeed = () => {
 
     return (
         <div>
-            <div className="d-flex justify-content-between align-items-center mb-4">
-                <div>
-                    <h1 className="h3 fw-bold mb-1">Daily AI Feed</h1>
-                    <p className="text-muted mb-0">Personalized articles</p>
-                </div>
-                <ButtonGroup className="shadow-sm rounded-pill overflow-hidden">
-                    <Button
-                        variant={provider === 'google' ? 'primary' : 'white'}
-                        onClick={() => setProvider('google')}
-                        className="px-4"
-                    >
-                        Google News
-                    </Button>
-                    <Button
-                        variant={provider === 'tavily' ? 'primary' : 'white'}
-                        onClick={() => setProvider('tavily')}
-                        className="px-4"
-                    >
-                        Tavily AI
-                    </Button>
-                </ButtonGroup>
-            </div>
+            {/* Header Row: Title | Calendar | Provider Toggle */}
+            <div className="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+                {/* Title */}
+                <h1 className="h3 fw-bold mb-0">Daily AI Feed</h1>
 
-            {/* Date Navigation - Last 7 Days */}
-            <div className="mb-4">
-                <div className="d-flex gap-2 overflow-auto pb-2 hide-scrollbar flex-nowrap justify-content-center">
+                {/* Date Navigation - Last 7 Days */}
+                <div className="d-flex gap-2 overflow-auto hide-scrollbar flex-nowrap flex-grow-1 justify-content-center">
                     {Array.from({ length: 7 }, (_, i) => {
                         const date = new Date();
-                        date.setDate(date.getDate() - i); // Reversed: Today first, then older days
+                        date.setDate(date.getDate() - i);
                         const dateStr = date.toISOString().split('T')[0];
                         const isSelected = dateStr === selectedDate;
                         const dayLabel = formatDisplayDate(dateStr);
@@ -97,19 +78,40 @@ const DailyFeed = () => {
                         return (
                             <Button
                                 key={dateStr}
-                                variant={isSelected ? 'primary' : 'white'}
-                                className="rounded-pill px-4 py-2 shadow-sm d-flex flex-column align-items-center"
+                                variant={isSelected ? 'primary' : 'outline-secondary'}
+                                size="sm"
+                                className="rounded-pill px-3 py-1 d-flex flex-column align-items-center"
                                 onClick={() => setSelectedDate(dateStr)}
-                                style={{ minWidth: '100px', fontWeight: 500 }}
+                                style={{ minWidth: '80px', fontWeight: 500 }}
                             >
-                                <span className="small">{dayLabel}</span>
-                                <span className="text-xs opacity-75" style={{ fontSize: '0.7rem' }}>
+                                <span style={{ fontSize: '0.8rem' }}>{dayLabel}</span>
+                                <span style={{ fontSize: '0.65rem', opacity: 0.7 }}>
                                     {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                                 </span>
                             </Button>
                         );
                     })}
                 </div>
+
+                {/* Provider Toggle */}
+                <ButtonGroup className="shadow-sm rounded-pill overflow-hidden">
+                    <Button
+                        variant={provider === 'google' ? 'primary' : 'white'}
+                        onClick={() => setProvider('google')}
+                        className="px-3"
+                        size="sm"
+                    >
+                        Google
+                    </Button>
+                    <Button
+                        variant={provider === 'tavily' ? 'primary' : 'white'}
+                        onClick={() => setProvider('tavily')}
+                        className="px-3"
+                        size="sm"
+                    >
+                        Tavily
+                    </Button>
+                </ButtonGroup>
             </div>
 
             {isLoading ? (

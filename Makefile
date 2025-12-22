@@ -39,6 +39,11 @@ start-backend:
 # FRONTEND
 # ============================================
 
+start-frontend:
+	@echo "Starting frontend..."
+	cd $(FRONTEND_DIR) && npm install && npm start -- -w
+
+
 # Expo Go (no native modules - faster, but Firebase/Google Sign-in won't work)
 start-expo-dev:
 	@echo "🛑 Stopping previous frontend..."
@@ -52,6 +57,7 @@ start-expo-dev:
 	@cd $(FRONTEND_DIR) && npx expo start --clear
 
 # Native Android build with hot-reload (includes Firebase, Google Sign-in)
+
 start-native-android:
 	@echo "🛑 Stopping previous frontend..."
 	@lsof -ti:8081 | xargs -r kill -9 2>/dev/null || true
