@@ -288,6 +288,52 @@ graph TB
 4. Evaluates and ranks articles based on relevance
 5. Calls `store_articles` → persists top articles to database
 
+### Execution Sequence (LLM + Chunking + Retry)
+```mermaid
+sequenceDiagram
+    participant FC as FeedCore
+    participant AG as Agent
+    participant RN as ADK Runner
+    participant GM as Groq Adapter
+    participant CH as Chunking
+    participant API as Groq API
+    participant T as Tools
+
+    FC->>AG: Run(userID)
+    AG->>RN: Create Runner + Session
+    
+    loop Agent Reasoning Loop
+        RN->>GM: GenerateContent(messages)
+        
+        Note over GM,CH: Token Limit Check
+        GM->>CH: EstimateTokens(totalChars)
+        alt Over 6000 tokens
+            CH-->>GM: Truncate messages
+            GM->>GM: Add "[truncated]" marker
+        end
+        
+        GM->>API: POST /chat/completions
+        alt API Error (429/500)
+            API-->>GM: Error
+            Note over GM: Retry logic in HTTP client
+            GM->>API: Retry request
+        end
+        API-->>GM: Response
+        GM-->>RN: LLMResponse
+        
+        alt Tool Call Requested
+            RN->>T: Execute Tool
+            Note over T: Tool-specific limits:<br/>- max 25 articles<br/>- max 6000 chars<br/>- content truncated to 200 chars
+            T-->>RN: Tool Result
+            Note over RN: Loop continues with tool result
+        else Final Response
+            RN-->>AG: Done
+        end
+    end
+    
+    AG-->>FC: RunResult{Summary}
+```
+
 ## Centralized AI Utilities
 
 ### Token Management (`internal/ai/chunking.go`)
