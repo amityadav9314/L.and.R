@@ -266,35 +266,18 @@ Return ONLY the extracted text, no commentary or additional formatting.`
 func (p *BaseProvider) OptimizeSearchQuery(userInterests string) (string, error) {
 	log.Printf("[%s.SearchQuery] Optimizing query for: %s", p.config.Name, userInterests)
 
-	// Calculate date 5 days ago for filtering
-	fiveDaysAgo := time.Now().AddDate(0, 0, -5).Format("2006-01-02")
+	prompt := fmt.Sprintf(`You are an expert at crafting search queries for finding the latest news and articles.
 
-	prompt := fmt.Sprintf(`You are a news intelligence agent.
+User's interests: "%s"
 
-INPUT:
-- Keywords: %s
-- Time window: last 5 days (after:%s)
+Create a single, optimized search query that will find the most relevant and recent articles about these topics.
+The query should:
+- Be concise (10-15 words max)
+- Focus on finding NEWS articles, not general information
+- Include key terms that will return high-quality, recent content
+- Be specific enough to avoid generic results
 
-TASK:
-1. Generate an optimized Google Search query that:
-   - Covers ALL keywords using OR logic where appropriate
-   - Returns ONLY relevant news/articles
-   - Filters results to the last 5 days using after:%s
-   - Excludes junk content using negative keywords: -jobs -hiring -courses -tutorial -reddit -quora -youtube -sponsored -advertisement
-   - Prioritizes credible sources (news sites, blogs, Substack, Medium)
-
-2. Requirements:
-   - Keep total query under 25 terms (Google limit)
-   - Use quoted phrases for multi-word topics
-   - Include "after:%s" for date filtering
-   - Add negative keywords for noise removal
-
-3. Output ONLY the final Google search query text. No explanation, no formatting.
-
-CONSTRAINTS:
-- Be aggressive in filtering noise
-- Optimize for relevance over volume
-- Focus on signal, not coverage`, userInterests, fiveDaysAgo, fiveDaysAgo, fiveDaysAgo)
+Return ONLY the search query text, nothing else. No quotes, no explanation.`, userInterests)
 
 	reqBody := chatRequest{
 		Model: p.config.TextModel,
