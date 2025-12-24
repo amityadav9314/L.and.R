@@ -1,0 +1,1 @@
+Store the selected best articles. Input: {user_id: string, articles: [{title, url, snippet, score}]}

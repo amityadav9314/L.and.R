@@ -14,10 +14,10 @@ type Client struct {
 
 // SearchResult represents a single organic result from SerpApi
 type SearchResult struct {
-	Title   string
-	URL     string
-	Snippet string
-	Score   float64 // We'll mock a score since SerpApi doesn't provide a direct one like Tavily
+	Title         string
+	URL           string
+	Snippet       string
+	PositionScore float64 // Position-based score (1.0 for first result, decreasing). NOT a relevance score. Use -1 if unavailable.
 }
 
 // SearchResponse represents the relevant parts of the SerpApi response
@@ -76,22 +76,84 @@ func (c *Client) Search(query string) (*SearchResponse, error) {
 			continue
 		}
 
-		// Calculate a simple mock score based on position (higher position = higher score)
-		// Tavily scores are usually 0.0 - 1.0
-		score := 1.0 - (float64(i) * 0.05)
-		if score < 0.1 {
-			score = 0.1
+		// Position-based score (NOT relevance). Top result = 1.0, decreasing by 0.05 per position.
+		positionScore := 1.0 - (float64(i) * 0.05)
+		if positionScore < 0.1 {
+			positionScore = 0.1
 		}
 
 		resultsList = append(resultsList, SearchResult{
-			Title:   title,
-			URL:     link,
-			Snippet: snippet,
-			Score:   score,
+			Title:         title,
+			URL:           link,
+			Snippet:       snippet,
+			PositionScore: positionScore,
 		})
 	}
 
 	log.Printf("[SerpApi] Found %d organic results", len(resultsList))
+	return &SearchResponse{
+		Results: resultsList,
+	}, nil
+}
+
+// SearchNews performs a Google News search via SerpApi
+func (c *Client) SearchNews(query string) (*SearchResponse, error) {
+	if c.apiKey == "" {
+		return nil, fmt.Errorf("SerpApi API key is not set")
+	}
+
+	parameter := map[string]string{
+		"engine": "google_news",
+		"q":      query,
+		"gl":     "us",
+		"hl":     "en",
+	}
+
+	log.Printf("[SerpApi] Searching News for: %q", query)
+	search := g.NewGoogleSearch(parameter, c.apiKey)
+	results, err := search.GetJSON()
+	if err != nil {
+		return nil, fmt.Errorf("serpapi news search failed: %w", err)
+	}
+
+	// Focus on news_results node
+	newsResults, ok := results["news_results"].([]interface{})
+	if !ok {
+		log.Printf("[SerpApi] No news_results found in response")
+		return &SearchResponse{Results: []SearchResult{}}, nil
+	}
+
+	var resultsList []SearchResult
+	for i, item := range newsResults {
+		res, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		title, _ := res["title"].(string)
+		link, _ := res["link"].(string)
+		snippet, _ := res["snippet"].(string)
+		// Issue #7: Don't use date as snippet, leave empty if no snippet available
+
+		if title == "" || link == "" {
+			continue
+		}
+
+		// Position-based score (NOT relevance). Use -1 if you want to indicate "unavailable".
+		positionScore := 1.0 - (float64(i) * 0.05)
+		if positionScore < 0.1 {
+			positionScore = 0.1
+		}
+
+		resultsList = append(resultsList, SearchResult{
+			Title:         title,
+			URL:           link,
+			Snippet:       snippet,
+			PositionScore: positionScore,
+		})
+	}
+
+	log.Printf("[SerpApi] Found %d news results", len(resultsList))
 	return &SearchResponse{
 		Results: resultsList,
 	}, nil

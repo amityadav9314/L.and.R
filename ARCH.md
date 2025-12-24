@@ -206,8 +206,115 @@ All jobs run in **IST timezone** managed by `notifications.Worker`.
 | **Push Notifications** | 9:00 AM IST | Sends due material reminders via FCM |
 
 ## Environment Variables
-- `GROQ_API_KEY`: Primary LLM provider
+- `GROQ_API_KEY`: Primary LLM provider (used by ADK Agent and AI operations)
 - `CEREBRAS_API_KEY`: Secondary LLM (optional, for load balancing)
 - `TAVILY_API_KEY`: AI-powered search for Daily Feed
 - `SERPAPI_API_KEY`: Google search results for Daily Feed
 - `JWT_SECRET`: Backend authentication token signing
+
+## Daily Feed Agent (Google ADK)
+
+### Overview
+The Daily Feed feature uses a **Google ADK-based agent** for intelligent article curation.
+
+### Architecture
+```mermaid
+graph TB
+    subgraph "Entry Points"
+        CRON[6 AM Cron Job]
+        REST[REST /api/feed/refresh]
+    end
+
+    subgraph "Core Layer"
+        FCORE[FeedCore]
+    end
+
+    subgraph "ADK Agent Layer"
+        AGENT[DailyFeedAgent]
+        RUNNER[ADK Runner]
+        SESSION[InMemory Session]
+    end
+
+    subgraph "LLM Adapter"
+        GROQ[Groq Model Adapter]
+        CHUNK[Chunking Utilities]
+    end
+
+    subgraph "Tools"
+        T1[get_user_preferences]
+        T2[search_news]
+        T3[store_articles]
+    end
+
+    subgraph "External APIs"
+        GROQAPI[Groq API]
+        TAV[Tavily API]
+        SERP[SerpApi]
+    end
+
+    subgraph "Data Layer"
+        STORE[(PostgreSQL)]
+        PROMPTS[Embedded Prompts]
+    end
+
+    CRON --> FCORE
+    REST --> FCORE
+    FCORE --> AGENT
+    AGENT --> RUNNER
+    RUNNER --> SESSION
+    RUNNER --> GROQ
+    GROQ --> CHUNK
+    CHUNK --> GROQAPI
+    RUNNER --> T1 & T2 & T3
+    T1 --> STORE
+    T2 --> TAV & SERP
+    T3 --> STORE
+    AGENT -.->|Instructions| PROMPTS
+    T1 & T2 & T3 -.->|Descriptions| PROMPTS
+```
+
+### Key Files
+| File | Purpose |
+|------|---------|
+| `internal/adk/feedagent/agent.go` | Agent definition, runner, and session management |
+| `internal/adk/tools/simple.go` | Generic tool wrapper implementing ADK's `tool.Tool` interface |
+| `internal/adk/tools/feed_tools.go` | Factory functions for feed-specific tools |
+| `pkg/adk/model/groq/model.go` | Custom Groq adapter implementing ADK's `model.LLM` interface |
+
+### Agent Flow
+1. Agent receives: `"Generate daily feed for user_id: X"`
+2. Calls `get_user_preferences` → retrieves user interests
+3. Calls `search_news` with optimized queries → fetches articles from Tavily/SerpApi
+4. Evaluates and ranks articles based on relevance
+5. Calls `store_articles` → persists top articles to database
+
+## Centralized AI Utilities
+
+### Token Management (`internal/ai/chunking.go`)
+Handles Groq's 8k token limit across all AI operations:
+
+| Function | Purpose |
+|----------|---------|
+| `SplitIntoChunks()` | Splits large content with overlap for context continuity |
+| `TruncateToLimit()` | Simple truncation when chunking isn't appropriate |
+| `EstimateTokens()` | Rough token count (~4 chars = 1 token) |
+| `AggregateResults()` | Combines results from multiple chunks |
+
+### Token Budget
+- **Total**: 8000 tokens (Groq free tier)
+- **Input**: ~6000 tokens max
+- **Response**: ~2000 tokens reserved
+
+## Externalized Prompts (`prompts/`)
+
+All AI prompts are externalized as text files and embedded at compile time:
+
+| File | Usage |
+|------|-------|
+| `agent_daily_feed.txt` | Agent system instructions |
+| `flashcards.txt` | Flashcard generation prompt |
+| `summary.txt` | Summary generation prompt |
+| `query_optimization.txt` | Search query optimization |
+| `tool_*.txt` | Tool descriptions for agent |
+
+Loaded via `go:embed` in `prompts/loader.go` for zero-runtime file I/O.

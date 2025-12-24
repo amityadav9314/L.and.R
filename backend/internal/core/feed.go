@@ -6,6 +6,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/amityadav/landr/internal/adk/feedagent"
 	"github.com/amityadav/landr/internal/ai"
 	"github.com/amityadav/landr/internal/serpapi"
 	"github.com/amityadav/landr/internal/store"
@@ -20,15 +21,17 @@ type FeedCore struct {
 	tavilyClient  *tavily.Client
 	serpapiClient *serpapi.Client
 	aiProvider    ai.Provider
+	groqAPIKey    string
 }
 
 // NewFeedCore creates a new FeedCore instance
-func NewFeedCore(st *store.PostgresStore, tavilyClient *tavily.Client, serpapiClient *serpapi.Client, aiProvider ai.Provider) *FeedCore {
+func NewFeedCore(st *store.PostgresStore, tavilyClient *tavily.Client, serpapiClient *serpapi.Client, aiProvider ai.Provider, groqAPIKey string) *FeedCore {
 	return &FeedCore{
 		store:         st,
 		tavilyClient:  tavilyClient,
 		serpapiClient: serpapiClient,
 		aiProvider:    aiProvider,
+		groqAPIKey:    groqAPIKey,
 	}
 }
 
@@ -122,7 +125,7 @@ func (c *FeedCore) GetFeedCalendarStatus(ctx context.Context, userID, monthStr s
 func (c *FeedCore) GenerateDailyFeedForUser(ctx context.Context, userID string) error {
 	log.Printf("[FeedCore.GenerateDailyFeedForUser] Starting for userID: %s", userID)
 
-	// 1. Get user's interest prompt
+	// 1. Get user's interest prompt (Quick check before starting heavy agent)
 	prefs, err := c.store.GetFeedPreferences(ctx, userID)
 	if err != nil {
 		return fmt.Errorf("failed to get feed preferences: %w", err)
@@ -132,87 +135,39 @@ func (c *FeedCore) GenerateDailyFeedForUser(ctx context.Context, userID string) 
 		return nil
 	}
 
-	// 2. Check existing articles to avoid duplicate API calls
+	log.Printf("[FeedCore.GenerateDailyFeedForUser] User interests: %s", prefs.InterestPrompt)
+
+	// Check existing articles to avoid duplicate API calls
+	// Fail-open: If DB query fails, existingArticles will be nil/empty and we proceed with generation.
 	today := time.Now().Truncate(24 * time.Hour)
 	existingArticles, err := c.store.GetDailyArticles(ctx, userID, today)
 	if err != nil {
-		log.Printf("[FeedCore.GenerateDailyFeedForUser] Error checking existing articles: %v", err)
+		log.Printf("[FeedCore.GenerateDailyFeedForUser] Error checking existing articles (proceeding anyway): %v", err)
 	}
 
-	hasGoogle := false
-	hasTavily := false
-	for _, a := range existingArticles {
-		if a.Provider == "google" {
-			hasGoogle = true
-		} else if a.Provider == "tavily" || a.Provider == "" {
-			hasTavily = true
-		}
-	}
-
-	if hasGoogle && hasTavily {
-		log.Printf("[FeedCore.GenerateDailyFeedForUser] Articles exist for both providers today, skipping search calls")
+	// Minimum articles before skipping regeneration
+	const minDailyArticles = 10
+	if len(existingArticles) >= minDailyArticles {
+		log.Printf("[FeedCore.GenerateDailyFeedForUser] Already have %d articles today, skipping generation", len(existingArticles))
 		return nil
 	}
 
-	// 3. Use LLM to optimize the search query
-	log.Printf("[FeedCore.GenerateDailyFeedForUser] Optimizing search query with LLM (Google missing: %v, Tavily missing: %v)...", !hasGoogle, !hasTavily)
-	optimizedQuery, err := c.aiProvider.OptimizeSearchQuery(prefs.InterestPrompt)
+	// 3. Run Google ADK Agent
+	log.Printf("[FeedCore.GenerateDailyFeedForUser] Starting AI Agent for user %s...", userID)
+
+	deps := feedagent.Dependencies{
+		Store:      c.store,
+		Tavily:     c.tavilyClient,
+		SerpApi:    c.serpapiClient,
+		GroqAPIKey: c.groqAPIKey,
+	}
+
+	result, err := feedagent.Run(ctx, deps, userID)
 	if err != nil {
-		log.Printf("[FeedCore.GenerateDailyFeedForUser] Query optimization failed, using original: %v", err)
-		optimizedQuery = prefs.InterestPrompt
-	}
-	log.Printf("[FeedCore.GenerateDailyFeedForUser] Original: %q -> Optimized: %q", prefs.InterestPrompt, optimizedQuery)
-
-	// 4. Call Search Providers
-	var storedCount, skippedCount int
-
-	// 4a. SerpApi (Google)
-	if c.serpapiClient != nil && !hasGoogle {
-		log.Printf("[FeedCore.GenerateDailyFeedForUser] Calling SerpApi...")
-		serpResp, err := c.serpapiClient.Search(optimizedQuery)
-		if err != nil {
-			log.Printf("[FeedCore.GenerateDailyFeedForUser] SerpApi search failed: %v", err)
-		} else {
-			for _, result := range serpResp.Results {
-				if err := c.storeArticle(ctx, userID, result.Title, result.URL, result.Snippet, result.Score, "google", today); err != nil {
-					if err.Error() == "skipped" {
-						skippedCount++
-					}
-				} else {
-					storedCount++
-				}
-			}
-		}
-	} else if hasGoogle {
-		log.Printf("[FeedCore.GenerateDailyFeedForUser] Skipping SerpApi (already has Google results for today)")
+		return fmt.Errorf("agent run failed: %w", err)
 	}
 
-	// 4b. Tavily
-	if c.tavilyClient != nil && !hasTavily {
-		log.Printf("[FeedCore.GenerateDailyFeedForUser] Calling Tavily...")
-		tavilyResp, err := c.tavilyClient.SearchWithOptions(optimizedQuery, tavily.SearchOptions{
-			MaxResults: 15,
-			NewsOnly:   true,
-			Days:       3,
-		})
-		if err != nil {
-			log.Printf("[FeedCore.GenerateDailyFeedForUser] Tavily search failed: %v", err)
-		} else {
-			for _, result := range tavilyResp.Results {
-				if err := c.storeArticle(ctx, userID, result.Title, result.URL, result.Content, result.Score, "tavily", today); err != nil {
-					if err.Error() == "skipped" {
-						skippedCount++
-					}
-				} else {
-					storedCount++
-				}
-			}
-		}
-	} else if hasTavily {
-		log.Printf("[FeedCore.GenerateDailyFeedForUser] Skipping Tavily (already has Tavily results for today)")
-	}
-
-	log.Printf("[FeedCore.GenerateDailyFeedForUser] Completed. Stored: %d, Skipped (duplicate): %d", storedCount, skippedCount)
+	log.Printf("[FeedCore.GenerateDailyFeedForUser] Agent completed. Summary: %s", result.Summary)
 	return nil
 }
 

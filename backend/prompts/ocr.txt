@@ -1,0 +1,5 @@
+Extract ALL text from this image exactly as written.
+Maintain the original structure, headings, and formatting.
+If there are diagrams or charts, describe them briefly in brackets like [Diagram: description].
+If the image contains handwritten text, do your best to transcribe it accurately.
+Return ONLY the extracted text, no commentary or additional formatting.

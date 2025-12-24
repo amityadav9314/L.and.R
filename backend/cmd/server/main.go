@@ -102,7 +102,7 @@ func main() {
 			serpapiClient = serpapi.NewClient(serpapiAPIKey)
 		}
 
-		feedCore = core.NewFeedCore(st, tavilyClient, serpapiClient, aiProvider)
+		feedCore = core.NewFeedCore(st, tavilyClient, serpapiClient, aiProvider, groqAPIKey)
 		feedSvc = service.NewFeedService(feedCore)
 	} else {
 		log.Printf("Daily Feed feature disabled (no TAVILY_API_KEY or SERPAPI_API_KEY)")

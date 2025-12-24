@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/amityadav/landr/pkg/pb/learning"
+	"github.com/amityadav/landr/prompts"
 )
 
 // Provider defines the interface for AI providers
@@ -32,7 +33,7 @@ type ProviderConfig struct {
 	MaxContentLen int
 }
 
-// Internal types for AI API communication
+// Internal types for AI API communication (unexported - implementation detail)
 type chatRequest struct {
 	Model    string        `json:"model"`
 	Messages []interface{} `json:"messages"`
@@ -95,8 +96,12 @@ func (p *BaseProvider) Name() string {
 	return p.config.Name
 }
 
-// sendRequest handles HTTP requests to the AI provider
-func (p *BaseProvider) sendRequest(reqBody interface{}, operation string) (string, error) {
+func (p *BaseProvider) ModelName() string {
+	return p.config.TextModel
+}
+
+// SendRequest handles HTTP requests to the AI provider
+func (p *BaseProvider) SendRequest(reqBody interface{}, operation string) (string, error) {
 	log.Printf("[%s.%s] Sending request...", p.config.Name, operation)
 
 	jsonBody, err := json.Marshal(reqBody)
@@ -141,33 +146,10 @@ func (p *BaseProvider) sendRequest(reqBody interface{}, operation string) (strin
 
 // GenerateFlashcards implements flashcard generation
 func (p *BaseProvider) GenerateFlashcards(content string, existingTags []string) (string, []string, []*learning.Flashcard, error) {
-	// Truncate content to stay within token limits
-	if len(content) > p.config.MaxContentLen {
-		log.Printf("[%s.Flashcards] Truncating from %d to %d chars", p.config.Name, len(content), p.config.MaxContentLen)
-		content = content[:p.config.MaxContentLen]
-	}
+	// Use centralized truncation
+	content = TruncateToLimit(content, p.config.MaxContentLen)
 
-	prompt := fmt.Sprintf(`You are a helpful assistant that creates flashcards from text.
-Analyze the following text and create:
-1. A short, descriptive Title for the material.
-2. A list of 3-5 relevant Tags (categories).
-3. 6 to 40 high-quality flashcards (Question and Answer pairs).
-
-Existing tags you might reuse if relevant: %s
-
-Return ONLY a raw JSON object with the following structure:
-{
-  "title": "String",
-  "tags": ["String", "String"],
-  "flashcards": [
-    {"question": "String", "answer": "String"}
-  ]
-}
-Do not include any markdown formatting (like json code blocks).
-Do not include any other text.
-
-Text:
-%s`, strings.Join(existingTags, ", "), content)
+	prompt := fmt.Sprintf(prompts.Flashcards, strings.Join(existingTags, ", "), content)
 
 	reqBody := chatRequest{
 		Model: p.config.TextModel,
@@ -176,7 +158,7 @@ Text:
 		},
 	}
 
-	rawContent, err := p.sendRequest(reqBody, "Flashcards")
+	rawContent, err := p.SendRequest(reqBody, "Flashcards")
 	if err != nil {
 		return "", nil, nil, err
 	}
@@ -201,23 +183,10 @@ Text:
 // GenerateSummary implements summary generation
 func (p *BaseProvider) GenerateSummary(content string) (string, error) {
 	maxLen := 25000
-	if len(content) > maxLen {
-		log.Printf("[%s.Summary] Truncating from %d to %d", p.config.Name, len(content), maxLen)
-		content = content[:maxLen]
-	}
+	// Use centralized truncation
+	content = TruncateToLimit(content, maxLen)
 
-	prompt := fmt.Sprintf(`You are a helpful assistant that creates concise summaries for learning materials.
-Create a clear, well-structured summary of the following text that helps a student review the key concepts.
-The summary should:
-- Be 5-8 paragraphs
-- Highlight the main concepts and key points
-- Be easy to scan and review quickly
-- Use bullet points where appropriate
-
-Return ONLY the summary text, no additional formatting or metadata.
-
-Text:
-%s`, content)
+	prompt := fmt.Sprintf(prompts.Summary, content)
 
 	reqBody := chatRequest{
 		Model: p.config.TextModel,
@@ -226,7 +195,7 @@ Text:
 		},
 	}
 
-	return p.sendRequest(reqBody, "Summary")
+	return p.SendRequest(reqBody, "Summary")
 }
 
 // ExtractTextFromImage implements OCR using vision model
@@ -240,11 +209,7 @@ func (p *BaseProvider) ExtractTextFromImage(base64Image string) (string, error) 
 		imageDataURL = "data:image/jpeg;base64," + base64Image
 	}
 
-	prompt := `Extract ALL text from this image exactly as written.
-Maintain the original structure, headings, and formatting.
-If there are diagrams or charts, describe them briefly in brackets like [Diagram: description].
-If the image contains handwritten text, do your best to transcribe it accurately.
-Return ONLY the extracted text, no commentary or additional formatting.`
+	prompt := prompts.OCR
 
 	reqBody := chatRequest{
 		Model: p.config.VisionModel,
@@ -259,25 +224,14 @@ Return ONLY the extracted text, no commentary or additional formatting.`
 		},
 	}
 
-	return p.sendRequest(reqBody, "OCR")
+	return p.SendRequest(reqBody, "OCR")
 }
 
 // OptimizeSearchQuery converts user interests into an optimized search query
 func (p *BaseProvider) OptimizeSearchQuery(userInterests string) (string, error) {
 	log.Printf("[%s.SearchQuery] Optimizing query for: %s", p.config.Name, userInterests)
 
-	prompt := fmt.Sprintf(`You are an expert at crafting search queries for finding the latest news and articles.
-
-User's interests: "%s"
-
-Create a single, optimized search query that will find the most relevant and recent articles about these topics.
-The query should:
-- Be concise (10-15 words max)
-- Focus on finding NEWS articles, not general information
-- Include key terms that will return high-quality, recent content
-- Be specific enough to avoid generic results
-
-Return ONLY the search query text, nothing else. No quotes, no explanation.`, userInterests)
+	prompt := fmt.Sprintf(prompts.QueryOptimization, userInterests)
 
 	reqBody := chatRequest{
 		Model: p.config.TextModel,
@@ -286,7 +240,7 @@ Return ONLY the search query text, nothing else. No quotes, no explanation.`, us
 		},
 	}
 
-	query, err := p.sendRequest(reqBody, "SearchQuery")
+	query, err := p.SendRequest(reqBody, "SearchQuery")
 	if err != nil {
 		// Fallback to original interests if LLM fails
 		log.Printf("[%s.SearchQuery] LLM failed, using original: %v", p.config.Name, err)

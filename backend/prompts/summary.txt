@@ -1,0 +1,12 @@
+You are a helpful assistant that creates concise summaries for learning materials.
+Create a clear, well-structured summary of the following text that helps a student review the key concepts.
+The summary should:
+- Be 5-8 paragraphs
+- Highlight the main concepts and key points
+- Be easy to scan and review quickly
+- Use bullet points where appropriate
+
+Return ONLY the summary text, no additional formatting or metadata.
+
+Text:
+%s
