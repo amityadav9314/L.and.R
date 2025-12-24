@@ -313,6 +313,7 @@ sequenceDiagram
         end
         
         GM->>API: POST /chat/completions
+        Note over GM: Waits 15s (Rate Limit Safety)
         alt API Error (429/500)
             API-->>GM: Error
             Note over GM: Retry logic in HTTP client
@@ -323,6 +324,7 @@ sequenceDiagram
         
         alt Tool Call Requested
             RN->>T: Execute Tool
+            Note over T: Waits 15s between search queries
             Note over T: Tool-specific limits:<br/>- max 25 articles<br/>- max 6000 chars<br/>- content truncated to 200 chars
             T-->>RN: Tool Result
             Note over RN: Loop continues with tool result
@@ -333,6 +335,13 @@ sequenceDiagram
     
     AG-->>FC: RunResult{Summary}
 ```
+
+### Operational Characteristics
+- **Long-Running**: The entire process can take **10-20 minutes**.
+- **Delays**: 
+    - **Groq Adapter**: **15s delay** before every API call.
+    - **Search Tool**: **15s delay** between every search query.
+- **Fail-Safe**: Uses `context.Background()` with 30m timeout in REST/Worker to prevent cancellation.
 
 ## Centralized AI Utilities
 

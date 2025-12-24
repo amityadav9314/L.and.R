@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -76,6 +77,10 @@ func NewSearchNewsTool(tav *tavily.Client, serp *serpapi.Client) tool.Tool {
 				if len(allArticles) >= maxArticles {
 					break
 				}
+
+				// Rate Limiting: Wait between search queries
+				log.Printf("[SearchTool] Waiting 15s before executing query...")
+				time.Sleep(15 * time.Second)
 
 				q, ok := qInt.(string)
 				if !ok {

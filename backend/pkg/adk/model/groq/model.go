@@ -48,7 +48,7 @@ func NewModel(cfg Config) *Model {
 		apiKey:    cfg.APIKey,
 		baseURL:   cfg.BaseURL,
 		modelName: cfg.ModelName,
-		client:    &http.Client{Timeout: 120 * time.Second},
+		client:    &http.Client{Timeout: 300 * time.Second},
 	}
 }
 
@@ -166,6 +166,10 @@ func (m *Model) sendRequest(reqBody chatRequest) (string, error) {
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+m.apiKey)
+
+	// Rate Limiting: Explicit wait as requested due to free tier strictness
+	log.Printf("[GroqAdapter] Waiting 15s before API call (Rate Limit Safety)...")
+	time.Sleep(15 * time.Second)
 
 	resp, err := m.client.Do(req)
 	if err != nil {

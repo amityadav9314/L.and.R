@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"runtime/debug"
+	"time"
 
 	"github.com/amityadav/landr/internal/ai"
 	"github.com/amityadav/landr/internal/core"
@@ -235,16 +236,24 @@ func main() {
 				return
 			}
 
-			// Trigger feed generation
-			if err := feedCore.GenerateDailyFeedForUser(r.Context(), userID); err != nil {
-				log.Printf("[REST] Feed generation failed for %s: %v", email, err)
-				http.Error(w, `{"error": "feed generation failed"}`, http.StatusInternalServerError)
-				return
-			}
+			// Trigger feed generation in background (async)
+			// Use context.Background() to prevent cancellation if client disconnects
+			go func() {
+				// Use a long timeout context (e.g. 30 mins) just in case
+				bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+				defer cancel()
+
+				log.Printf("[REST] Starting background feed generation for user %s", userID)
+				if err := feedCore.GenerateDailyFeedForUser(bgCtx, userID); err != nil {
+					log.Printf("[REST] Background feed generation failed for %s: %v", email, err)
+				} else {
+					log.Printf("[REST] Background feed generation completed for %s", email)
+				}
+			}()
 
 			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"status": "success", "message": "Daily feed refreshed successfully"}`))
+			w.WriteHeader(http.StatusAccepted)
+			w.Write([]byte(`{"status": "accepted", "message": "Daily feed refresh started in background"}`))
 			return
 		}
 
