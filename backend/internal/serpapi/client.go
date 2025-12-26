@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/amityadav/landr/internal/search"
 	g "github.com/serpapi/google-search-results-golang"
 )
 
@@ -96,8 +97,8 @@ func (c *Client) Search(query string) (*SearchResponse, error) {
 	}, nil
 }
 
-// SearchNews performs a Google News search via SerpApi
-func (c *Client) SearchNews(query string) (*SearchResponse, error) {
+// SearchNewsRaw performs a Google News search via SerpApi and returns raw response
+func (c *Client) SearchNewsRaw(query string) (*SearchResponse, error) {
 	if c.apiKey == "" {
 		return nil, fmt.Errorf("SerpApi API key is not set")
 	}
@@ -161,4 +162,34 @@ func (c *Client) SearchNews(query string) (*SearchResponse, error) {
 	return &SearchResponse{
 		Results: resultsList,
 	}, nil
+}
+
+// Name returns the provider identifier
+func (c *Client) Name() string {
+	return "google"
+}
+
+// SearchNews implements the SearchProvider interface (using Google News)
+func (c *Client) SearchNews(query string, maxResults int) ([]search.Article, error) {
+	resp, err := c.SearchNewsRaw(query)
+	if err != nil {
+		return nil, err
+	}
+
+	// Limit results
+	results := resp.Results
+	if len(results) > maxResults {
+		results = results[:maxResults]
+	}
+
+	articles := make([]search.Article, len(results))
+	for i, r := range results {
+		articles[i] = search.Article{
+			Title:    r.Title,
+			URL:      r.URL,
+			Snippet:  r.Snippet,
+			Provider: "google",
+		}
+	}
+	return articles, nil
 }

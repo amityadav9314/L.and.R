@@ -8,10 +8,11 @@ import (
 	"time"
 
 	"github.com/amityadav/landr/internal/adk/tools"
+	"github.com/amityadav/landr/internal/ai"
 	"github.com/amityadav/landr/internal/ai/models"
-	"github.com/amityadav/landr/internal/serpapi"
+	"github.com/amityadav/landr/internal/scraper"
+	"github.com/amityadav/landr/internal/search"
 	"github.com/amityadav/landr/internal/store"
-	"github.com/amityadav/landr/internal/tavily"
 	"github.com/amityadav/landr/pkg/adk/model/groq"
 	"github.com/amityadav/landr/prompts"
 	"google.golang.org/adk/agent"
@@ -24,17 +25,19 @@ import (
 
 // Dependencies holds the services needed by the agent
 type Dependencies struct {
-	Store      *store.PostgresStore
-	Tavily     *tavily.Client
-	SerpApi    *serpapi.Client
-	GroqAPIKey string
+	Store           *store.PostgresStore
+	SearchProviders []search.SearchProvider // Changed: Use interface slice
+	Scraper         *scraper.Scraper
+	AIProvider      ai.Provider
+	GroqAPIKey      string
 }
 
-// New creates a new Daily Feed Agent
+// New creates a new Daily Feed Agent with V2 workflow
 func New(ctx context.Context, deps Dependencies) (agent.Agent, error) {
 	// 1. Initialize custom Groq Model Adapter
 	modelName := models.TaskAgentDailyFeedModel
 	log.Printf("[DailyFeedAgent] Initializing with model: %s", modelName)
+	log.Printf("[DailyFeedAgent] Registered search providers: %d", len(deps.SearchProviders))
 
 	modelAdapter := groq.NewModel(groq.Config{
 		APIKey:    deps.GroqAPIKey,
@@ -43,16 +46,26 @@ func New(ctx context.Context, deps Dependencies) (agent.Agent, error) {
 
 	// 2. Define Tools using internal/adk/tools package
 	getPrefsTool := tools.NewGetPreferencesTool(deps.Store)
-	searchNewsTool := tools.NewSearchNewsTool(deps.Tavily, deps.SerpApi)
+	searchNewsTool := tools.NewSearchNewsTool(deps.SearchProviders) // Pass provider slice
+	scrapeContentTool := tools.NewScrapeContentTool(deps.Scraper)
+	summarizeContentTool := tools.NewSummarizeContentTool(deps.AIProvider)
+	evaluateArticleTool := tools.NewEvaluateArticleTool(deps.AIProvider)
 	storeArticlesTool := tools.NewStoreArticlesTool(deps.Store)
 
-	// 3. Create Agent
+	// 3. Create Agent with all V2 tools
 	return llmagent.New(llmagent.Config{
-		Name:        "daily_feed_agent",
+		Name:        "daily_feed_agent_v2",
 		Model:       modelAdapter,
-		Description: "An agent that curates daily AI/ML news.",
+		Description: "V2 Agent: Scrape → Summarize → Evaluate → Store",
 		Instruction: prompts.AgentDailyFeed,
-		Tools:       []tool.Tool{getPrefsTool, searchNewsTool, storeArticlesTool},
+		Tools: []tool.Tool{
+			getPrefsTool,
+			searchNewsTool,
+			scrapeContentTool,
+			summarizeContentTool,
+			evaluateArticleTool,
+			storeArticlesTool,
+		},
 	})
 }
 
@@ -112,7 +125,7 @@ func Run(ctx context.Context, deps Dependencies, userID string) (*RunResult, err
 	}
 
 	// Execute Run
-	log.Printf("[DailyFeedAgent] Starting run for User: %s (%s) | Model: %s", userEmail, userID, models.TaskAgentDailyFeedModel)
+	log.Printf("[DailyFeedAgent] Starting V2 run for User: %s (%s) | Model: %s", userEmail, userID, models.TaskAgentDailyFeedModel)
 
 	var finalResponse string
 
@@ -144,6 +157,6 @@ func Run(ctx context.Context, deps Dependencies, userID string) (*RunResult, err
 		}
 	}
 
-	log.Printf("[DailyFeedAgent] Run completed for user %s", userID)
+	log.Printf("[DailyFeedAgent] V2 run completed for user %s", userID)
 	return &RunResult{Summary: finalResponse}, nil
 }

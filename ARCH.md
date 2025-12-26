@@ -276,17 +276,25 @@ graph TB
 ### Key Files
 | File | Purpose |
 |------|---------|
-| `internal/adk/feedagent/agent.go` | Agent definition, runner, and session management |
-| `internal/adk/tools/simple.go` | Generic tool wrapper implementing ADK's `tool.Tool` interface |
-| `internal/adk/tools/feed_tools.go` | Factory functions for feed-specific tools |
+| `internal/adk/feedagent/agent.go` | Agent V2 definition with 6 tools |
+| `internal/adk/tools/feed_tools.go` | All V2 tools (search, scrape, summarize, evaluate, store) |
+| `internal/search/provider.go` | SearchProvider interface |
+| `internal/search/registry.go` | Dynamic provider registry |
+| `internal/tavily/client.go` | Tavily search provider implementation |
+| `internal/serpapi/client.go` | SerpApi search provider implementation |
 | `pkg/adk/model/groq/model.go` | Custom Groq adapter implementing ADK's `model.LLM` interface |
+| `prompts/agent_daily_feed.txt` | V2 agent instructions (scrape → summarize → evaluate) |
+| `prompts/article_evaluation.txt` | Article scoring prompt template |
 
-### Agent Flow
+### Agent V2 Flow
 1. Agent receives: `"Generate daily feed for user_id: X"`
-2. Calls `get_user_preferences` → retrieves user interests
-3. Calls `search_news` with optimized queries → fetches articles from Tavily/SerpApi
-4. Evaluates and ranks articles based on relevance
-5. Calls `store_articles` → persists top articles to database
+2. Calls `get_user_preferences` → retrieves interests + `feed_eval_prompt`
+3. Calls `search_news` → queries all registered providers (Tavily, SerpApi, future...)
+4. For each article:
+   - Calls `scrape_content` → gets full article text
+   - Calls `summarize_content` → generates concise summary
+   - Calls `evaluate_article` → scores 0.0-1.0 against user criteria
+5. Calls `store_articles` → saves articles with score ≥ 0.6
 
 ### Execution Sequence (LLM + Chunking + Retry)
 ```mermaid
@@ -373,3 +381,103 @@ All AI prompts are externalized as text files and embedded at compile time:
 | `tool_*.txt` | Tool descriptions for agent |
 
 Loaded via `go:embed` in `prompts/loader.go` for zero-runtime file I/O.
+## Code Organization
+
+### Backend Structure
+```
+backend/
+├── cmd/server/
+│   └── main.go                    # Entry point (80 lines - orchestration only)
+├── internal/
+│   ├── config/
+│   │   └── config.go              # Configuration management
+│   ├── server/
+│   │   ├── init.go                # Service initialization
+│   │   ├── http.go                # HTTP middleware (CORS, gRPC-Web, recovery)
+│   │   └── rest.go                # REST API handlers
+│   ├── ai/
+│   │   ├── provider.go            # Provider interface
+│   │   ├── base_provider.go       # BaseProvider implementation
+│   │   ├── multi_provider.go      # MultiProvider for load balancing
+│   │   └── factory.go             # Provider factory functions
+│   ├── search/
+│   │   ├── provider.go            # SearchProvider interface
+│   │   └── registry.go            # Dynamic provider registry
+│   ├── adk/
+│   │   ├── feedagent/
+│   │   │   └── agent.go           # V2 ADK agent
+│   │   └── tools/
+│   │       └── feed_tools.go      # All 6 V2 tools
+│   ├── feed/
+│   │   └── constants.go           # Feed configuration constants
+│   └── ...
+└── prompts/
+    ├── agent_daily_feed.txt       # V2 agent instructions
+    ├── article_evaluation.txt     # Article scoring prompt
+    ├── tool_*.txt                 # Tool descriptions
+    └── loader.go                  # Embedded prompts
+```
+
+### Design Patterns
+
+#### 1. Interface-Based Architecture
+- **AI Providers**: `Provider` interface with `BaseProvider` and `MultiProvider` implementations
+- **Search Providers**: `SearchProvider` interface with Tavily/SerpApi implementations
+- **Benefits**: Easy to add new providers, testable, loosely coupled
+
+#### 2. Registry Pattern
+- **Search Registry**: Dynamically register N search providers
+- **No hardcoding**: Add providers via environment variables
+- **Example**:
+  ```go
+  registry := search.NewRegistry()
+  registry.Register(tavily.NewClient(apiKey))
+  registry.Register(serpapi.NewClient(apiKey))
+  // Future: registry.Register(bing.NewClient(apiKey))
+  ```
+
+#### 3. Factory Pattern
+- **AI Providers**: `NewLLMProvider(name, apiKey, model)` creates appropriate provider
+- **ADK Tools**: `New*Tool(dependencies)` for dependency injection
+- **Benefits**: Centralized creation logic, easy configuration
+
+#### 4. Constructor Pattern (`New*`)
+- All constructors follow `New*` naming convention
+- Set defaults, validate inputs, initialize state
+- Examples: `NewBaseProvider()`, `NewRegistry()`, `NewGetPreferencesTool()`
+
+### Key Architectural Decisions
+
+1. **Extensible Search Providers**
+   - Interface + Registry pattern allows N providers
+   - No code changes needed to add new search APIs
+   - Resolves TODOs from feed_v2 workflow
+
+2. **V2 Content-Aware Evaluation**
+   - Scrape → Summarize → Evaluate → Store pipeline
+   - Uses `feed_eval_prompt` for personalized scoring
+   - Only stores articles with score ≥ 0.6
+
+3. **Clean Code Organization**
+   - Separated interface from implementations
+   - Config, server init, and handlers in separate packages
+   - main.go reduced from 400+ to 80 lines
+
+4. **Centralized Configuration**
+   - `internal/config` package for all env vars
+   - `internal/feed/constants.go` for feed-specific constants
+   - `prompts/` package for all AI prompts
+
+## Testing
+
+### Agent Testing
+```bash
+make test-agent  # Run with mocked search providers
+```
+
+### Manual Testing
+```bash
+# Trigger feed generation for a user
+curl -X POST http://localhost:8080/api/feed/refresh?email=user@example.com \
+  -H "X-API-Key: $FEED_API_KEY"
+```

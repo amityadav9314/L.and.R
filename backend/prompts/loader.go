@@ -27,3 +27,15 @@ var ToolSearchNewsDesc string
 
 //go:embed tool_store_articles.txt
 var ToolStoreArticlesDesc string
+
+//go:embed tool_scrape_content.txt
+var ToolScrapeContentDesc string
+
+//go:embed tool_summarize_content.txt
+var ToolSummarizeContentDesc string
+
+//go:embed tool_evaluate_article.txt
+var ToolEvaluateArticleDesc string
+
+//go:embed article_evaluation.txt
+var ArticleEvaluation string

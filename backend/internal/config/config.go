@@ -1,0 +1,38 @@
+package config
+
+import "os"
+
+// Config holds all application configuration
+type Config struct {
+	DatabaseURL      string
+	JWTSecret        string
+	GoogleClientID   string
+	GroqAPIKey       string
+	CerebrasAPIKey   string
+	TavilyAPIKey     string
+	SerpAPIKey       string
+	FeedAPIKey       string
+	FirebaseCredPath string
+}
+
+// Load loads configuration from environment variables
+func Load() Config {
+	return Config{
+		DatabaseURL:      getEnv("DATABASE_URL", "postgres://amityadav9314:amit8780@localhost:5432/inkgrid?sslmode=disable"),
+		JWTSecret:        getEnv("JWT_SECRET", "dev-secret-key"),
+		GoogleClientID:   os.Getenv("GOOGLE_CLIENT_ID"),
+		GroqAPIKey:       os.Getenv("GROQ_API_KEY"),
+		CerebrasAPIKey:   os.Getenv("CEREBRAS_API_KEY"),
+		TavilyAPIKey:     os.Getenv("TAVILY_API_KEY"),
+		SerpAPIKey:       os.Getenv("SERPAPI_API_KEY"),
+		FeedAPIKey:       os.Getenv("FEED_API_KEY"),
+		FirebaseCredPath: "firebase/service-account.json",
+	}
+}
+
+func getEnv(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}

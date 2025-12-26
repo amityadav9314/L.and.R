@@ -143,16 +143,4 @@ For each candidate URL (parallel execution recommended):
 ---
 
 ## 6. Implementation Plan
-1. DB Migration: Add new column.
-2. Backend Refactor:
-   - Create `internal/adk/feed_v2/` (or update `core/feed.go`)
-3. Implement deterministic workflow in Go.
-4. Use LLM only for:
-   - Query generation
-   - Summarization
-   - Evaluation
-5. Explicitly **avoid ReAct / autonomous agents**.
-   - This is a **workflow**, not an agent.
-6. Testing:
-   - Mock Scraper
-   - Mock AIProvider
+0: We must use google adk for feed generation v2

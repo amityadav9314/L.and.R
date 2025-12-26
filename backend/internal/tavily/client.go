@@ -8,6 +8,8 @@ import (
 	"log"
 	"net/http"
 	"time"
+
+	"github.com/amityadav/landr/internal/search"
 )
 
 const apiURL = "https://api.tavily.com/search"
@@ -125,4 +127,32 @@ func (c *Client) SearchWithOptions(query string, opts SearchOptions) (*SearchRes
 
 	log.Printf("[Tavily] Found %d results for query: %s", len(searchResp.Results), query)
 	return &searchResp, nil
+}
+
+// Name returns the provider identifier
+func (c *Client) Name() string {
+	return "tavily"
+}
+
+// SearchNews implements the SearchProvider interface
+func (c *Client) SearchNews(query string, maxResults int) ([]search.Article, error) {
+	resp, err := c.SearchWithOptions(query, SearchOptions{
+		MaxResults: maxResults,
+		NewsOnly:   true,
+		Days:       7,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	articles := make([]search.Article, len(resp.Results))
+	for i, r := range resp.Results {
+		articles[i] = search.Article{
+			Title:    r.Title,
+			URL:      r.URL,
+			Snippet:  r.Content,
+			Provider: "tavily",
+		}
+	}
+	return articles, nil
 }

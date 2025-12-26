@@ -7,9 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/amityadav/landr/internal/serpapi"
+	"github.com/amityadav/landr/internal/ai"
+	"github.com/amityadav/landr/internal/scraper"
+	"github.com/amityadav/landr/internal/search"
 	"github.com/amityadav/landr/internal/store"
-	"github.com/amityadav/landr/internal/tavily"
 	"github.com/amityadav/landr/prompts"
 	"google.golang.org/adk/tool"
 	"google.golang.org/adk/tool/functiontool"
@@ -24,7 +25,8 @@ type GetPreferencesArgs struct {
 }
 
 type GetPreferencesResult struct {
-	Interests string `json:"interests"`
+	Interests    string `json:"interests"`
+	EvalCriteria string `json:"eval_criteria"`
 }
 
 func NewGetPreferencesTool(s *store.PostgresStore) tool.Tool {
@@ -40,12 +42,25 @@ func NewGetPreferencesTool(s *store.PostgresStore) tool.Tool {
 			return GetPreferencesResult{}, fmt.Errorf("failed to get prefs: %w", err)
 		}
 
-		log.Printf("[GetPreferencesTool] Found prefs - Enabled: %v, Length: %d", prefs.FeedEnabled, len(prefs.InterestPrompt))
+		log.Printf("[GetPreferencesTool] Found prefs - Enabled: %v, Interests: %d chars, EvalPrompt: %d chars",
+			prefs.FeedEnabled, len(prefs.InterestPrompt), len(prefs.FeedEvalPrompt))
 
 		if !prefs.FeedEnabled || prefs.InterestPrompt == "" {
-			return GetPreferencesResult{Interests: "Feed is disabled or no interests set."}, nil
+			return GetPreferencesResult{
+				Interests:    "Feed is disabled or no interests set.",
+				EvalCriteria: "",
+			}, nil
 		}
-		return GetPreferencesResult{Interests: fmt.Sprintf("User Interests: %s", prefs.InterestPrompt)}, nil
+
+		evalCriteria := prefs.FeedEvalPrompt
+		if evalCriteria == "" {
+			evalCriteria = "Ensure the article is informative, relevant to their interests, and not clickbait."
+		}
+
+		return GetPreferencesResult{
+			Interests:    prefs.InterestPrompt,
+			EvalCriteria: evalCriteria,
+		}, nil
 	}
 
 	t, err := functiontool.New(functiontool.Config{
@@ -59,7 +74,7 @@ func NewGetPreferencesTool(s *store.PostgresStore) tool.Tool {
 }
 
 // ========================================
-// search_news Tool
+// search_news Tool (using SearchProvider interface)
 // ========================================
 
 type SearchNewsArgs struct {
@@ -70,75 +85,58 @@ type SearchNewsResult struct {
 	Articles string `json:"articles"`
 }
 
-func NewSearchNewsTool(tav *tavily.Client, serp *serpapi.Client) tool.Tool {
+func NewSearchNewsTool(providers []search.SearchProvider) tool.Tool {
 	handler := func(ctx tool.Context, args SearchNewsArgs) (SearchNewsResult, error) {
-		const maxChars = 12000 // Increased limit for more context
-		const maxArticles = 60 // Increased from 25 to allow more variety
+		const maxChars = 12000
+		const maxArticles = 60
 
 		var allArticles []string
 		totalChars := 0
 
 		log.Printf("[SearchTool] Received %d queries: %v", len(args.Queries), args.Queries)
+		log.Printf("[SearchTool] Using %d search providers", len(providers))
 
-		for _, q := range args.Queries {
+		for _, query := range args.Queries {
 			if len(allArticles) >= maxArticles {
 				break
 			}
 
-			// Rate Limiting: Wait between search queries
-			log.Printf("[SearchTool] Waiting 5s before executing query: %s", q) // Reduced wait time slightly
+			// Rate limiting between queries
+			log.Printf("[SearchTool] Waiting 5s before executing query: %s", query)
 			time.Sleep(5 * time.Second)
 
-			// Tavily Search (News)
-			if tav != nil && len(allArticles) < maxArticles {
-				log.Printf("[SearchTool] Calling Tavily for query: %s", q)
-				resp, err := tav.SearchWithOptions(q, tavily.SearchOptions{
-					MaxResults: 10, // Increased from 3 to 10
-					NewsOnly:   true,
-					Days:       7,
-				})
-				if err == nil {
-					log.Printf("[SearchTool] Tavily returned %d results", len(resp.Results))
-					for _, r := range resp.Results {
-						if len(allArticles) >= maxArticles || totalChars >= maxChars {
-							break
-						}
-						// Limit content length to save tokens
-						content := r.Content
-						if len(content) > 300 {
-							content = content[:300] + "..."
-						}
-						// Explicit instruction in Source field to guide LLM
-						article := fmt.Sprintf("Title: %s\nURL: %s\nContent: %s\nSource: TAVILY (Set provider='tavily')\n---", r.Title, r.URL, content)
-						allArticles = append(allArticles, article)
-						totalChars += len(article)
-					}
-				} else {
-					log.Printf("[SearchTool] Tavily failed: %v", err)
+			// Search across all registered providers
+			for _, provider := range providers {
+				if len(allArticles) >= maxArticles || totalChars >= maxChars {
+					break
 				}
-			}
 
-			// SerpApi Search (Google News)
-			if serp != nil && len(allArticles) < maxArticles && totalChars < maxChars {
-				log.Printf("[SearchTool] Calling SerpApi (Google News) for query: %s", q)
-				resp, err := serp.SearchNews(q)
-				if err == nil {
-					log.Printf("[SearchTool] SerpApi returned %d results", len(resp.Results))
-					for i, r := range resp.Results {
-						if i >= 10 || len(allArticles) >= maxArticles || totalChars >= maxChars { // Increased from 3 to 10
-							break
-						}
-						snippet := r.Snippet
-						if len(snippet) > 300 {
-							snippet = snippet[:300] + "..."
-						}
-						// Explicit instruction in Source field
-						article := fmt.Sprintf("Title: %s\nURL: %s\nSnippet: %s\nSource: GOOGLE (Set provider='google')\n---", r.Title, r.URL, snippet)
-						allArticles = append(allArticles, article)
-						totalChars += len(article)
+				log.Printf("[SearchTool] Calling %s for query: %s", provider.Name(), query)
+				articles, err := provider.SearchNews(query, 10)
+				if err != nil {
+					log.Printf("[SearchTool] %s failed: %v", provider.Name(), err)
+					continue
+				}
+
+				log.Printf("[SearchTool] %s returned %d results", provider.Name(), len(articles))
+				for _, a := range articles {
+					if len(allArticles) >= maxArticles || totalChars >= maxChars {
+						break
 					}
-				} else {
-					log.Printf("[SearchTool] SerpApi failed: %v", err)
+
+					// Limit content length to save tokens
+					content := a.Snippet
+					if len(content) > 300 {
+						content = content[:300] + "..."
+					}
+
+					// Format article with explicit provider instruction
+					providerUpper := strings.ToUpper(a.Provider)
+					article := fmt.Sprintf("Title: %s\nURL: %s\nContent: %s\nSource: %s (Set provider='%s')\n---",
+						a.Title, a.URL, content, providerUpper, a.Provider)
+
+					allArticles = append(allArticles, article)
+					totalChars += len(article)
 				}
 			}
 		}
@@ -147,6 +145,7 @@ func NewSearchNewsTool(tav *tavily.Client, serp *serpapi.Client) tool.Tool {
 			log.Printf("[SearchTool] No articles found across all queries.")
 			return SearchNewsResult{Articles: "No articles found."}, nil
 		}
+
 		log.Printf("[SearchTool] Total unique articles collected: %d", len(allArticles))
 		return SearchNewsResult{Articles: fmt.Sprintf("Found %d articles:\n\n%s", len(allArticles), strings.Join(allArticles, "\n\n"))}, nil
 	}
@@ -157,6 +156,150 @@ func NewSearchNewsTool(tav *tavily.Client, serp *serpapi.Client) tool.Tool {
 	}, handler)
 	if err != nil {
 		log.Fatalf("Failed to create search_news tool: %v", err)
+	}
+	return t
+}
+
+// ========================================
+// scrape_content Tool
+// ========================================
+
+type ScrapeContentArgs struct {
+	URL string `json:"url"`
+}
+
+type ScrapeContentResult struct {
+	Content string `json:"content"`
+}
+
+func NewScrapeContentTool(scraper *scraper.Scraper) tool.Tool {
+	handler := func(ctx tool.Context, args ScrapeContentArgs) (ScrapeContentResult, error) {
+		log.Printf("[ScrapeContentTool] Scraping URL: %s", args.URL)
+
+		if args.URL == "" {
+			return ScrapeContentResult{}, fmt.Errorf("missing url")
+		}
+
+		content, err := scraper.Scrape(args.URL)
+		if err != nil {
+			log.Printf("[ScrapeContentTool] Scraping failed for %s: %v", args.URL, err)
+			return ScrapeContentResult{}, fmt.Errorf("scraping failed: %w", err)
+		}
+
+		log.Printf("[ScrapeContentTool] Successfully scraped %d chars from %s", len(content), args.URL)
+		return ScrapeContentResult{Content: content}, nil
+	}
+
+	t, err := functiontool.New(functiontool.Config{
+		Name:        "scrape_content",
+		Description: prompts.ToolScrapeContentDesc,
+	}, handler)
+	if err != nil {
+		log.Fatalf("Failed to create scrape_content tool: %v", err)
+	}
+	return t
+}
+
+// ========================================
+// summarize_content Tool
+// ========================================
+
+type SummarizeContentArgs struct {
+	Content string `json:"content"`
+}
+
+type SummarizeContentResult struct {
+	Summary string `json:"summary"`
+}
+
+func NewSummarizeContentTool(ai ai.Provider) tool.Tool {
+	handler := func(ctx tool.Context, args SummarizeContentArgs) (SummarizeContentResult, error) {
+		log.Printf("[SummarizeContentTool] Summarizing %d chars of content", len(args.Content))
+
+		if args.Content == "" {
+			return SummarizeContentResult{}, fmt.Errorf("missing content")
+		}
+
+		summary, err := ai.GenerateSummary(args.Content)
+		if err != nil {
+			log.Printf("[SummarizeContentTool] Summarization failed: %v", err)
+			return SummarizeContentResult{}, fmt.Errorf("summarization failed: %w", err)
+		}
+
+		log.Printf("[SummarizeContentTool] Generated summary of %d chars", len(summary))
+		return SummarizeContentResult{Summary: summary}, nil
+	}
+
+	t, err := functiontool.New(functiontool.Config{
+		Name:        "summarize_content",
+		Description: prompts.ToolSummarizeContentDesc,
+	}, handler)
+	if err != nil {
+		log.Fatalf("Failed to create summarize_content tool: %v", err)
+	}
+	return t
+}
+
+// ========================================
+// evaluate_article Tool
+// ========================================
+
+type EvaluateArticleArgs struct {
+	Summary      string `json:"summary"`
+	Interests    string `json:"interests"`
+	EvalCriteria string `json:"eval_criteria"`
+}
+
+type EvaluateArticleResult struct {
+	Score float64 `json:"score"`
+}
+
+func NewEvaluateArticleTool(ai ai.Provider) tool.Tool {
+	handler := func(ctx tool.Context, args EvaluateArticleArgs) (EvaluateArticleResult, error) {
+		log.Printf("[EvaluateArticleTool] Evaluating article summary (%d chars)", len(args.Summary))
+
+		if args.Summary == "" {
+			return EvaluateArticleResult{Score: 0.0}, nil
+		}
+
+		criteria := args.EvalCriteria
+		if criteria == "" {
+			criteria = "Ensure the article is informative, relevant to their interests, and not clickbait."
+		}
+
+		prompt := fmt.Sprintf(prompts.ArticleEvaluation, args.Interests, criteria, args.Summary)
+
+		resp, err := ai.GenerateCompletion(prompt)
+		if err != nil {
+			log.Printf("[EvaluateArticleTool] Evaluation failed: %v", err)
+			return EvaluateArticleResult{Score: 0.0}, nil // Return 0 on error instead of failing
+		}
+
+		// Parse float score
+		var score float64
+		_, err = fmt.Sscanf(strings.TrimSpace(resp), "%f", &score)
+		if err != nil {
+			log.Printf("[EvaluateArticleTool] Failed to parse score from: %s", resp)
+			return EvaluateArticleResult{Score: 0.0}, nil
+		}
+
+		// Clamp score to 0.0-1.0 range
+		if score < 0.0 {
+			score = 0.0
+		} else if score > 1.0 {
+			score = 1.0
+		}
+
+		log.Printf("[EvaluateArticleTool] Article scored: %.2f", score)
+		return EvaluateArticleResult{Score: score}, nil
+	}
+
+	t, err := functiontool.New(functiontool.Config{
+		Name:        "evaluate_article",
+		Description: prompts.ToolEvaluateArticleDesc,
+	}, handler)
+	if err != nil {
+		log.Fatalf("Failed to create evaluate_article tool: %v", err)
 	}
 	return t
 }

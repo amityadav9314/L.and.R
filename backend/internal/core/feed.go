@@ -6,35 +6,32 @@ import (
 	"log"
 	"time"
 
-	"github.com/amityadav/landr/internal/adk/feed_v2"
+	"github.com/amityadav/landr/internal/adk/feedagent"
 	"github.com/amityadav/landr/internal/ai"
 	"github.com/amityadav/landr/internal/scraper"
-	"github.com/amityadav/landr/internal/serpapi"
+	"github.com/amityadav/landr/internal/search"
 	"github.com/amityadav/landr/internal/store"
-	"github.com/amityadav/landr/internal/tavily"
 	"github.com/amityadav/landr/pkg/pb/feed"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // FeedCore handles the business logic for the Daily Feed feature
 type FeedCore struct {
-	store         *store.PostgresStore
-	tavilyClient  *tavily.Client
-	serpapiClient *serpapi.Client
-	scraper       *scraper.Scraper
-	aiProvider    ai.Provider
-	groqAPIKey    string
+	store          *store.PostgresStore
+	searchRegistry *search.Registry
+	scraper        *scraper.Scraper
+	aiProvider     ai.Provider
+	groqAPIKey     string
 }
 
 // NewFeedCore creates a new FeedCore instance
-func NewFeedCore(st *store.PostgresStore, tavilyClient *tavily.Client, serpapiClient *serpapi.Client, scraper *scraper.Scraper, aiProvider ai.Provider, groqAPIKey string) *FeedCore {
+func NewFeedCore(st *store.PostgresStore, searchRegistry *search.Registry, scraper *scraper.Scraper, aiProvider ai.Provider, groqAPIKey string) *FeedCore {
 	return &FeedCore{
-		store:         st,
-		tavilyClient:  tavilyClient,
-		serpapiClient: serpapiClient,
-		scraper:       scraper,
-		aiProvider:    aiProvider,
-		groqAPIKey:    groqAPIKey,
+		store:          st,
+		searchRegistry: searchRegistry,
+		scraper:        scraper,
+		aiProvider:     aiProvider,
+		groqAPIKey:     groqAPIKey,
 	}
 }
 
@@ -155,24 +152,23 @@ func (c *FeedCore) GenerateDailyFeedForUser(ctx context.Context, userID string) 
 		return nil
 	}
 
-	// 3. Run V2 Workflow
-	log.Printf("[FeedCore.GenerateDailyFeedForUser] Starting Feed V2 Workflow for user %s...", userID)
+	// 3. Run ADK Agent (V2 Workflow)
+	log.Printf("[FeedCore.GenerateDailyFeedForUser] Starting Feed V2 Agent for user %s...", userID)
 
-	deps := feed_v2.WorkflowDependencies{
-		Store:     c.store,
-		Tavily:    c.tavilyClient,
-		SerpApi:   c.serpapiClient,
-		Scraper:   c.scraper,
-		AI:        c.aiProvider,
-		GroqModel: "current-best",
+	deps := feedagent.Dependencies{
+		Store:           c.store,
+		SearchProviders: c.searchRegistry.GetAll(),
+		Scraper:         c.scraper,
+		AIProvider:      c.aiProvider,
+		GroqAPIKey:      c.groqAPIKey,
 	}
 
-	workflow := feed_v2.NewWorkflow(deps, feed_v2.DefaultConfig)
-	if err := workflow.Run(ctx, userID); err != nil {
-		return fmt.Errorf("feed v2 workflow failed: %w", err)
+	result, err := feedagent.Run(ctx, deps, userID)
+	if err != nil {
+		return fmt.Errorf("feed agent failed: %w", err)
 	}
 
-	log.Printf("[FeedCore.GenerateDailyFeedForUser] V2 Workflow completed.")
+	log.Printf("[FeedCore.GenerateDailyFeedForUser] Agent completed: %s", result.Summary)
 	return nil
 }
 

@@ -17,9 +17,11 @@ import (
 
 // WorkflowDependencies holds all services needed for the V2 feed workflow
 type WorkflowDependencies struct {
-	Store     *store.PostgresStore
-	Tavily    *tavily.Client
-	SerpApi   *serpapi.Client
+	Store *store.PostgresStore
+	// TODO we have have n numaber of providers for search, should we keep on adding them here???
+	Tavily  *tavily.Client
+	SerpApi *serpapi.Client
+
 	Scraper   *scraper.Scraper
 	AI        ai.Provider
 	GroqModel string // e.g. "llama-3.3-70b-versatile"
@@ -34,6 +36,7 @@ type Config struct {
 }
 
 var DefaultConfig = Config{
+	// TODO - should we not keep this in constants file??
 	MaxArticlesPerDay: 10,
 	SearchMaxResults:  10,
 	MinRelevanceScore: 0.6,
@@ -130,6 +133,7 @@ type CandidateURL struct {
 func (w *Workflow) searchParameters(query string) []CandidateURL {
 	var candidates []CandidateURL
 
+	// TODO we must have a list of providers somewhere in some contants. Then we must loop over those providers and run all steps below.
 	// 1. Tavily
 	if w.deps.Tavily != nil {
 		log.Printf("[FeedV2] Searching Tavily (Sync)...")
@@ -248,6 +252,7 @@ func (w *Workflow) processCandidates(ctx context.Context, userID string, candida
 // AI Helpers (Wrappers around AI Provider)
 
 func (w *Workflow) generateSearchQuery(ctx context.Context, interests string) (string, error) {
+	// TODO - we must use package prompts. There is already one written over there, please check and merge and use that
 	prompt := fmt.Sprintf(`You are a news curator. The user likes: "%s".
 Generate ONE specific, high-quality search query to find recent news articles for this user.
 The query MUST be under 350 characters.
@@ -277,6 +282,7 @@ func (w *Workflow) evaluateArticle(ctx context.Context, summary, interests, eval
 		criteria = "Ensure the article is informative, relevant to their interests, and not clickbait."
 	}
 
+	// TODO - we must use package prompts. There is already one written over there, please check and merge and use that
 	prompt := fmt.Sprintf(`Evaluate this article summary for a user.
 User Interests: "%s"
 Evaluation Criteria: "%s"
