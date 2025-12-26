@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/amityadav/landr/internal/ai"
+	"github.com/amityadav/landr/internal/ai/models"
 	"github.com/amityadav/landr/internal/core"
 	"github.com/amityadav/landr/internal/firebase"
 	"github.com/amityadav/landr/internal/middleware"
@@ -68,23 +69,47 @@ func main() {
 
 	// Learning - Multi-provider AI (Groq + Cerebras racing in parallel)
 	scr := scraper.NewScraper()
-	var aiProvider ai.Provider
-	if groqAPIKey != "" && cerebrasAPIKey != "" {
-		// Both keys available - use multi-provider (parallel race)
-		log.Printf("Using multi-provider AI: Groq + Cerebras (parallel)")
-		groq := ai.NewGroqProvider(groqAPIKey)
-		cerebras := ai.NewCerebrasProvider(cerebrasAPIKey)
-		aiProvider = ai.NewMultiProvider(groq, cerebras)
-	} else if groqAPIKey != "" {
-		log.Printf("Using single provider: Groq")
-		aiProvider = ai.NewGroqProvider(groqAPIKey)
+	// Learning - Multi-provider AI (Groq + Cerebras racing in parallel)
+	var learningProvider ai.Provider
+	var feedProvider ai.Provider // Distinct provider for Feed Agent
+
+	// Helper to create safe provider (fallback logic could be added here)
+	createProvider := func(name, key, model string) ai.Provider {
+		return ai.NewLLMProvider(name, key, model)
+	}
+
+	if groqAPIKey != "" {
+		log.Printf("Initializing AI Providers (Primary: Groq)")
+
+		// 1. Learning Provider (Flashcards) - uses TaskFlashcardModel (GPT-OSS)
+		// If we have Cerebras too, we can still use MultiProvider for race, or just simple Groq.
+		// For simplicity/robustness, let's stick to Groq for Learning unless Multi is desired.
+		// Detailed requirement: "Feed uses Qwen, Flashcards uses GPT-OSS"
+
+		groqFlashcard := createProvider("groq", groqAPIKey, models.TaskFlashcardModel)
+
+		if cerebrasAPIKey != "" {
+			// Multi-provider race for Flashcards (Speed)
+			cerebrasFlashcard := createProvider("cerebras", cerebrasAPIKey, models.TaskFlashcardModel)
+			learningProvider = ai.NewMultiProvider(groqFlashcard, cerebrasFlashcard)
+		} else {
+			learningProvider = groqFlashcard
+		}
+
+		// 2. Feed Provider (Agent) - uses TaskAgentDailyFeedModel (Qwen/Llama)
+		// Agent needs robust model, avoiding MultiProvider race race complexity for stateful agent.
+		feedProvider = createProvider("groq", groqAPIKey, models.TaskAgentDailyFeedModel)
+
 	} else if cerebrasAPIKey != "" {
-		log.Printf("Using single provider: Cerebras")
-		aiProvider = ai.NewCerebrasProvider(cerebrasAPIKey)
+		log.Printf("Initializing AI Providers (Primary: Cerebras)")
+		// Fallback to Cerebras for everything
+		learningProvider = createProvider("cerebras", cerebrasAPIKey, models.TaskFlashcardModel)
+		feedProvider = createProvider("cerebras", cerebrasAPIKey, models.TaskAgentDailyFeedModel)
 	} else {
 		log.Fatal("No AI provider configured. Set GROQ_API_KEY or CEREBRAS_API_KEY")
 	}
-	learningCore := core.NewLearningCore(st, scr, aiProvider)
+
+	learningCore := core.NewLearningCore(st, scr, learningProvider)
 	learningSvc := service.NewLearningService(learningCore, st)
 
 	// Feed Service (requires Tavily or SerpApi API key)
@@ -103,7 +128,7 @@ func main() {
 			serpapiClient = serpapi.NewClient(serpapiAPIKey)
 		}
 
-		feedCore = core.NewFeedCore(st, tavilyClient, serpapiClient, aiProvider, groqAPIKey)
+		feedCore = core.NewFeedCore(st, tavilyClient, serpapiClient, scr, feedProvider, groqAPIKey)
 		feedSvc = service.NewFeedService(feedCore)
 	} else {
 		log.Printf("Daily Feed feature disabled (no TAVILY_API_KEY or SERPAPI_API_KEY)")

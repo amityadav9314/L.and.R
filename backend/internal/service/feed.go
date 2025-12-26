@@ -26,7 +26,7 @@ func (s *FeedService) UpdateFeedPreferences(ctx context.Context, req *feed.Updat
 	if err != nil {
 		return nil, err
 	}
-	err = s.core.UpdateFeedPreferences(ctx, userID, req.InterestPrompt, req.FeedEnabled)
+	err = s.core.UpdateFeedPreferences(ctx, userID, req.InterestPrompt, req.FeedEvalPrompt, req.FeedEnabled)
 	if err != nil {
 		return nil, err
 	}

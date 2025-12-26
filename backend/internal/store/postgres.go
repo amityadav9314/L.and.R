@@ -56,6 +56,16 @@ func (s *PostgresStore) GetUserByGoogleID(ctx context.Context, googleID string) 
 	return &user, nil
 }
 
+func (s *PostgresStore) GetUserByID(ctx context.Context, userID string) (*auth.UserProfile, error) {
+	query := `SELECT id, email, name, picture FROM users WHERE id = $1`
+	row := s.db.QueryRow(ctx, query, userID)
+	var user auth.UserProfile
+	if err := row.Scan(&user.Id, &user.Email, &user.Name, &user.Picture); err != nil {
+		return nil, fmt.Errorf("failed to get user: %w", err)
+	}
+	return &user, nil
+}
+
 func (s *PostgresStore) CreateMaterial(ctx context.Context, userID, matType, content, title, sourceURL string) (string, error) {
 	log.Printf("[Store.CreateMaterial] Inserting material - UserID: %s, Type: %s, Title: %s", userID, matType, title)
 	query := `
@@ -485,14 +495,15 @@ func (s *PostgresStore) UpdateMaterialSummary(ctx context.Context, materialID, s
 type FeedPreferences struct {
 	InterestPrompt string
 	FeedEnabled    bool
+	FeedEvalPrompt string
 }
 
 // GetFeedPreferences fetches the user's feed preferences
 func (s *PostgresStore) GetFeedPreferences(ctx context.Context, userID string) (*FeedPreferences, error) {
 	log.Printf("[Store.GetFeedPreferences] Fetching for userID: %s", userID)
-	query := `SELECT COALESCE(interest_prompt, ''), COALESCE(feed_enabled, FALSE) FROM users WHERE id = $1`
+	query := `SELECT COALESCE(interest_prompt, ''), COALESCE(feed_enabled, FALSE), COALESCE(feed_eval_prompt, '') FROM users WHERE id = $1`
 	var prefs FeedPreferences
-	err := s.db.QueryRow(ctx, query, userID).Scan(&prefs.InterestPrompt, &prefs.FeedEnabled)
+	err := s.db.QueryRow(ctx, query, userID).Scan(&prefs.InterestPrompt, &prefs.FeedEnabled, &prefs.FeedEvalPrompt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get feed preferences: %w", err)
 	}
@@ -500,10 +511,10 @@ func (s *PostgresStore) GetFeedPreferences(ctx context.Context, userID string) (
 }
 
 // UpdateFeedPreferences updates the user's feed preferences
-func (s *PostgresStore) UpdateFeedPreferences(ctx context.Context, userID, interestPrompt string, feedEnabled bool) error {
+func (s *PostgresStore) UpdateFeedPreferences(ctx context.Context, userID, interestPrompt, evalPrompt string, feedEnabled bool) error {
 	log.Printf("[Store.UpdateFeedPreferences] Updating for userID: %s, enabled: %v", userID, feedEnabled)
-	query := `UPDATE users SET interest_prompt = $1, feed_enabled = $2, updated_at = NOW() WHERE id = $3`
-	_, err := s.db.Exec(ctx, query, interestPrompt, feedEnabled, userID)
+	query := `UPDATE users SET interest_prompt = $1, feed_eval_prompt = $2, feed_enabled = $3, updated_at = NOW() WHERE id = $4`
+	_, err := s.db.Exec(ctx, query, interestPrompt, evalPrompt, feedEnabled, userID)
 	if err != nil {
 		return fmt.Errorf("failed to update feed preferences: %w", err)
 	}
@@ -538,7 +549,7 @@ func (s *PostgresStore) StoreDailyArticle(ctx context.Context, userID string, ar
 
 // GetDailyArticles fetches articles for a specific date
 func (s *PostgresStore) GetDailyArticles(ctx context.Context, userID string, date time.Time) ([]*DailyArticle, error) {
-	log.Printf("[Store.GetDailyArticles] Fetching for userID: %s, date: %s", userID, date.Format("2006-01-02"))
+	log.Printf("[Store.GetDailyArticles] Fetching for userID: %s, date param: %v (Unix: %d)", userID, date, date.Unix())
 	query := `
 		SELECT id, title, url, snippet, relevance_score, suggested_date, created_at, provider
 		FROM daily_articles

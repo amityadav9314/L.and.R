@@ -6,8 +6,9 @@ import (
 	"log"
 	"time"
 
-	"github.com/amityadav/landr/internal/adk/feedagent"
+	"github.com/amityadav/landr/internal/adk/feed_v2"
 	"github.com/amityadav/landr/internal/ai"
+	"github.com/amityadav/landr/internal/scraper"
 	"github.com/amityadav/landr/internal/serpapi"
 	"github.com/amityadav/landr/internal/store"
 	"github.com/amityadav/landr/internal/tavily"
@@ -20,16 +21,18 @@ type FeedCore struct {
 	store         *store.PostgresStore
 	tavilyClient  *tavily.Client
 	serpapiClient *serpapi.Client
+	scraper       *scraper.Scraper
 	aiProvider    ai.Provider
 	groqAPIKey    string
 }
 
 // NewFeedCore creates a new FeedCore instance
-func NewFeedCore(st *store.PostgresStore, tavilyClient *tavily.Client, serpapiClient *serpapi.Client, aiProvider ai.Provider, groqAPIKey string) *FeedCore {
+func NewFeedCore(st *store.PostgresStore, tavilyClient *tavily.Client, serpapiClient *serpapi.Client, scraper *scraper.Scraper, aiProvider ai.Provider, groqAPIKey string) *FeedCore {
 	return &FeedCore{
 		store:         st,
 		tavilyClient:  tavilyClient,
 		serpapiClient: serpapiClient,
+		scraper:       scraper,
 		aiProvider:    aiProvider,
 		groqAPIKey:    groqAPIKey,
 	}
@@ -44,12 +47,13 @@ func (c *FeedCore) GetFeedPreferences(ctx context.Context, userID string) (*feed
 	return &feed.FeedPreferencesResponse{
 		InterestPrompt: prefs.InterestPrompt,
 		FeedEnabled:    prefs.FeedEnabled,
+		FeedEvalPrompt: prefs.FeedEvalPrompt, // V2 added
 	}, nil
 }
 
 // UpdateFeedPreferences updates the user's feed preferences
-func (c *FeedCore) UpdateFeedPreferences(ctx context.Context, userID, interestPrompt string, feedEnabled bool) error {
-	return c.store.UpdateFeedPreferences(ctx, userID, interestPrompt, feedEnabled)
+func (c *FeedCore) UpdateFeedPreferences(ctx context.Context, userID, interestPrompt, evalPrompt string, feedEnabled bool) error {
+	return c.store.UpdateFeedPreferences(ctx, userID, interestPrompt, evalPrompt, feedEnabled)
 }
 
 // GetDailyFeed fetches articles for a specific date
@@ -125,7 +129,7 @@ func (c *FeedCore) GetFeedCalendarStatus(ctx context.Context, userID, monthStr s
 func (c *FeedCore) GenerateDailyFeedForUser(ctx context.Context, userID string) error {
 	log.Printf("[FeedCore.GenerateDailyFeedForUser] Starting for userID: %s", userID)
 
-	// 1. Get user's interest prompt (Quick check before starting heavy agent)
+	// 1. Get user's interest prompt (Quick check before starting heavy workflow)
 	prefs, err := c.store.GetFeedPreferences(ctx, userID)
 	if err != nil {
 		return fmt.Errorf("failed to get feed preferences: %w", err)
@@ -137,12 +141,11 @@ func (c *FeedCore) GenerateDailyFeedForUser(ctx context.Context, userID string) 
 
 	log.Printf("[FeedCore.GenerateDailyFeedForUser] User interests: %s", prefs.InterestPrompt)
 
-	// Check existing articles to avoid duplicate API calls
-	// Fail-open: If DB query fails, existingArticles will be nil/empty and we proceed with generation.
+	// Check existing articles
 	today := time.Now().Truncate(24 * time.Hour)
 	existingArticles, err := c.store.GetDailyArticles(ctx, userID, today)
 	if err != nil {
-		log.Printf("[FeedCore.GenerateDailyFeedForUser] Error checking existing articles (proceeding anyway): %v", err)
+		log.Printf("[FeedCore.GenerateDailyFeedForUser] Error checking existing articles: %v", err)
 	}
 
 	// Minimum articles before skipping regeneration
@@ -152,44 +155,25 @@ func (c *FeedCore) GenerateDailyFeedForUser(ctx context.Context, userID string) 
 		return nil
 	}
 
-	// 3. Run Google ADK Agent
-	log.Printf("[FeedCore.GenerateDailyFeedForUser] Starting AI Agent for user %s...", userID)
+	// 3. Run V2 Workflow
+	log.Printf("[FeedCore.GenerateDailyFeedForUser] Starting Feed V2 Workflow for user %s...", userID)
 
-	deps := feedagent.Dependencies{
-		Store:      c.store,
-		Tavily:     c.tavilyClient,
-		SerpApi:    c.serpapiClient,
-		GroqAPIKey: c.groqAPIKey,
+	deps := feed_v2.WorkflowDependencies{
+		Store:     c.store,
+		Tavily:    c.tavilyClient,
+		SerpApi:   c.serpapiClient,
+		Scraper:   c.scraper,
+		AI:        c.aiProvider,
+		GroqModel: "current-best",
 	}
 
-	result, err := feedagent.Run(ctx, deps, userID)
-	if err != nil {
-		return fmt.Errorf("agent run failed: %w", err)
+	workflow := feed_v2.NewWorkflow(deps, feed_v2.DefaultConfig)
+	if err := workflow.Run(ctx, userID); err != nil {
+		return fmt.Errorf("feed v2 workflow failed: %w", err)
 	}
 
-	log.Printf("[FeedCore.GenerateDailyFeedForUser] Agent completed. Summary: %s", result.Summary)
+	log.Printf("[FeedCore.GenerateDailyFeedForUser] V2 Workflow completed.")
 	return nil
-}
-
-// storeArticle is a helper to check existence and store a daily article
-func (c *FeedCore) storeArticle(ctx context.Context, userID, title, url, snippet string, score float64, provider string, date time.Time) error {
-	exists, err := c.store.ArticleURLExists(ctx, userID, url)
-	if err != nil {
-		log.Printf("[FeedCore.storeArticle] Error checking URL: %v", err)
-	}
-	if exists {
-		return fmt.Errorf("skipped")
-	}
-
-	article := &store.DailyArticle{
-		Title:          title,
-		URL:            url,
-		Snippet:        snippet,
-		RelevanceScore: score,
-		SuggestedDate:  date,
-		Provider:       provider,
-	}
-	return c.store.StoreDailyArticle(ctx, userID, article)
 }
 
 // GenerateDailyFeedForAllUsers runs the feed generation for all enabled users

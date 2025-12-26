@@ -17,6 +17,7 @@ export const SettingsScreen = () => {
     // Feed Preferences State
     const [feedEnabled, setFeedEnabled] = useState(false);
     const [interestPrompt, setInterestPrompt] = useState('');
+    const [evalPrompt, setEvalPrompt] = useState('');
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
 
@@ -27,6 +28,7 @@ export const SettingsScreen = () => {
                 const prefs = await feedClient.getFeedPreferences();
                 setFeedEnabled(prefs.feedEnabled);
                 setInterestPrompt(prefs.interestPrompt);
+                setEvalPrompt(prefs.feedEvalPrompt);
             } catch (error) {
                 console.log('Failed to load feed preferences:', error);
             } finally {
@@ -43,6 +45,7 @@ export const SettingsScreen = () => {
             await feedClient.updateFeedPreferences({
                 feedEnabled,
                 interestPrompt,
+                feedEvalPrompt: evalPrompt,
             });
             Alert.alert('Success ✅', 'Your feed preferences have been saved!');
         } catch (error) {
@@ -98,6 +101,7 @@ export const SettingsScreen = () => {
                                                 await feedClient.updateFeedPreferences({
                                                     feedEnabled: value,
                                                     interestPrompt,
+                                                    feedEvalPrompt: evalPrompt,
                                                 });
                                                 // Invalidate cache so DailyFeedScreen refetches
                                                 queryClient.invalidateQueries({ queryKey: ['feedPreferences'] });
@@ -131,6 +135,23 @@ export const SettingsScreen = () => {
                                             multiline
                                             numberOfLines={3}
                                         />
+
+                                        <View style={[styles.divider, { marginVertical: 16 }]} />
+
+                                        <Text style={styles.inputLabel}>Evaluation Criteria (Optional)</Text>
+                                        <Text style={styles.inputHint}>
+                                            Define how the AI should score articles. E.g., "Must be technical and detailed", "Avoid marketing fluff", "Score high for tutorials".
+                                        </Text>
+                                        <TextInput
+                                            style={styles.textInput}
+                                            placeholder="Enter evaluation criteria..."
+                                            placeholderTextColor={colors.textSecondary}
+                                            value={evalPrompt}
+                                            onChangeText={setEvalPrompt}
+                                            multiline
+                                            numberOfLines={2}
+                                        />
+
                                         <TouchableOpacity
                                             style={[styles.saveButton, saving && styles.saveButtonDisabled]}
                                             onPress={saveFeedPreferences}

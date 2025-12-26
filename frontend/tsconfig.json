@@ -9,6 +9,7 @@
   },
   "exclude": [
     "**/*.native.ts",
-    "**/*.native.tsx"
+    "**/*.native.tsx",
+    "desktop"
   ]
 }

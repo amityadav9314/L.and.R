@@ -24,11 +24,13 @@ service FeedService {
 message UpdateFeedPreferencesRequest {
   string interest_prompt = 1;
   bool feed_enabled = 2;
+  string feed_eval_prompt = 3;
 }
 
 message FeedPreferencesResponse {
   string interest_prompt = 1;
   bool feed_enabled = 2;
+  string feed_eval_prompt = 3;
 }
 
 message GetDailyFeedRequest {

@@ -27,6 +27,7 @@ type UpdateFeedPreferencesRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	InterestPrompt string                 `protobuf:"bytes,1,opt,name=interest_prompt,json=interestPrompt,proto3" json:"interest_prompt,omitempty"`
 	FeedEnabled    bool                   `protobuf:"varint,2,opt,name=feed_enabled,json=feedEnabled,proto3" json:"feed_enabled,omitempty"`
+	FeedEvalPrompt string                 `protobuf:"bytes,3,opt,name=feed_eval_prompt,json=feedEvalPrompt,proto3" json:"feed_eval_prompt,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -75,10 +76,18 @@ func (x *UpdateFeedPreferencesRequest) GetFeedEnabled() bool {
 	return false
 }
 
+func (x *UpdateFeedPreferencesRequest) GetFeedEvalPrompt() string {
+	if x != nil {
+		return x.FeedEvalPrompt
+	}
+	return ""
+}
+
 type FeedPreferencesResponse struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	InterestPrompt string                 `protobuf:"bytes,1,opt,name=interest_prompt,json=interestPrompt,proto3" json:"interest_prompt,omitempty"`
 	FeedEnabled    bool                   `protobuf:"varint,2,opt,name=feed_enabled,json=feedEnabled,proto3" json:"feed_enabled,omitempty"`
+	FeedEvalPrompt string                 `protobuf:"bytes,3,opt,name=feed_eval_prompt,json=feedEvalPrompt,proto3" json:"feed_eval_prompt,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -125,6 +134,13 @@ func (x *FeedPreferencesResponse) GetFeedEnabled() bool {
 		return x.FeedEnabled
 	}
 	return false
+}
+
+func (x *FeedPreferencesResponse) GetFeedEvalPrompt() string {
+	if x != nil {
+		return x.FeedEvalPrompt
+	}
+	return ""
 }
 
 type GetDailyFeedRequest struct {
@@ -469,13 +485,15 @@ var File_backend_proto_feed_feed_proto protoreflect.FileDescriptor
 
 const file_backend_proto_feed_feed_proto_rawDesc = "" +
 	"\n" +
-	"\x1dbackend/proto/feed/feed.proto\x12\x04feed\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"j\n" +
+	"\x1dbackend/proto/feed/feed.proto\x12\x04feed\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x94\x01\n" +
 	"\x1cUpdateFeedPreferencesRequest\x12'\n" +
 	"\x0finterest_prompt\x18\x01 \x01(\tR\x0einterestPrompt\x12!\n" +
-	"\ffeed_enabled\x18\x02 \x01(\bR\vfeedEnabled\"e\n" +
+	"\ffeed_enabled\x18\x02 \x01(\bR\vfeedEnabled\x12(\n" +
+	"\x10feed_eval_prompt\x18\x03 \x01(\tR\x0efeedEvalPrompt\"\x8f\x01\n" +
 	"\x17FeedPreferencesResponse\x12'\n" +
 	"\x0finterest_prompt\x18\x01 \x01(\tR\x0einterestPrompt\x12!\n" +
-	"\ffeed_enabled\x18\x02 \x01(\bR\vfeedEnabled\")\n" +
+	"\ffeed_enabled\x18\x02 \x01(\bR\vfeedEnabled\x12(\n" +
+	"\x10feed_eval_prompt\x18\x03 \x01(\tR\x0efeedEvalPrompt\")\n" +
 	"\x13GetDailyFeedRequest\x12\x12\n" +
 	"\x04date\x18\x01 \x01(\tR\x04date\"\xf6\x01\n" +
 	"\aArticle\x12\x0e\n" +

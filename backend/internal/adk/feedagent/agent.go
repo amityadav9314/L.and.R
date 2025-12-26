@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/amityadav/landr/internal/adk/tools"
+	"github.com/amityadav/landr/internal/ai/models"
 	"github.com/amityadav/landr/internal/serpapi"
 	"github.com/amityadav/landr/internal/store"
 	"github.com/amityadav/landr/internal/tavily"
@@ -32,9 +33,12 @@ type Dependencies struct {
 // New creates a new Daily Feed Agent
 func New(ctx context.Context, deps Dependencies) (agent.Agent, error) {
 	// 1. Initialize custom Groq Model Adapter
+	modelName := models.TaskAgentDailyFeedModel
+	log.Printf("[DailyFeedAgent] Initializing with model: %s", modelName)
+
 	modelAdapter := groq.NewModel(groq.Config{
-		APIKey: deps.GroqAPIKey,
-		// Uses defaults: Groq endpoint and gpt-oss-120b
+		APIKey:    deps.GroqAPIKey,
+		ModelName: modelName,
 	})
 
 	// 2. Define Tools using internal/adk/tools package
@@ -79,7 +83,27 @@ func Run(ctx context.Context, deps Dependencies, userID string) (*RunResult, err
 	}
 
 	// Prepare Input
-	sessionID := userID + "-" + time.Now().Format("20060102")
+	user, err := deps.Store.GetUserByID(ctx, userID)
+	if err != nil {
+		log.Printf("[DailyFeedAgent] Warning: could not fetch user email for logging: %v", err)
+	}
+	userEmail := "unknown"
+	if user != nil {
+		userEmail = user.Email
+	}
+
+	sessionID := fmt.Sprintf("%s-%s-%s", userID, userEmail, time.Now().Format("20060102-150405"))
+
+	// Create session
+	_, err = sessionSvc.Create(ctx, &session.CreateRequest{
+		AppName:   "DailyFeed",
+		UserID:    userID,
+		SessionID: sessionID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create session: %w", err)
+	}
+
 	inputMsg := &genai.Content{
 		Role: "user",
 		Parts: []*genai.Part{
@@ -88,7 +112,7 @@ func Run(ctx context.Context, deps Dependencies, userID string) (*RunResult, err
 	}
 
 	// Execute Run
-	log.Printf("[DailyFeedAgent] Starting run for user %s", userID)
+	log.Printf("[DailyFeedAgent] Starting run for User: %s (%s) | Model: %s", userEmail, userID, models.TaskAgentDailyFeedModel)
 
 	var finalResponse string
 

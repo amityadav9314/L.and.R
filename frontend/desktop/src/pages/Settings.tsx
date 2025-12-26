@@ -10,6 +10,7 @@ const Settings = () => {
     const { user } = useAuthStore();
     const [enabled, setEnabled] = useState(false);
     const [interestPrompt, setInterestPrompt] = useState('');
+    const [evalPrompt, setEvalPrompt] = useState('');
     const [saved, setSaved] = useState(false);
 
     const { data: prefs, isLoading } = useQuery({
@@ -21,11 +22,12 @@ const Settings = () => {
         if (prefs) {
             setEnabled(prefs.feedEnabled);
             setInterestPrompt(prefs.interestPrompt || '');
+            setEvalPrompt(prefs.feedEvalPrompt || '');
         }
     }, [prefs]);
 
     const updateMutation = useMutation({
-        mutationFn: () => feedClient.updateFeedPreferences({ feedEnabled: enabled, interestPrompt }),
+        mutationFn: () => feedClient.updateFeedPreferences({ feedEnabled: enabled, interestPrompt, feedEvalPrompt: evalPrompt }),
         onSuccess: () => {
             setSaved(true);
             queryClient.invalidateQueries({ queryKey: ['feedPreferences'] });
@@ -102,6 +104,20 @@ const Settings = () => {
                                         value={interestPrompt}
                                         onChange={(e) => setInterestPrompt(e.target.value)}
                                         placeholder="Enter your interests..."
+                                        disabled={!enabled}
+                                        className="rounded-3 border-light bg-light"
+                                    />
+                                </Form.Group>
+
+                                <Form.Group className="mb-4">
+                                    <Form.Label className="fw-bold">Evaluation Criteria (Optional)</Form.Label>
+                                    <p className="small text-muted mb-2">Define how the AI should evaluate articles (e.g., "Must be technical and deep dive", "Avoid clickbait", "Focus on practical tutorials").</p>
+                                    <Form.Control
+                                        as="textarea"
+                                        rows={2}
+                                        value={evalPrompt}
+                                        onChange={(e) => setEvalPrompt(e.target.value)}
+                                        placeholder="Enter evaluation criteria..."
                                         disabled={!enabled}
                                         className="rounded-3 border-light bg-light"
                                     />

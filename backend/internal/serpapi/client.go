@@ -107,6 +107,7 @@ func (c *Client) SearchNews(query string) (*SearchResponse, error) {
 		"q":      query,
 		"gl":     "us",
 		"hl":     "en",
+		"num":    "10", // Limit to 10 results per query as requested
 	}
 
 	log.Printf("[SerpApi] Searching News for: %q", query)
@@ -153,7 +154,10 @@ func (c *Client) SearchNews(query string) (*SearchResponse, error) {
 		})
 	}
 
-	log.Printf("[SerpApi] Found %d news results", len(resultsList))
+	log.Printf("[SerpApi] Found %d news results (truncating to 10)", len(resultsList))
+	if len(resultsList) > 10 {
+		resultsList = resultsList[:10]
+	}
 	return &SearchResponse{
 		Results: resultsList,
 	}, nil

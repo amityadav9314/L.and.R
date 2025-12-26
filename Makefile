@@ -1,4 +1,4 @@
-.PHONY: help build start-backend start-frontend desktop deploy-desktop apk stop db-start db-stop migrate-up proto
+.PHONY: help build test-agent start-backend start-frontend desktop deploy-desktop apk stop db-start db-stop migrate-up proto
 
 # Variables
 BACKEND_DIR := backend
@@ -20,6 +20,7 @@ help:
 	@echo "  make android-debug   - Build debug APK only"
 	@echo "  make android-install - Install debug APK on emulator/device"
 	@echo "  make stop            - Stop all servers"
+	@echo "  make test-agent      - Run agent test with mocked Tavily/SerpApi"
 	@echo "  make db-start        - Start PostgreSQL (Docker)"
 	@echo "  make proto           - Generate proto files"
 	@echo ""
@@ -38,6 +39,15 @@ build:
 	@echo "✅ Desktop type check passed"
 	@echo ""
 	@echo "🎉 Build complete!"
+
+# ============================================
+# TESTING (Agent with mocked search APIs)
+# ============================================
+test-agent:
+	@echo "🧪 Running Agent Test (Mocked Search)..."
+	@echo "   Uses: REAL Groq, REAL DB, MOCKED Tavily/SerpApi"
+	@cd $(BACKEND_DIR) && go test -v -timeout 15m ./internal/adk/feedagent/...
+	@echo "✅ Test complete!"
 
 # ============================================
 # BACKEND

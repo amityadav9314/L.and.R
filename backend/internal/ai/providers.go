@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/amityadav/landr/internal/ai/models"
 	"github.com/amityadav/landr/pkg/pb/learning"
 	"github.com/amityadav/landr/prompts"
 )
@@ -21,6 +22,7 @@ type Provider interface {
 	GenerateSummary(content string) (string, error)
 	ExtractTextFromImage(base64Image string) (string, error)
 	OptimizeSearchQuery(userInterests string) (string, error) // Convert user interests to optimized search query
+	GenerateCompletion(prompt string) (string, error)         // Generic completion for V2 Agent
 }
 
 // ProviderConfig holds configuration for a provider
@@ -182,7 +184,7 @@ func (p *BaseProvider) GenerateFlashcards(content string, existingTags []string)
 
 // GenerateSummary implements summary generation
 func (p *BaseProvider) GenerateSummary(content string) (string, error) {
-	maxLen := 25000
+	maxLen := 12000
 	// Use centralized truncation
 	content = TruncateToLimit(content, maxLen)
 
@@ -196,6 +198,17 @@ func (p *BaseProvider) GenerateSummary(content string) (string, error) {
 	}
 
 	return p.SendRequest(reqBody, "Summary")
+}
+
+// GenerateCompletion implements generic chat completion
+func (p *BaseProvider) GenerateCompletion(prompt string) (string, error) {
+	reqBody := chatRequest{
+		Model: p.config.TextModel,
+		Messages: []interface{}{
+			textMessage{Role: "user", Content: prompt},
+		},
+	}
+	return p.SendRequest(reqBody, "Completion")
 }
 
 // ExtractTextFromImage implements OCR using vision model
@@ -328,26 +341,43 @@ func (m *MultiProvider) OptimizeSearchQuery(userInterests string) (string, error
 	return m.primary.OptimizeSearchQuery(userInterests)
 }
 
-// Convenience constructors for specific providers
-
-// NewGroqProvider creates a Groq provider
-func NewGroqProvider(apiKey string) *BaseProvider {
-	return NewBaseProvider(ProviderConfig{
-		Name:        "Groq",
-		BaseURL:     "https://api.groq.com/openai/v1/chat/completions",
-		APIKey:      apiKey,
-		TextModel:   "openai/gpt-oss-120b",
-		VisionModel: "meta-llama/llama-4-scout-17b-16e-instruct",
-	})
+// GenerateCompletion uses primary provider
+func (m *MultiProvider) GenerateCompletion(prompt string) (string, error) {
+	return m.primary.GenerateCompletion(prompt)
 }
 
-// NewCerebrasProvider creates a Cerebras provider
-func NewCerebrasProvider(apiKey string) *BaseProvider {
-	return NewBaseProvider(ProviderConfig{
-		Name:        "Cerebras",
-		BaseURL:     "https://api.cerebras.ai/v1/chat/completions",
-		APIKey:      apiKey,
-		TextModel:   "gpt-oss-120b",
-		VisionModel: "", // Cerebras doesn't have vision model
-	})
+// Convenience constructors for specific providers
+
+// NewLLMProvider creates a provider instance based on the provider name
+// Supported providers: "groq", "cerebras"
+func NewLLMProvider(providerName, apiKey, modelID string) *BaseProvider {
+	switch providerName {
+	case "groq":
+		return NewBaseProvider(ProviderConfig{
+			Name:        "Groq",
+			BaseURL:     "https://api.groq.com/openai/v1/chat/completions",
+			APIKey:      apiKey,
+			TextModel:   modelID,                // Caller specified
+			VisionModel: models.TaskVisionModel, // Default for now
+		})
+	case "cerebras":
+		return NewBaseProvider(ProviderConfig{
+			Name:        "Cerebras",
+			BaseURL:     "https://api.cerebras.ai/v1/chat/completions",
+			APIKey:      apiKey,
+			TextModel:   modelID, // Caller specified
+			VisionModel: "",      // Cerebras doesn't have vision model
+		})
+	default:
+		// Default to Groq if unknown, or could panic/return nil.
+		// For safety in this codebase, let's default to Groq but log?
+		// Actually, standardizing on Groq as safe default is okay if API key works.
+		return NewBaseProvider(ProviderConfig{
+			Name:        "Unknown(Groq)",
+			BaseURL:     "https://api.groq.com/openai/v1/chat/completions",
+			APIKey:      apiKey,
+			TextModel:   modelID,
+			VisionModel: models.TaskVisionModel,
+		})
+	}
 }

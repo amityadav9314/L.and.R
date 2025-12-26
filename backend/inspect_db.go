@@ -16,7 +16,7 @@ func main() {
 	}
 	defer db.Close()
 
-	tables := []string{"users", "materials", "flashcards", "tags", "material_tags"}
+	tables := []string{"users", "materials", "flashcards", "tags", "material_tags", "daily_articles"}
 	for _, table := range tables {
 		fmt.Printf("Checking table: %s\n", table)
 		var tableName string

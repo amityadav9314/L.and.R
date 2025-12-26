@@ -15,11 +15,13 @@ export const protobufPackage = "feed";
 export interface UpdateFeedPreferencesRequest {
   interestPrompt: string;
   feedEnabled: boolean;
+  feedEvalPrompt: string;
 }
 
 export interface FeedPreferencesResponse {
   interestPrompt: string;
   feedEnabled: boolean;
+  feedEvalPrompt: string;
 }
 
 export interface GetDailyFeedRequest {
@@ -58,7 +60,7 @@ export interface GetFeedCalendarStatusResponse {
 }
 
 function createBaseUpdateFeedPreferencesRequest(): UpdateFeedPreferencesRequest {
-  return { interestPrompt: "", feedEnabled: false };
+  return { interestPrompt: "", feedEnabled: false, feedEvalPrompt: "" };
 }
 
 export const UpdateFeedPreferencesRequest: MessageFns<UpdateFeedPreferencesRequest> = {
@@ -68,6 +70,9 @@ export const UpdateFeedPreferencesRequest: MessageFns<UpdateFeedPreferencesReque
     }
     if (message.feedEnabled !== false) {
       writer.uint32(16).bool(message.feedEnabled);
+    }
+    if (message.feedEvalPrompt !== "") {
+      writer.uint32(26).string(message.feedEvalPrompt);
     }
     return writer;
   },
@@ -95,6 +100,14 @@ export const UpdateFeedPreferencesRequest: MessageFns<UpdateFeedPreferencesReque
           message.feedEnabled = reader.bool();
           continue;
         }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.feedEvalPrompt = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -108,6 +121,7 @@ export const UpdateFeedPreferencesRequest: MessageFns<UpdateFeedPreferencesReque
     return {
       interestPrompt: isSet(object.interestPrompt) ? globalThis.String(object.interestPrompt) : "",
       feedEnabled: isSet(object.feedEnabled) ? globalThis.Boolean(object.feedEnabled) : false,
+      feedEvalPrompt: isSet(object.feedEvalPrompt) ? globalThis.String(object.feedEvalPrompt) : "",
     };
   },
 
@@ -119,6 +133,9 @@ export const UpdateFeedPreferencesRequest: MessageFns<UpdateFeedPreferencesReque
     if (message.feedEnabled !== false) {
       obj.feedEnabled = message.feedEnabled;
     }
+    if (message.feedEvalPrompt !== "") {
+      obj.feedEvalPrompt = message.feedEvalPrompt;
+    }
     return obj;
   },
 
@@ -129,12 +146,13 @@ export const UpdateFeedPreferencesRequest: MessageFns<UpdateFeedPreferencesReque
     const message = createBaseUpdateFeedPreferencesRequest();
     message.interestPrompt = object.interestPrompt ?? "";
     message.feedEnabled = object.feedEnabled ?? false;
+    message.feedEvalPrompt = object.feedEvalPrompt ?? "";
     return message;
   },
 };
 
 function createBaseFeedPreferencesResponse(): FeedPreferencesResponse {
-  return { interestPrompt: "", feedEnabled: false };
+  return { interestPrompt: "", feedEnabled: false, feedEvalPrompt: "" };
 }
 
 export const FeedPreferencesResponse: MessageFns<FeedPreferencesResponse> = {
@@ -144,6 +162,9 @@ export const FeedPreferencesResponse: MessageFns<FeedPreferencesResponse> = {
     }
     if (message.feedEnabled !== false) {
       writer.uint32(16).bool(message.feedEnabled);
+    }
+    if (message.feedEvalPrompt !== "") {
+      writer.uint32(26).string(message.feedEvalPrompt);
     }
     return writer;
   },
@@ -171,6 +192,14 @@ export const FeedPreferencesResponse: MessageFns<FeedPreferencesResponse> = {
           message.feedEnabled = reader.bool();
           continue;
         }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.feedEvalPrompt = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -184,6 +213,7 @@ export const FeedPreferencesResponse: MessageFns<FeedPreferencesResponse> = {
     return {
       interestPrompt: isSet(object.interestPrompt) ? globalThis.String(object.interestPrompt) : "",
       feedEnabled: isSet(object.feedEnabled) ? globalThis.Boolean(object.feedEnabled) : false,
+      feedEvalPrompt: isSet(object.feedEvalPrompt) ? globalThis.String(object.feedEvalPrompt) : "",
     };
   },
 
@@ -195,6 +225,9 @@ export const FeedPreferencesResponse: MessageFns<FeedPreferencesResponse> = {
     if (message.feedEnabled !== false) {
       obj.feedEnabled = message.feedEnabled;
     }
+    if (message.feedEvalPrompt !== "") {
+      obj.feedEvalPrompt = message.feedEvalPrompt;
+    }
     return obj;
   },
 
@@ -205,6 +238,7 @@ export const FeedPreferencesResponse: MessageFns<FeedPreferencesResponse> = {
     const message = createBaseFeedPreferencesResponse();
     message.interestPrompt = object.interestPrompt ?? "";
     message.feedEnabled = object.feedEnabled ?? false;
+    message.feedEvalPrompt = object.feedEvalPrompt ?? "";
     return message;
   },
 };
