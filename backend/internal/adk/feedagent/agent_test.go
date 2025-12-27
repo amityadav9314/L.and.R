@@ -13,7 +13,7 @@ import (
 	"github.com/amityadav/landr/internal/adk/tools"
 	"github.com/amityadav/landr/internal/ai/models"
 	"github.com/amityadav/landr/internal/store"
-	"github.com/amityadav/landr/pkg/adk/model/groq"
+	adkmodel "github.com/amityadav/landr/pkg/adk/model"
 	"github.com/amityadav/landr/prompts"
 	"github.com/joho/godotenv"
 	"google.golang.org/adk/agent"
@@ -111,11 +111,11 @@ func TestAgentWithMockedSearch(t *testing.T) {
 	}
 	t.Logf("Testing with UserID: %s", userID)
 
-	// 3. Build Agent with REAL Groq, REAL DB	// Create Groq Model Adapter (Real LLM, mocked tools)
-	groqModel := groq.NewModel(groq.Config{
-		APIKey:    os.Getenv("GROQ_API_KEY"),
-		ModelName: models.TaskAgentDailyFeedModel, // Use robust model for test
-	})
+	// 3. Build Agent with REAL Groq (via factory), REAL DB, MOCKED search
+	groqModel, err := adkmodel.NewModel("groq", os.Getenv("GROQ_API_KEY"), models.TaskAgentDailyFeedModel)
+	if err != nil {
+		t.Fatalf("Failed to create ADK model: %v", err)
+	}
 	getPrefsTool := tools.NewGetPreferencesTool(st)
 	searchNewsMock := MockSearchNewsTool() // <-- MOCKED
 	storeArticlesTool := tools.NewStoreArticlesTool(st)

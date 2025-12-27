@@ -13,7 +13,7 @@ import (
 	"github.com/amityadav/landr/internal/scraper"
 	"github.com/amityadav/landr/internal/search"
 	"github.com/amityadav/landr/internal/store"
-	"github.com/amityadav/landr/pkg/adk/model/groq"
+	adkmodel "github.com/amityadav/landr/pkg/adk/model"
 	"github.com/amityadav/landr/prompts"
 	"google.golang.org/adk/agent"
 	"google.golang.org/adk/agent/llmagent"
@@ -34,15 +34,15 @@ type Dependencies struct {
 
 // New creates a new Daily Feed Agent with V2 workflow
 func New(ctx context.Context, deps Dependencies) (agent.Agent, error) {
-	// 1. Initialize custom Groq Model Adapter
+	// 1. Initialize custom Groq Model Adapter via factory
 	modelName := models.TaskAgentDailyFeedModel
 	log.Printf("[DailyFeedAgent] Initializing with model: %s", modelName)
 	log.Printf("[DailyFeedAgent] Registered search providers: %d", len(deps.SearchProviders))
 
-	modelAdapter := groq.NewModel(groq.Config{
-		APIKey:    deps.GroqAPIKey,
-		ModelName: modelName,
-	})
+	modelAdapter, err := adkmodel.NewModel("groq", deps.GroqAPIKey, modelName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create ADK model: %w", err)
+	}
 
 	// 2. Define Tools using internal/adk/tools package
 	getPrefsTool := tools.NewGetPreferencesTool(deps.Store)

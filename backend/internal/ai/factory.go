@@ -1,8 +1,13 @@
 package ai
 
-import "github.com/amityadav/landr/internal/ai/models"
+import (
+	"fmt"
 
-// NewLLMProvider creates a provider instance based on the provider name
+	"github.com/amityadav/landr/internal/ai/models"
+)
+
+// NewLLMProvider creates a provider instance based on the provider name.
+// Returns nil and logs a fatal error if the provider is unsupported.
 // Supported providers: "groq", "cerebras"
 func NewLLMProvider(providerName, apiKey, modelID string) *BaseProvider {
 	switch providerName {
@@ -23,13 +28,7 @@ func NewLLMProvider(providerName, apiKey, modelID string) *BaseProvider {
 			VisionModel: "", // Cerebras doesn't have vision model
 		})
 	default:
-		// Default to Groq if unknown
-		return NewBaseProvider(ProviderConfig{
-			Name:        "Unknown(Groq)",
-			BaseURL:     "https://api.groq.com/openai/v1/chat/completions",
-			APIKey:      apiKey,
-			TextModel:   modelID,
-			VisionModel: models.TaskVisionModel,
-		})
+		// Fail fast: don't silently default to an unknown provider
+		panic(fmt.Sprintf("unsupported AI provider: %s (supported: groq, cerebras)", providerName))
 	}
 }

@@ -11,8 +11,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/amityadav/landr/internal/ai/models"
-
 	"google.golang.org/adk/model"
 	"google.golang.org/genai"
 )
@@ -37,20 +35,27 @@ func (m *Model) Name() string {
 	return "groq-adapter"
 }
 
-// NewModel creates a new Groq model adapter from config
-func NewModel(cfg Config) *Model {
-	if cfg.BaseURL == "" {
-		cfg.BaseURL = "https://api.groq.com/openai/v1/chat/completions"
+// NewModel creates a new Groq model adapter from config.
+// Returns error if required fields (APIKey, ModelName) are missing.
+func NewModel(cfg Config) (*Model, error) {
+	if cfg.APIKey == "" {
+		return nil, fmt.Errorf("groq: APIKey is required")
 	}
 	if cfg.ModelName == "" {
-		cfg.ModelName = models.TaskAgentDailyFeedModel // Use specific agent constant
+		return nil, fmt.Errorf("groq: ModelName is required")
 	}
+
+	baseURL := cfg.BaseURL
+	if baseURL == "" {
+		baseURL = "https://api.groq.com/openai/v1/chat/completions"
+	}
+
 	return &Model{
 		apiKey:    cfg.APIKey,
-		baseURL:   cfg.BaseURL,
+		baseURL:   baseURL,
 		modelName: cfg.ModelName,
 		client:    &http.Client{Timeout: 300 * time.Second},
-	}
+	}, nil
 }
 
 // --- OpenAI-compatible API types ---

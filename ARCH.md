@@ -282,6 +282,7 @@ graph TB
 | `internal/search/registry.go` | Dynamic provider registry |
 | `internal/tavily/client.go` | Tavily search provider implementation |
 | `internal/serpapi/client.go` | SerpApi search provider implementation |
+| `pkg/adk/model/factory.go` | Unified factory for creating ADK models |
 | `pkg/adk/model/groq/model.go` | Custom Groq adapter implementing ADK's `model.LLM` interface |
 | `prompts/agent_daily_feed.txt` | V2 agent instructions (scrape → summarize → evaluate) |
 | `prompts/article_evaluation.txt` | Article scoring prompt template |
@@ -351,7 +352,55 @@ sequenceDiagram
     - **Search Tool**: **15s delay** between every search query.
 - **Fail-Safe**: Uses `context.Background()` with 30m timeout in REST/Worker to prevent cancellation.
 
+## AI Model Architecture
+
+### Two Types of AI Interfaces
+
+The application uses two distinct AI interfaces for different purposes:
+
+1. **Simple Provider** (`ai.Provider`): For basic AI tasks (flashcards, summaries, completions)
+2. **ADK Model** (`adkmodel.LLM`): For agentic workflows with tool calling capabilities
+
+### Unified Factory Pattern
+
+Both types use factory functions for consistent, centralized creation:
+
+| Type | Factory | Returns | Usage |
+|------|---------|---------|-------|
+| Simple Provider | `ai.NewLLMProvider(name, key, model)` | `ai.Provider` | Learning, Feed services |
+| ADK Model | `adkmodel.NewModel(name, key, model)` | `adkmodel.LLM` | Daily Feed Agent |
+
+**Example Usage**:
+```go
+// For simple AI tasks (flashcards, summaries)
+provider := ai.NewLLMProvider("groq", apiKey, models.TaskFlashcardModel)
+summary, err := provider.GenerateSummary(content)
+
+// For ADK agents with tool calling
+model, err := adkmodel.NewModel("groq", apiKey, models.TaskAgentDailyFeedModel)
+agent, err := llmagent.New(llmagent.Config{
+    Model: model,
+    Tools: []tool.Tool{...},
+})
+```
+
+### Why Two Interfaces?
+
+- **Simple Provider**: Optimized for single-shot completions, no tool calling overhead
+- **ADK Model**: Implements Google's ADK `LLM` interface, supports multi-turn conversations with tool execution
+
+### Extensibility
+
+Both factories use a switch-based pattern, making it easy to add new providers:
+
+```go
+// Future: Add Cerebras ADK adapter
+case "cerebras":
+    return cerebras.NewModel(cerebras.Config{...}), nil
+```
+
 ## Centralized AI Utilities
+
 
 ### Token Management (`internal/ai/chunking.go`)
 Handles Groq's 8k token limit across all AI operations:
@@ -411,6 +460,12 @@ backend/
 │   ├── feed/
 │   │   └── constants.go           # Feed configuration constants
 │   └── ...
+├── pkg/
+│   └── adk/
+│       └── model/
+│           ├── factory.go         # Unified ADK model factory
+│           └── groq/
+│               └── model.go       # Groq ADK adapter
 └── prompts/
     ├── agent_daily_feed.txt       # V2 agent instructions
     ├── article_evaluation.txt     # Article scoring prompt

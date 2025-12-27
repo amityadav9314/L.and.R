@@ -25,6 +25,7 @@
     "android": {
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
+      "highRefreshRate": true,
       "package": "com.amityadav.landr",
       "googleServicesFile": "./google-services.json",
       "usesCleartextTraffic": true,
