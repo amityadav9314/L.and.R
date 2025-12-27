@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  # Backend Service
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: landr-backend
+    restart: unless-stopped
+    environment:
+      # Use your existing PostgreSQL
+      DATABASE_URL: ${DATABASE_URL}
+      
+      # Authentication
+      JWT_SECRET: ${JWT_SECRET}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      
+      # AI Providers
+      GROQ_API_KEY: ${GROQ_API_KEY}
+      CEREBRAS_API_KEY: ${CEREBRAS_API_KEY:-}
+      
+      # Search Providers
+      TAVILY_API_KEY: ${TAVILY_API_KEY:-}
+      SERPAPI_API_KEY: ${SERPAPI_API_KEY:-}
+      
+      # Feed API
+      FEED_API_KEY: ${FEED_API_KEY:-}
+    ports:
+      - "50051:50051"  # gRPC
+      - "8080:8080"    # HTTP/REST + gRPC-Web
+    network_mode: host  # Use host network to access existing PostgreSQL
+
+  # Frontend Web App (PWA)
+  frontend-web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.web
+    container_name: landr-frontend-web
+    restart: unless-stopped
+    environment:
+      EXPO_PUBLIC_API_URL: ${EXPO_PUBLIC_API_URL:-http://localhost:8080}
+      EXPO_PUBLIC_GRPC_URL: ${EXPO_PUBLIC_GRPC_URL:-http://localhost:8080}
+    ports:
+      - "3000:3000"
+    network_mode: host
+
+  # Frontend Desktop App
+  frontend-desktop:
+    build:
+      context: ./frontend/desktop
+      dockerfile: Dockerfile.desktop
+    container_name: landr-frontend-desktop
+    restart: unless-stopped
+    environment:
+      EXPO_PUBLIC_API_URL: ${EXPO_PUBLIC_API_URL:-http://localhost:8080}
+      EXPO_PUBLIC_GRPC_URL: ${EXPO_PUBLIC_GRPC_URL:-http://localhost:8080}
+    ports:
+      - "3001:3001"  # Desktop app on different port
+    network_mode: host
