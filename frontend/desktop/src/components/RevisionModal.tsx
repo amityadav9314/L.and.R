@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Modal, Button, Spinner, ProgressBar, Badge } from 'react-bootstrap';
-import { CheckCircle, XCircle, RotateCcw } from 'lucide-react';
+import { Modal, Button, Spinner, ProgressBar, Badge, Nav, Tab } from 'react-bootstrap';
+import { CheckCircle, XCircle, RotateCcw, FileText, BookOpen, ExternalLink } from 'lucide-react';
 import { learningClient } from '../services/api.ts';
 
 interface RevisionModalProps {
@@ -14,10 +14,14 @@ const RevisionModal = ({ show, onHide, materialId, onComplete }: RevisionModalPr
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isFlipped, setIsFlipped] = useState(false);
     const [viewingState, setViewingState] = useState<'summary' | 'flashcards'>('summary');
+    const [activeTab, setActiveTab] = useState<'summary' | 'content'>('summary');
 
     const [flashcards, setFlashcards] = useState<any[]>([]);
     const [summary, setSummary] = useState<string>('');
+    const [content, setContent] = useState<string>('');
     const [materialTitle, setMaterialTitle] = useState<string>('');
+    const [materialType, setMaterialType] = useState<string>('');
+    const [sourceUrl, setSourceUrl] = useState<string>('');
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
@@ -25,7 +29,8 @@ const RevisionModal = ({ show, onHide, materialId, onComplete }: RevisionModalPr
             console.log('[RevisionModal] Opening session for material:', materialId);
             setCurrentIndex(0);
             setIsFlipped(false);
-            setViewingState('summary'); // Always start with summary
+            setViewingState('summary');
+            setActiveTab('summary');
             setIsLoading(true);
 
             // Fetch both flashcards and summary
@@ -35,9 +40,13 @@ const RevisionModal = ({ show, onHide, materialId, onComplete }: RevisionModalPr
             ])
                 .then(([flashcardsData, summaryData]) => {
                     console.log('[RevisionModal] Flashcards loaded:', flashcardsData.flashcards?.length || 0);
+                    console.log('[RevisionModal] Material type:', summaryData.materialType);
                     setFlashcards(flashcardsData.flashcards || []);
                     setSummary(summaryData.summary || '');
+                    setContent(summaryData.content || '');
                     setMaterialTitle(summaryData.title || 'Material');
+                    setMaterialType(summaryData.materialType || 'TEXT');
+                    setSourceUrl(summaryData.sourceUrl || '');
                 })
                 .catch(err => {
                     console.error('[RevisionModal] Failed to fetch data:', err);
@@ -119,6 +128,84 @@ const RevisionModal = ({ show, onHide, materialId, onComplete }: RevisionModalPr
 
     const progress = flashcards.length > 0 ? ((currentIndex) / flashcards.length) * 100 : 0;
 
+    // Render content based on material type
+    const renderContent = () => {
+        if (!content) {
+            return <p className="text-muted text-center">No content available.</p>;
+        }
+
+        switch (materialType) {
+            case 'LINK':
+            case 'YOUTUBE':
+                return (
+                    <div className="text-center py-4">
+                        <div className="mb-4">
+                            <ExternalLink size={48} className="text-primary opacity-50" />
+                        </div>
+                        <p className="text-muted mb-3">
+                            {materialType === 'YOUTUBE' ? 'YouTube Video' : 'External Link'}
+                        </p>
+                        <a 
+                            href={sourceUrl || content} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="btn btn-outline-primary rounded-pill px-4"
+                        >
+                            <ExternalLink size={16} className="me-2" />
+                            Open {materialType === 'YOUTUBE' ? 'Video' : 'Link'}
+                        </a>
+                        {materialType === 'YOUTUBE' && sourceUrl && (
+                            <div className="mt-4">
+                                <div className="ratio ratio-16x9" style={{ maxWidth: '560px', margin: '0 auto' }}>
+                                    <iframe
+                                        src={`https://www.youtube.com/embed/${extractYouTubeId(sourceUrl)}`}
+                                        title="YouTube video"
+                                        allowFullScreen
+                                        className="rounded-3"
+                                    />
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                );
+            case 'IMAGE':
+                // For image type, content might be base64 or a description
+                return (
+                    <div className="text-center py-3">
+                        <p className="text-muted small mb-3">Extracted text from image:</p>
+                        <div
+                            className="text-start text-muted lh-lg bg-light rounded-3 p-3"
+                            style={{
+                                fontSize: '0.9rem',
+                                maxHeight: '350px',
+                                overflow: 'auto',
+                                whiteSpace: 'pre-wrap',
+                                wordWrap: 'break-word'
+                            }}
+                        >
+                            {content}
+                        </div>
+                    </div>
+                );
+            case 'TEXT':
+            default:
+                return (
+                    <div
+                        className="text-start lh-lg"
+                        style={{
+                            fontSize: '0.95rem',
+                            maxHeight: '400px',
+                            overflow: 'auto',
+                            whiteSpace: 'pre-wrap',
+                            wordWrap: 'break-word'
+                        }}
+                    >
+                        {content}
+                    </div>
+                );
+        }
+    };
+
     return (
         <Modal
             show={show}
@@ -132,7 +219,7 @@ const RevisionModal = ({ show, onHide, materialId, onComplete }: RevisionModalPr
                 <Modal.Title className="fw-bold w-100">
                     <div className="d-flex justify-content-between align-items-center me-4">
                         <span className="h5 mb-0 fw-bold text-primary">Revision Session</span>
-                        {flashcards.length > 0 && (
+                        {flashcards.length > 0 && viewingState === 'flashcards' && (
                             <span className="small text-muted">Card {currentIndex + 1} of {flashcards.length}</span>
                         )}
                     </div>
@@ -152,33 +239,65 @@ const RevisionModal = ({ show, onHide, materialId, onComplete }: RevisionModalPr
                         <Button variant="primary" className="rounded-pill px-4" onClick={onHide}>Close</Button>
                     </div>
                 ) : viewingState === 'summary' ? (
-                    <div className="text-center py-4">
+                    <div className="py-2">
                         <div className="mb-4 p-4 bg-light rounded-4 border">
-                            <div className="d-flex align-items-center justify-content-center gap-2 mb-3">
-                                <Badge bg="info" className="rounded-pill px-3 py-2">📝 Material Summary</Badge>
-                            </div>
-                            <h4 className="fw-bold mb-3 text-primary">{materialTitle}</h4>
-                            <div
-                                className="text-start text-muted lh-lg"
-                                style={{
-                                    fontSize: '0.95rem',
-                                    maxHeight: '400px',
-                                    overflow: 'auto',
-                                    whiteSpace: 'pre-wrap',
-                                    wordWrap: 'break-word'
-                                }}
-                            >
-                                {summary || 'No summary available for this material.'}
-                            </div>
+                            <h4 className="fw-bold mb-3 text-primary text-center">{materialTitle}</h4>
+                            
+                            {/* Tabs for Summary and Content */}
+                            <Tab.Container activeKey={activeTab} onSelect={(k) => setActiveTab(k as 'summary' | 'content')}>
+                                <Nav variant="pills" className="justify-content-center mb-3 gap-2">
+                                    <Nav.Item>
+                                        <Nav.Link 
+                                            eventKey="summary" 
+                                            className="rounded-pill px-4 d-flex align-items-center gap-2"
+                                        >
+                                            <BookOpen size={16} />
+                                            Summary
+                                        </Nav.Link>
+                                    </Nav.Item>
+                                    <Nav.Item>
+                                        <Nav.Link 
+                                            eventKey="content" 
+                                            className="rounded-pill px-4 d-flex align-items-center gap-2"
+                                        >
+                                            <FileText size={16} />
+                                            Original Content
+                                        </Nav.Link>
+                                    </Nav.Item>
+                                </Nav>
+                                
+                                <Tab.Content>
+                                    <Tab.Pane eventKey="summary">
+                                        <div
+                                            className="text-start text-muted lh-lg"
+                                            style={{
+                                                fontSize: '0.95rem',
+                                                maxHeight: '400px',
+                                                overflow: 'auto',
+                                                whiteSpace: 'pre-wrap',
+                                                wordWrap: 'break-word'
+                                            }}
+                                        >
+                                            {summary || 'No summary available for this material.'}
+                                        </div>
+                                    </Tab.Pane>
+                                    <Tab.Pane eventKey="content">
+                                        {renderContent()}
+                                    </Tab.Pane>
+                                </Tab.Content>
+                            </Tab.Container>
                         </div>
-                        <Button
-                            variant="primary"
-                            size="lg"
-                            className="rounded-pill px-5 shadow-sm"
-                            onClick={() => setViewingState('flashcards')}
-                        >
-                            Continue to Questions ({flashcards.length} cards)
-                        </Button>
+                        
+                        <div className="text-center">
+                            <Button
+                                variant="primary"
+                                size="lg"
+                                className="rounded-pill px-5 shadow-sm"
+                                onClick={() => setViewingState('flashcards')}
+                            >
+                                Continue to Questions ({flashcards.length} cards)
+                            </Button>
+                        </div>
                     </div>
                 ) : (
                     <>
@@ -269,9 +388,26 @@ const RevisionModal = ({ show, onHide, materialId, onComplete }: RevisionModalPr
                     scrollbar-width: thin;
                     -ms-overflow-style: none;
                 }
+                .nav-pills .nav-link {
+                    color: #6c757d;
+                    background-color: transparent;
+                    border: 1px solid #dee2e6;
+                }
+                .nav-pills .nav-link.active {
+                    color: #fff;
+                    background-color: #0d6efd;
+                    border-color: #0d6efd;
+                }
             `}</style>
         </Modal>
     );
 };
+
+// Helper function to extract YouTube video ID
+function extractYouTubeId(url: string): string {
+    const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+    const match = url.match(regex);
+    return match ? match[1] : '';
+}
 
 export default RevisionModal;

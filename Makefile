@@ -174,17 +174,33 @@ migrate-up:
 	@migrate -path backend/db/migrations -database "postgres://amityadav9314:amit8780@localhost:5432/inkgrid?sslmode=disable" up
 
 # ============================================
-# PROTO
+# PROTO - Generates for: Go backend, Mobile TS, Desktop TS
 # ============================================
 proto:
-	@echo "Generating Go proto files..."
+	@echo "🔧 Generating Go proto files (backend)..."
 	@protoc --go_out=backend --go_opt=module=github.com/amityadav/landr \
 	--go-grpc_out=backend --go-grpc_opt=module=github.com/amityadav/landr \
 	backend/proto/auth/*.proto backend/proto/learning/*.proto backend/proto/feed/*.proto
-	@echo "Generating TypeScript proto files..."
+	@echo "✅ Go proto files generated"
+	
+	@echo "🔧 Generating TypeScript proto files (mobile)..."
 	@protoc --plugin=./frontend/node_modules/.bin/protoc-gen-ts_proto \
 	--ts_proto_out=./frontend/proto/backend \
 	--ts_proto_opt=esModuleInterop=true,outputServices=nice-grpc,env=browser,useExactTypes=false \
 	--proto_path=./backend \
 	backend/proto/auth/auth.proto backend/proto/learning/learning.proto backend/proto/feed/feed.proto
-	@echo "Proto generation complete!"
+	@echo "✅ Mobile TypeScript proto files generated"
+	
+	@echo "🔧 Generating TypeScript proto files (desktop)..."
+	@protoc --plugin=./frontend/node_modules/.bin/protoc-gen-ts_proto \
+	--ts_proto_out=./frontend/desktop/src/proto/backend \
+	--ts_proto_opt=esModuleInterop=true,outputServices=nice-grpc,env=browser,useExactTypes=false \
+	--proto_path=./backend \
+	backend/proto/auth/auth.proto backend/proto/learning/learning.proto backend/proto/feed/feed.proto
+	@echo "✅ Desktop TypeScript proto files generated"
+	
+	@echo ""
+	@echo "🎉 Proto generation complete! Generated for:"
+	@echo "   - Go backend:    backend/pkg/pb/"
+	@echo "   - Mobile (RN):   frontend/proto/backend/"
+	@echo "   - Desktop (Web): frontend/desktop/src/proto/backend/"

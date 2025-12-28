@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
     View,
     Text,
@@ -6,6 +6,7 @@ import {
     TouchableOpacity,
     ActivityIndicator,
     ScrollView,
+    Linking,
 } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigation, useRoute } from '../navigation/ManualRouter';
@@ -14,6 +15,8 @@ import { learningClient } from '../services/api';
 import { AppHeader } from '../components/AppHeader';
 import { useTheme, ThemeColors } from '../utils/theme';
 
+type TabType = 'summary' | 'content';
+
 export const SummaryScreen = () => {
     const navigation = useNavigation();
     const route = useRoute();
@@ -21,6 +24,7 @@ export const SummaryScreen = () => {
     const insets = useSafeAreaInsets();
     const { materialId, title } = route.params as { materialId: string; title: string };
     const displayTitle = title || 'Material Summary';
+    const [activeTab, setActiveTab] = useState<TabType>('summary');
 
     const { data, isLoading, error, refetch } = useQuery({
         queryKey: ['materialSummary', materialId],
@@ -29,6 +33,8 @@ export const SummaryScreen = () => {
             try {
                 const response = await learningClient.getMaterialSummary({ materialId });
                 console.log('[SummaryScreen] Got summary, length:', response.summary?.length || 0);
+                console.log('[SummaryScreen] Got content, length:', response.content?.length || 0);
+                console.log('[SummaryScreen] Material type:', response.materialType);
                 return response;
             } catch (err) {
                 console.error('[SummaryScreen] Error fetching summary:', err);
@@ -45,6 +51,60 @@ export const SummaryScreen = () => {
 
     const handleSkip = () => {
         navigation.navigate('MaterialDetail', { materialId, title: data?.title || title });
+    };
+
+    const handleOpenLink = () => {
+        const url = data?.sourceUrl || data?.content;
+        if (url) {
+            Linking.openURL(url).catch(err => {
+                console.error('[SummaryScreen] Failed to open URL:', err);
+            });
+        }
+    };
+
+    const renderContent = () => {
+        if (!data?.content) {
+            return <Text style={styles.contentText}>No content available.</Text>;
+        }
+
+        const materialType = data.materialType || 'TEXT';
+
+        switch (materialType) {
+            case 'LINK':
+            case 'YOUTUBE':
+                return (
+                    <View style={styles.linkContainer}>
+                        <Text style={styles.linkIcon}>
+                            {materialType === 'YOUTUBE' ? '📺' : '🔗'}
+                        </Text>
+                        <Text style={styles.linkLabel}>
+                            {materialType === 'YOUTUBE' ? 'YouTube Video' : 'External Link'}
+                        </Text>
+                        <TouchableOpacity style={styles.openLinkButton} onPress={handleOpenLink}>
+                            <Text style={styles.openLinkButtonText}>
+                                Open {materialType === 'YOUTUBE' ? 'Video' : 'Link'} ↗
+                            </Text>
+                        </TouchableOpacity>
+                        {data.sourceUrl && (
+                            <Text style={styles.urlText} numberOfLines={2}>
+                                {data.sourceUrl}
+                            </Text>
+                        )}
+                    </View>
+                );
+            case 'IMAGE':
+                return (
+                    <View>
+                        <Text style={styles.imageLabel}>Extracted text from image:</Text>
+                        <View style={styles.imageContentBox}>
+                            <Text style={styles.contentText}>{data.content}</Text>
+                        </View>
+                    </View>
+                );
+            case 'TEXT':
+            default:
+                return <Text style={styles.contentText}>{data.content}</Text>;
+        }
     };
 
     if (isLoading) {
@@ -83,8 +143,25 @@ export const SummaryScreen = () => {
             <AppHeader />
             <View style={styles.contentContainer}>
                 <Text style={styles.headerTitle} numberOfLines={2}>{displayTitle}</Text>
-                <View style={styles.badge}>
-                    <Text style={styles.badgeText}>📖 Summary</Text>
+                
+                {/* Tab Selector */}
+                <View style={styles.tabContainer}>
+                    <TouchableOpacity 
+                        style={[styles.tab, activeTab === 'summary' && styles.activeTab]}
+                        onPress={() => setActiveTab('summary')}
+                    >
+                        <Text style={[styles.tabText, activeTab === 'summary' && styles.activeTabText]}>
+                            📖 Summary
+                        </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                        style={[styles.tab, activeTab === 'content' && styles.activeTab]}
+                        onPress={() => setActiveTab('content')}
+                    >
+                        <Text style={[styles.tabText, activeTab === 'content' && styles.activeTabText]}>
+                            📄 Original
+                        </Text>
+                    </TouchableOpacity>
                 </View>
 
                 <ScrollView
@@ -92,12 +169,18 @@ export const SummaryScreen = () => {
                     contentContainerStyle={styles.summaryContent}
                     showsVerticalScrollIndicator={true}
                 >
-                    <Text style={styles.summaryText}>{data?.summary || 'No summary available.'}</Text>
+                    {activeTab === 'summary' ? (
+                        <Text style={styles.summaryText}>
+                            {data?.summary || 'No summary available.'}
+                        </Text>
+                    ) : (
+                        renderContent()
+                    )}
                 </ScrollView>
 
                 <View style={styles.buttonContainer}>
-                    <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
-                        <Text style={styles.skipButtonText}>Skip</Text>
+                    <TouchableOpacity style={styles.skipButtonBottom} onPress={handleSkip}>
+                        <Text style={styles.skipButtonTextBottom}>Skip</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.continueButton} onPress={handleContinue}>
                         <Text style={styles.continueButtonText}>Continue to Questions →</Text>
@@ -115,7 +198,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     },
     contentContainer: {
         flex: 1,
-        paddingHorizontal: 3,
+        paddingHorizontal: 16,
         paddingVertical: 16
     },
     headerTitle: {
@@ -123,20 +206,32 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         fontWeight: '700',
         color: colors.textPrimary,
         textAlign: 'center',
-        marginBottom: 12
+        marginBottom: 16
     },
-    badge: {
-        alignSelf: 'center',
+    tabContainer: {
+        flexDirection: 'row',
         backgroundColor: colors.cardAlt,
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        borderRadius: 20,
+        borderRadius: 12,
+        padding: 4,
         marginBottom: 16,
     },
-    badgeText: {
+    tab: {
+        flex: 1,
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        borderRadius: 10,
+        alignItems: 'center',
+    },
+    activeTab: {
+        backgroundColor: colors.primary,
+    },
+    tabText: {
         fontSize: 14,
         fontWeight: '600',
         color: colors.textSecondary,
+    },
+    activeTabText: {
+        color: colors.textInverse,
     },
     summaryScroll: {
         flex: 1,
@@ -152,6 +247,53 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         lineHeight: 26,
         color: colors.textPrimary,
     },
+    contentText: {
+        fontSize: 15,
+        lineHeight: 24,
+        color: colors.textPrimary,
+    },
+    linkContainer: {
+        alignItems: 'center',
+        paddingVertical: 20,
+    },
+    linkIcon: {
+        fontSize: 48,
+        marginBottom: 12,
+    },
+    linkLabel: {
+        fontSize: 16,
+        color: colors.textSecondary,
+        marginBottom: 16,
+    },
+    openLinkButton: {
+        backgroundColor: colors.primary,
+        paddingHorizontal: 24,
+        paddingVertical: 12,
+        borderRadius: 25,
+        marginBottom: 16,
+    },
+    openLinkButtonText: {
+        color: colors.textInverse,
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    urlText: {
+        fontSize: 12,
+        color: colors.textSecondary,
+        textAlign: 'center',
+        paddingHorizontal: 20,
+    },
+    imageLabel: {
+        fontSize: 14,
+        color: colors.textSecondary,
+        marginBottom: 12,
+        textAlign: 'center',
+    },
+    imageContentBox: {
+        backgroundColor: colors.cardAlt,
+        borderRadius: 12,
+        padding: 16,
+    },
     buttonContainer: {
         flexDirection: 'row',
         gap: 12,
@@ -164,6 +306,18 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         alignItems: 'center',
     },
     skipButtonText: {
+        color: colors.textSecondary,
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    skipButtonBottom: {
+        flex: 1,
+        backgroundColor: colors.cardAlt,
+        paddingVertical: 16,
+        borderRadius: 14,
+        alignItems: 'center',
+    },
+    skipButtonTextBottom: {
         color: colors.textSecondary,
         fontSize: 16,
         fontWeight: '600',

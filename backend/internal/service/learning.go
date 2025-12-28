@@ -222,16 +222,19 @@ func (s *LearningService) GetMaterialSummary(ctx context.Context, req *learning.
 
 	log.Printf("[GetMaterialSummary] Fetching summary for materialID: %s, userID: %s", req.MaterialId, userID)
 
-	summary, title, err := s.core.GetMaterialSummary(ctx, userID, req.MaterialId)
+	result, err := s.core.GetMaterialSummary(ctx, userID, req.MaterialId)
 	if err != nil {
 		log.Printf("[GetMaterialSummary] ERROR: %v", err)
 		return nil, status.Errorf(codes.Internal, "failed to get material summary: %v", err)
 	}
 
-	log.Printf("[GetMaterialSummary] SUCCESS - Summary length: %d", len(summary))
+	log.Printf("[GetMaterialSummary] SUCCESS - Summary length: %d, Type: %s", len(result.Summary), result.MaterialType)
 	return &learning.GetMaterialSummaryResponse{
-		Summary: summary,
-		Title:   title,
+		Summary:      result.Summary,
+		Title:        result.Title,
+		Content:      result.Content,
+		MaterialType: result.MaterialType,
+		SourceUrl:    result.SourceURL,
 	}, nil
 }
 

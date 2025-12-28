@@ -35,7 +35,7 @@ type Store interface {
 	UpdateFlashcardContent(ctx context.Context, id, question, answer string) error
 
 	// Material Summary
-	GetMaterialContent(ctx context.Context, userID, materialID string) (content string, summary string, title string, err error)
+	GetMaterialContent(ctx context.Context, userID, materialID string) (content string, summary string, title string, materialType string, sourceURL string, err error)
 	UpdateMaterialSummary(ctx context.Context, materialID, summary string) error
 
 	// Daily Feed

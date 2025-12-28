@@ -40,7 +40,7 @@ func (c *LearningCore) AddMaterial(ctx context.Context, userID, matType, content
 		if err == nil && existingID != "" {
 			log.Printf("[Core.AddMaterial] Duplicate detected: %s. Returning existing material.", existingID)
 			// We still need to return the title and tags, let's fetch them
-			_, _, title, err := c.store.GetMaterialContent(ctx, userID, existingID)
+			_, _, title, _, _, err := c.store.GetMaterialContent(ctx, userID, existingID)
 			if err != nil {
 				return existingID, 0, "", nil, nil
 			}
@@ -346,20 +346,37 @@ func (c *LearningCore) GetNotificationStatus(ctx context.Context, userID string)
 	return flashcardCount, materialCount > 0, materialCount, firstTitle, nil
 }
 
-func (c *LearningCore) GetMaterialSummary(ctx context.Context, userID, materialID string) (string, string, error) {
+// MaterialSummaryResult contains all data for GetMaterialSummary response
+type MaterialSummaryResult struct {
+	Summary      string
+	Title        string
+	Content      string
+	MaterialType string
+	SourceURL    string
+}
+
+func (c *LearningCore) GetMaterialSummary(ctx context.Context, userID, materialID string) (*MaterialSummaryResult, error) {
 	log.Printf("[Core.GetMaterialSummary] Getting summary for materialID: %s, userID: %s", materialID, userID)
 
 	// 1. Fetch material content and existing summary
-	content, summary, title, err := c.store.GetMaterialContent(ctx, userID, materialID)
+	content, summary, title, materialType, sourceURL, err := c.store.GetMaterialContent(ctx, userID, materialID)
 	if err != nil {
 		log.Printf("[Core.GetMaterialSummary] Failed to get material: %v", err)
-		return "", "", fmt.Errorf("failed to get material: %w", err)
+		return nil, fmt.Errorf("failed to get material: %w", err)
+	}
+
+	result := &MaterialSummaryResult{
+		Title:        title,
+		Content:      content,
+		MaterialType: materialType,
+		SourceURL:    sourceURL,
 	}
 
 	// 2. If summary exists, return it
 	if summary != "" {
 		log.Printf("[Core.GetMaterialSummary] Returning existing summary, length: %d", len(summary))
-		return summary, title, nil
+		result.Summary = summary
+		return result, nil
 	}
 
 	// 3. Generate summary via AI
@@ -367,7 +384,7 @@ func (c *LearningCore) GetMaterialSummary(ctx context.Context, userID, materialI
 	summary, err = c.ai.GenerateSummary(content)
 	if err != nil {
 		log.Printf("[Core.GetMaterialSummary] AI generation failed: %v", err)
-		return "", title, fmt.Errorf("failed to generate summary: %w", err)
+		return result, fmt.Errorf("failed to generate summary: %w", err)
 	}
 
 	// 4. Save summary to database
@@ -377,5 +394,6 @@ func (c *LearningCore) GetMaterialSummary(ctx context.Context, userID, materialI
 	}
 
 	log.Printf("[Core.GetMaterialSummary] Summary generated and saved, length: %d", len(summary))
-	return summary, title, nil
+	result.Summary = summary
+	return result, nil
 }

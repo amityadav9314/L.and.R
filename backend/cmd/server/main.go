@@ -1,22 +1,12 @@
 package main
 
 import (
-	"context"
 	"log"
-	"net"
-	"net/http"
 
-	"github.com/amityadav/landr/internal/config"
-	"github.com/amityadav/landr/internal/middleware"
-	"github.com/amityadav/landr/internal/server"
-	"github.com/amityadav/landr/internal/store"
-	"github.com/amityadav/landr/internal/token"
-	"github.com/amityadav/landr/pkg/pb/auth"
-	"github.com/amityadav/landr/pkg/pb/feed"
-	"github.com/amityadav/landr/pkg/pb/learning"
+	appfx "github.com/amityadav/landr/internal/fx"
 	"github.com/joho/godotenv"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/reflection"
+	"go.uber.org/fx"
+	"go.uber.org/fx/fxevent"
 )
 
 func main() {
@@ -25,60 +15,30 @@ func main() {
 		log.Println("No .env file found, using environment variables")
 	}
 
-	// Load configuration
-	cfg := config.Load()
+	// Create and run the FX application
+	// FX automatically:
+	// 1. Resolves all dependencies (like Spring @Autowired)
+	// 2. Manages lifecycle (OnStart/OnStop hooks)
+	// 3. Handles graceful shutdown on SIGINT/SIGTERM
+	app := fx.New(
+		// Modules group related providers (like Spring @Configuration)
+		appfx.ConfigModule,       // Provides: config.Config
+		appfx.StoreModule,        // Provides: *store.PostgresStore
+		appfx.TokenModule,        // Provides: *token.Manager
+		appfx.ScraperModule,      // Provides: *scraper.Scraper
+		appfx.AIModule,           // Provides: ai.Provider (named: "learning", "feed")
+		appfx.SearchModule,       // Provides: *search.Registry
+		appfx.CoreModule,         // Provides: *core.AuthCore, *core.LearningCore, *core.FeedCore
+		appfx.ServiceModule,      // Provides: *service.AuthService, *service.LearningService, *service.FeedService
+		appfx.NotificationModule, // Provides: *firebase.Sender, *notifications.Worker
+		appfx.ServerModule,       // Starts gRPC + HTTP servers, registers services
 
-	// Initialize database
-	ctx := context.Background()
-	st, err := store.NewPostgresStore(ctx, cfg.DatabaseURL)
-	if err != nil {
-		log.Fatalf("failed to connect to db: %v", err)
-	}
-	defer st.Close()
-
-	// Initialize all services
-	services := server.Initialize(cfg, st)
-
-	// Setup gRPC server
-	tm := token.NewManager(cfg.JWTSecret)
-	authInterceptor := middleware.NewAuthInterceptor(tm)
-
-	lis, err := net.Listen("tcp", ":50051")
-	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
-	}
-
-	grpcServer := grpc.NewServer(
-		grpc.UnaryInterceptor(authInterceptor.Unary()),
+		// Use simple console logger for cleaner output
+		fx.WithLogger(func() fxevent.Logger {
+			return &fxevent.ConsoleLogger{W: log.Writer()}
+		}),
 	)
 
-	// Register gRPC services
-	auth.RegisterAuthServiceServer(grpcServer, services.AuthService)
-	learning.RegisterLearningServiceServer(grpcServer, services.LearningService)
-	if services.FeedService != nil {
-		feed.RegisterFeedServiceServer(grpcServer, services.FeedService)
-	}
-
-	reflection.Register(grpcServer)
-
-	// Setup HTTP server (gRPC-Web + REST)
-	wrappedServer := server.CreateGRPCWebWrapper(grpcServer)
-	httpHandler := server.CreateHTTPHandler(wrappedServer)
-	restHandler := server.CreateRESTHandler(services, cfg)
-	combinedHandler := server.CreateCombinedHandler(httpHandler, restHandler)
-	recoveryHandler := server.CreateRecoveryHandler(combinedHandler)
-
-	// Start HTTP server
-	go func() {
-		log.Printf("gRPC-Web + REST API listening on :8080")
-		if err := http.ListenAndServe(":8080", recoveryHandler); err != nil {
-			log.Fatalf("failed to serve grpc-web: %v", err)
-		}
-	}()
-
-	// Start gRPC server
-	log.Printf("Server listening on :50051")
-	if err := grpcServer.Serve(lis); err != nil {
-		log.Fatalf("failed to serve: %v", err)
-	}
+	// Run blocks until the app receives a shutdown signal
+	app.Run()
 }

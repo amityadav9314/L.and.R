@@ -454,21 +454,21 @@ func (s *PostgresStore) UpdateFlashcard(ctx context.Context, id string, stage in
 	return nil
 }
 
-func (s *PostgresStore) GetMaterialContent(ctx context.Context, userID, materialID string) (string, string, string, error) {
+func (s *PostgresStore) GetMaterialContent(ctx context.Context, userID, materialID string) (string, string, string, string, string, error) {
 	log.Printf("[Store.GetMaterialContent] Fetching material: %s for user: %s", materialID, userID)
 	query := `
-		SELECT content, COALESCE(summary, ''), title
+		SELECT content, COALESCE(summary, ''), title, type, COALESCE(source_url, '')
 		FROM materials
 		WHERE id = $1 AND user_id = $2;
 	`
-	var content, summary, title string
-	err := s.db.QueryRow(ctx, query, materialID, userID).Scan(&content, &summary, &title)
+	var content, summary, title, materialType, sourceURL string
+	err := s.db.QueryRow(ctx, query, materialID, userID).Scan(&content, &summary, &title, &materialType, &sourceURL)
 	if err != nil {
 		log.Printf("[Store.GetMaterialContent] Query failed: %v", err)
-		return "", "", "", fmt.Errorf("failed to get material content: %w", err)
+		return "", "", "", "", "", fmt.Errorf("failed to get material content: %w", err)
 	}
-	log.Printf("[Store.GetMaterialContent] Found material, content length: %d, has summary: %v", len(content), summary != "")
-	return content, summary, title, nil
+	log.Printf("[Store.GetMaterialContent] Found material, content length: %d, has summary: %v, type: %s", len(content), summary != "", materialType)
+	return content, summary, title, materialType, sourceURL, nil
 }
 
 func (s *PostgresStore) UpdateMaterialSummary(ctx context.Context, materialID, summary string) error {
