@@ -10,7 +10,6 @@ import (
 	"github.com/amityadav/landr/internal/adk/tools"
 	"github.com/amityadav/landr/internal/ai"
 	"github.com/amityadav/landr/internal/ai/models"
-	"github.com/amityadav/landr/internal/scraper"
 	"github.com/amityadav/landr/internal/search"
 	"github.com/amityadav/landr/internal/store"
 	adkmodel "github.com/amityadav/landr/pkg/adk/model"
@@ -26,47 +25,49 @@ import (
 // Dependencies holds the services needed by the agent
 type Dependencies struct {
 	Store           *store.PostgresStore
-	SearchProviders []search.SearchProvider // Changed: Use interface slice
-	Scraper         *scraper.Scraper
+	SearchProviders []search.SearchProvider
 	AIProvider      ai.Provider
 	GroqAPIKey      string
+	CerebrasAPIKey  string
 }
 
-// New creates a new Daily Feed Agent with V2 workflow
-func New(ctx context.Context, deps Dependencies) (agent.Agent, error) {
-	// 1. Initialize custom Groq Model Adapter via factory
+// NewFeedAgent creates a new Daily Feed Agent with V2 workflow
+func NewFeedAgent(ctx context.Context, deps Dependencies) (agent.Agent, error) {
+	// 1. Initialize fallback model (Groq → Cerebras on rate limit)
 	modelName := models.TaskAgentDailyFeedModel
-	log.Printf("[DailyFeedAgent] Initializing with model: %s", modelName)
+	log.Printf("[DailyFeedAgent] Initializing with model: %s (Groq primary, Cerebras fallback)", modelName)
 	log.Printf("[DailyFeedAgent] Registered search providers: %d", len(deps.SearchProviders))
 
-	modelAdapter, err := adkmodel.NewModel("groq", deps.GroqAPIKey, modelName)
+	modelAdapter, err := adkmodel.NewFallbackModel(deps.GroqAPIKey, deps.CerebrasAPIKey, modelName)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create ADK model: %w", err)
+		return nil, fmt.Errorf("failed to create fallback model: %w", err)
 	}
 
 	// 2. Define Tools using internal/adk/tools package
-	getPrefsTool := tools.NewGetPreferencesTool(deps.Store)
-	searchNewsTool := tools.NewSearchNewsTool(deps.SearchProviders) // Pass provider slice
-	scrapeContentTool := tools.NewScrapeContentTool(deps.Scraper)
-	summarizeContentTool := tools.NewSummarizeContentTool(deps.AIProvider)
-	evaluateArticleTool := tools.NewEvaluateArticleTool(deps.AIProvider)
-	storeArticlesTool := tools.NewStoreArticlesTool(deps.Store)
+	allTools := getAllTools(deps)
 
 	// 3. Create Agent with all V2 tools
 	return llmagent.New(llmagent.Config{
 		Name:        "daily_feed_agent_v2",
 		Model:       modelAdapter,
-		Description: "V2 Agent: Scrape → Summarize → Evaluate → Store",
+		Description: "V2 Agent: Search → Batch Evaluate URLs → Store",
 		Instruction: prompts.AgentDailyFeed,
-		Tools: []tool.Tool{
-			getPrefsTool,
-			searchNewsTool,
-			scrapeContentTool,
-			summarizeContentTool,
-			evaluateArticleTool,
-			storeArticlesTool,
-		},
+		Tools:       allTools,
 	})
+}
+
+func getAllTools(deps Dependencies) []tool.Tool {
+	getPrefsTool := tools.NewGetPreferencesTool(deps.Store)
+	searchNewsTool := tools.NewSearchNewsTool(deps.SearchProviders)
+	evaluateURLsBatchTool := tools.NewEvaluateURLsBatchTool(deps.AIProvider)
+	storeArticlesTool := tools.NewStoreArticlesTool(deps.Store)
+
+	return []tool.Tool{
+		getPrefsTool,
+		searchNewsTool,
+		evaluateURLsBatchTool,
+		storeArticlesTool,
+	}
 }
 
 // RunResult contains the outcome of an agent run
@@ -77,7 +78,7 @@ type RunResult struct {
 
 // Run executes the agent for a specific user and returns the result
 func Run(ctx context.Context, deps Dependencies, userID string) (*RunResult, error) {
-	myAgent, err := New(ctx, deps)
+	myAgent, err := NewFeedAgent(ctx, deps)
 	if err != nil {
 		return nil, err
 	}
@@ -133,6 +134,16 @@ func Run(ctx context.Context, deps Dependencies, userID string) (*RunResult, err
 	next, stop := iter.Pull2(r.Run(ctx, userID, sessionID, inputMsg, agent.RunConfig{}))
 	defer stop()
 
+	finalResponse, err2 := processEvent(next, finalResponse)
+	if err2 != nil {
+		return nil, err2
+	}
+
+	log.Printf("[DailyFeedAgent] V2 run completed for user %s", userID)
+	return &RunResult{Summary: finalResponse}, nil
+}
+
+func processEvent(next func() (*session.Event, error, bool), finalResponse string) (string, error) {
 	for {
 		event, err, ok := next()
 		if !ok {
@@ -140,7 +151,7 @@ func Run(ctx context.Context, deps Dependencies, userID string) (*RunResult, err
 		}
 		if err != nil {
 			log.Printf("[DailyFeedAgent] Error during run: %v", err)
-			return nil, err
+			return "", err
 		}
 
 		// Log events and capture final response
@@ -156,7 +167,5 @@ func Run(ctx context.Context, deps Dependencies, userID string) (*RunResult, err
 			}
 		}
 	}
-
-	log.Printf("[DailyFeedAgent] V2 run completed for user %s", userID)
-	return &RunResult{Summary: finalResponse}, nil
+	return finalResponse, nil
 }

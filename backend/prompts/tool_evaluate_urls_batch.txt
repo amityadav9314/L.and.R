@@ -1,0 +1,9 @@
+Evaluate article relevance based on URLs, titles, and snippets (no full content scraping).
+
+Input:
+- urls: Array of {url, title, snippet, provider}
+- interests: User's interest topics
+- eval_criteria: Evaluation criteria
+
+Output:
+- scores: JSON array [{url, score}] where score is 0.0-1.0

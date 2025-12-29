@@ -3,7 +3,7 @@ package feed
 const (
 	// Article filtering
 	MinRelevanceScore = 0.6
-	MaxArticlesPerDay = 10
+	MinArticlesPerDay = 10
 
 	// Search configuration
 	MaxSearchLoops   = 3

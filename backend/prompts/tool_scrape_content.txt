@@ -1,1 +1,0 @@
-Scrapes the full content from a given URL. Use this to get the complete article text before summarizing.

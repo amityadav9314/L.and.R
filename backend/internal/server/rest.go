@@ -9,8 +9,19 @@ import (
 	"github.com/amityadav/landr/internal/config"
 	"github.com/amityadav/landr/internal/core"
 	"github.com/amityadav/landr/internal/notifications"
+	"github.com/amityadav/landr/internal/service"
 	"github.com/amityadav/landr/internal/store"
 )
+
+// Services groups all service dependencies for REST handlers
+type Services struct {
+	Store           *store.PostgresStore
+	AuthService     *service.AuthService
+	LearningService *service.LearningService
+	FeedService     *service.FeedService
+	FeedCore        *core.FeedCore
+	NotifWorker     *notifications.Worker
+}
 
 // CreateRESTHandler creates REST API endpoints
 func CreateRESTHandler(services Services, cfg config.Config) http.HandlerFunc {

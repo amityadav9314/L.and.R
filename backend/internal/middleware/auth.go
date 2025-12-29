@@ -84,4 +84,3 @@ func GetUserID(ctx context.Context) (string, error) {
 	}
 	return userID, nil
 }
-

@@ -48,7 +48,7 @@ Content: A deep dive into how autonomous agents like AutoGPT and specialized ADK
 Source: Tavily
 ---
 
-Title: Mock Article - New Groq LPU benchmarks released
+Title: Mock Article - NewFeedAgent Groq LPU benchmarks released
 URL: https://example.com/groq-benchmarks
 Snippet: Groq's latest LPU shows 10x performance increase in token generation for Llama 3 models compared to traditional GPUs.
 Source: GoogleNews
@@ -62,7 +62,7 @@ Source: Tavily
 
 Title: Mock Article - Open Source LLMs gaining traction
 URL: https://example.com/open-llms
-Snippet: New open weights models from Meta and Mistral are challenging proprietary solutions.
+Snippet: NewFeedAgent open weights models from Meta and Mistral are challenging proprietary solutions.
 Source: GoogleNews
 ---
 

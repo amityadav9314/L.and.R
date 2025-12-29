@@ -1,1 +1,0 @@
-Generates a concise summary of article content. Use this after scraping to create a readable snippet.

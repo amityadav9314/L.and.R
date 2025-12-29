@@ -187,8 +187,8 @@ func NewAuthCore(st *store.PostgresStore, tm *token.Manager, cfg config.Config) 
 // LearningCoreParams groups dependencies for LearningCore (fx.In for named deps)
 type LearningCoreParams struct {
 	fx.In
-	Store           *store.PostgresStore
-	Scraper         *scraper.Scraper
+	Store            *store.PostgresStore
+	Scraper          *scraper.Scraper
 	LearningProvider ai.Provider `name:"learning"`
 }
 
@@ -216,7 +216,7 @@ func NewFeedCore(p FeedCoreParams) *core.FeedCore {
 		return nil
 	}
 
-	c := core.NewFeedCore(p.Store, p.SearchRegistry, p.Scraper, p.FeedProvider, p.Config.GroqAPIKey)
+	c := core.NewFeedCore(p.Store, p.SearchRegistry, p.Scraper, p.FeedProvider, p.Config.GroqAPIKey, p.Config.CerebrasAPIKey)
 	log.Printf("[FX] FeedCore initialized")
 	return c
 }
@@ -280,4 +280,3 @@ func NewNotificationWorker(p NotificationWorkerParams) *notifications.Worker {
 	log.Printf("[FX] NotificationWorker initialized")
 	return worker
 }
-

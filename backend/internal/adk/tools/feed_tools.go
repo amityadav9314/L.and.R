@@ -2,13 +2,13 @@ package tools
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
 	"time"
 
 	"github.com/amityadav/landr/internal/ai"
-	"github.com/amityadav/landr/internal/scraper"
 	"github.com/amityadav/landr/internal/search"
 	"github.com/amityadav/landr/internal/store"
 	"github.com/amityadav/landr/prompts"
@@ -87,7 +87,7 @@ type SearchNewsResult struct {
 
 func NewSearchNewsTool(providers []search.SearchProvider) tool.Tool {
 	handler := func(ctx tool.Context, args SearchNewsArgs) (SearchNewsResult, error) {
-		const maxChars = 12000
+		const maxChars = 30000 // Increased to fit more articles
 		const maxArticles = 60
 
 		var allArticles []string
@@ -161,105 +161,56 @@ func NewSearchNewsTool(providers []search.SearchProvider) tool.Tool {
 }
 
 // ========================================
-// scrape_content Tool
+// evaluate_urls_batch Tool
 // ========================================
 
-type ScrapeContentArgs struct {
-	URL string `json:"url"`
+type URLInput struct {
+	URL      string `json:"url"`
+	Title    string `json:"title"`
+	Snippet  string `json:"snippet"`
+	Provider string `json:"provider"`
 }
 
-type ScrapeContentResult struct {
-	Content string `json:"content"`
+type EvaluateURLsBatchArgs struct {
+	URLs         []URLInput `json:"urls"`
+	Interests    string     `json:"interests"`
+	EvalCriteria string     `json:"eval_criteria"`
 }
 
-func NewScrapeContentTool(scraper *scraper.Scraper) tool.Tool {
-	handler := func(ctx tool.Context, args ScrapeContentArgs) (ScrapeContentResult, error) {
-		log.Printf("[ScrapeContentTool] Scraping URL: %s", args.URL)
+type URLScore struct {
+	URL      string  `json:"url"`
+	Title    string  `json:"title"`
+	Snippet  string  `json:"snippet"`
+	Provider string  `json:"provider"`
+	Score    float64 `json:"score"`
+}
 
-		if args.URL == "" {
-			return ScrapeContentResult{}, fmt.Errorf("missing url")
-		}
+type EvaluateURLsBatchResult struct {
+	Scores []URLScore `json:"scores"`
+}
 
-		content, err := scraper.Scrape(args.URL)
-		if err != nil {
-			log.Printf("[ScrapeContentTool] Scraping failed for %s: %v", args.URL, err)
-			return ScrapeContentResult{}, fmt.Errorf("scraping failed: %w", err)
-		}
-
-		log.Printf("[ScrapeContentTool] Successfully scraped %d chars from %s", len(content), args.URL)
-		return ScrapeContentResult{Content: content}, nil
+// cleanURL removes query parameters to save tokens
+func cleanURL(u string) string {
+	if idx := strings.Index(u, "?"); idx != -1 {
+		return u[:idx]
 	}
+	return u
+}
 
-	t, err := functiontool.New(functiontool.Config{
-		Name:        "scrape_content",
-		Description: prompts.ToolScrapeContentDesc,
-	}, handler)
-	if err != nil {
-		log.Fatalf("Failed to create scrape_content tool: %v", err)
+// truncateSnippet limits snippet length to save tokens
+func truncateSnippet(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
 	}
-	return t
+	return s[:maxLen] + "..."
 }
 
-// ========================================
-// summarize_content Tool
-// ========================================
+func NewEvaluateURLsBatchTool(ai ai.Provider) tool.Tool {
+	handler := func(ctx tool.Context, args EvaluateURLsBatchArgs) (EvaluateURLsBatchResult, error) {
+		log.Printf("[EvaluateURLsBatchTool] Evaluating %d URLs in batches", len(args.URLs))
 
-type SummarizeContentArgs struct {
-	Content string `json:"content"`
-}
-
-type SummarizeContentResult struct {
-	Summary string `json:"summary"`
-}
-
-func NewSummarizeContentTool(ai ai.Provider) tool.Tool {
-	handler := func(ctx tool.Context, args SummarizeContentArgs) (SummarizeContentResult, error) {
-		log.Printf("[SummarizeContentTool] Summarizing %d chars of content", len(args.Content))
-
-		if args.Content == "" {
-			return SummarizeContentResult{}, fmt.Errorf("missing content")
-		}
-
-		summary, err := ai.GenerateSummary(args.Content)
-		if err != nil {
-			log.Printf("[SummarizeContentTool] Summarization failed: %v", err)
-			return SummarizeContentResult{}, fmt.Errorf("summarization failed: %w", err)
-		}
-
-		log.Printf("[SummarizeContentTool] Generated summary of %d chars", len(summary))
-		return SummarizeContentResult{Summary: summary}, nil
-	}
-
-	t, err := functiontool.New(functiontool.Config{
-		Name:        "summarize_content",
-		Description: prompts.ToolSummarizeContentDesc,
-	}, handler)
-	if err != nil {
-		log.Fatalf("Failed to create summarize_content tool: %v", err)
-	}
-	return t
-}
-
-// ========================================
-// evaluate_article Tool
-// ========================================
-
-type EvaluateArticleArgs struct {
-	Summary      string `json:"summary"`
-	Interests    string `json:"interests"`
-	EvalCriteria string `json:"eval_criteria"`
-}
-
-type EvaluateArticleResult struct {
-	Score float64 `json:"score"`
-}
-
-func NewEvaluateArticleTool(ai ai.Provider) tool.Tool {
-	handler := func(ctx tool.Context, args EvaluateArticleArgs) (EvaluateArticleResult, error) {
-		log.Printf("[EvaluateArticleTool] Evaluating article summary (%d chars)", len(args.Summary))
-
-		if args.Summary == "" {
-			return EvaluateArticleResult{Score: 0.0}, nil
+		if len(args.URLs) == 0 {
+			return EvaluateURLsBatchResult{Scores: []URLScore{}}, nil
 		}
 
 		criteria := args.EvalCriteria
@@ -267,39 +218,115 @@ func NewEvaluateArticleTool(ai ai.Provider) tool.Tool {
 			criteria = "Ensure the article is informative, relevant to their interests, and not clickbait."
 		}
 
-		prompt := fmt.Sprintf(prompts.ArticleEvaluation, args.Interests, criteria, args.Summary)
+		// Process in batches of 5 to avoid rate limits
+		const batchSize = 5
+		const delayBetweenBatches = 10 * time.Second
 
-		resp, err := ai.GenerateCompletion(prompt)
-		if err != nil {
-			log.Printf("[EvaluateArticleTool] Evaluation failed: %v", err)
-			return EvaluateArticleResult{Score: 0.0}, nil // Return 0 on error instead of failing
+		var allScores []URLScore
+
+		for i := 0; i < len(args.URLs); i += batchSize {
+			end := i + batchSize
+			if end > len(args.URLs) {
+				end = len(args.URLs)
+			}
+
+			batch := args.URLs[i:end]
+			batchNum := (i / batchSize) + 1
+			totalBatches := (len(args.URLs) + batchSize - 1) / batchSize
+
+			log.Printf("[EvaluateURLsBatchTool] Processing batch %d/%d (%d URLs)", batchNum, totalBatches, len(batch))
+
+			// Build compact URL list - clean URLs and truncate snippets
+			var urlList strings.Builder
+			for j, u := range batch {
+				cleanedURL := cleanURL(u.URL)
+				shortSnippet := truncateSnippet(u.Snippet, 80)
+				urlList.WriteString(fmt.Sprintf("%d. %s | %s\n", j+1, u.Title, cleanedURL))
+				if shortSnippet != "" {
+					urlList.WriteString(fmt.Sprintf("   %s\n", shortSnippet))
+				}
+			}
+
+			prompt := fmt.Sprintf(prompts.URLBatchEvaluation,
+				args.Interests,
+				criteria,
+				urlList.String())
+
+			resp, err := ai.GenerateCompletion(prompt)
+			if err != nil {
+				log.Printf("[EvaluateURLsBatchTool] Batch %d failed: %v, using default scores", batchNum, err)
+				// On error, assign default scores for this batch but keep full article data
+				for _, u := range batch {
+					allScores = append(allScores, URLScore{
+						URL:      u.URL,
+						Title:    u.Title,
+						Snippet:  u.Snippet,
+						Provider: u.Provider,
+						Score:    0.5,
+					})
+				}
+			} else {
+				// Parse JSON response - only contains url and score
+				var batchScores []struct {
+					URL   string  `json:"url"`
+					Score float64 `json:"score"`
+				}
+				cleanResp := strings.TrimSpace(resp)
+				cleanResp = strings.TrimPrefix(cleanResp, "```json")
+				cleanResp = strings.TrimPrefix(cleanResp, "```")
+				cleanResp = strings.TrimSuffix(cleanResp, "```")
+				cleanResp = strings.TrimSpace(cleanResp)
+
+				if err := json.Unmarshal([]byte(cleanResp), &batchScores); err != nil {
+					log.Printf("[EvaluateURLsBatchTool] Batch %d: Failed to parse JSON, using defaults", batchNum)
+					for _, u := range batch {
+						allScores = append(allScores, URLScore{
+							URL:      u.URL,
+							Title:    u.Title,
+							Snippet:  u.Snippet,
+							Provider: u.Provider,
+							Score:    0.5,
+						})
+					}
+				} else {
+					// Map scores back to original URLs and preserve full article data
+					scoreMap := make(map[string]float64)
+					for _, s := range batchScores {
+						scoreMap[cleanURL(s.URL)] = s.Score
+					}
+					for _, u := range batch {
+						score, ok := scoreMap[cleanURL(u.URL)]
+						if !ok {
+							score = 0.5 // Default if not found
+						}
+						allScores = append(allScores, URLScore{
+							URL:      u.URL,
+							Title:    u.Title,
+							Snippet:  u.Snippet,
+							Provider: u.Provider,
+							Score:    score,
+						})
+					}
+				}
+			}
+
+			// Wait before next batch (except for last batch)
+			if end < len(args.URLs) {
+				log.Printf("[EvaluateURLsBatchTool] Waiting %v before next batch...", delayBetweenBatches)
+				time.Sleep(delayBetweenBatches)
+			}
 		}
 
-		// Parse float score
-		var score float64
-		_, err = fmt.Sscanf(strings.TrimSpace(resp), "%f", &score)
-		if err != nil {
-			log.Printf("[EvaluateArticleTool] Failed to parse score from: %s", resp)
-			return EvaluateArticleResult{Score: 0.0}, nil
-		}
-
-		// Clamp score to 0.0-1.0 range
-		if score < 0.0 {
-			score = 0.0
-		} else if score > 1.0 {
-			score = 1.0
-		}
-
-		log.Printf("[EvaluateArticleTool] Article scored: %.2f", score)
-		return EvaluateArticleResult{Score: score}, nil
+		log.Printf("[EvaluateURLsBatchTool] Successfully evaluated %d URLs", len(allScores))
+		return EvaluateURLsBatchResult{Scores: allScores}, nil
 	}
 
 	t, err := functiontool.New(functiontool.Config{
-		Name:        "evaluate_article",
-		Description: prompts.ToolEvaluateArticleDesc,
+		Name:        "evaluate_urls_batch",
+		Description: prompts.ToolEvaluateURLsBatchDesc,
 	}, handler)
 	if err != nil {
-		log.Fatalf("Failed to create evaluate_article tool: %v", err)
+		log.Fatalf("Failed to create evaluate_urls_batch tool: %v", err)
 	}
 	return t
 }

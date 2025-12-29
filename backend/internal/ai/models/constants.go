@@ -28,7 +28,8 @@ const (
 
 	// TaskAgentDailyFeedModel: Complex tool use, reasoning.
 	//TaskAgentDailyFeedModel = ModelGroqQwen_32b
-	TaskAgentDailyFeedModel = ModelGroqLlama3_3_70b
+	//TaskAgentDailyFeedModel = ModelGroqLlama3_3_70b
+	TaskAgentDailyFeedModel = ModelGroqGptOss120b
 
 	// TaskSummaryModel: High context, instruction following.
 	TaskSummaryModel = ModelGroqGptOss120b // Upgraded to Llama 3.3 for better quality

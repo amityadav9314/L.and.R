@@ -73,9 +73,9 @@ type ServerParams struct {
 	Store           *store.PostgresStore
 	AuthService     *service.AuthService
 	LearningService *service.LearningService
-	FeedService     *service.FeedService      `optional:"true"`
-	FeedCore        *core.FeedCore            `optional:"true"`
-	NotifWorker     *notifications.Worker     `optional:"true"`
+	FeedService     *service.FeedService  `optional:"true"`
+	FeedCore        *core.FeedCore        `optional:"true"`
+	NotifWorker     *notifications.Worker `optional:"true"`
 	Config          config.Config
 }
 
@@ -155,4 +155,3 @@ func StartNotificationWorker(p WorkerStartParams) {
 		},
 	})
 }
-

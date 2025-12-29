@@ -6,8 +6,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/amityadav/landr/internal/adk/feedagent"
 	"github.com/amityadav/landr/internal/ai"
+	feedConstants "github.com/amityadav/landr/internal/feed"
 	"github.com/amityadav/landr/internal/scraper"
 	"github.com/amityadav/landr/internal/search"
 	"github.com/amityadav/landr/internal/store"
@@ -22,16 +22,18 @@ type FeedCore struct {
 	scraper        *scraper.Scraper
 	aiProvider     ai.Provider
 	groqAPIKey     string
+	cerebrasAPIKey string
 }
 
 // NewFeedCore creates a new FeedCore instance
-func NewFeedCore(st *store.PostgresStore, searchRegistry *search.Registry, scraper *scraper.Scraper, aiProvider ai.Provider, groqAPIKey string) *FeedCore {
+func NewFeedCore(st *store.PostgresStore, searchRegistry *search.Registry, scraper *scraper.Scraper, aiProvider ai.Provider, groqAPIKey string, cerebrasAPIKey string) *FeedCore {
 	return &FeedCore{
 		store:          st,
 		searchRegistry: searchRegistry,
 		scraper:        scraper,
 		aiProvider:     aiProvider,
 		groqAPIKey:     groqAPIKey,
+		cerebrasAPIKey: cerebrasAPIKey,
 	}
 }
 
@@ -118,7 +120,7 @@ func (c *FeedCore) GetFeedCalendarStatus(ctx context.Context, userID, monthStr s
 }
 
 // GenerateDailyFeedForUser fetches articles for a single user based on their interest prompt.
-// It checks if articles already exist for today - if so, it skips calling Tavily (cached).
+// It checks if articles already exist for today - if so, it skips calling Search Provider whatever registered (cached).
 // Features:
 // - LLM-optimized search query
 // - Recency filtering (news topic, last 3 days)
@@ -146,29 +148,29 @@ func (c *FeedCore) GenerateDailyFeedForUser(ctx context.Context, userID string) 
 	}
 
 	// Minimum articles before skipping regeneration
-	const minDailyArticles = 10
+	const minDailyArticles = feedConstants.MinArticlesPerDay
 	if len(existingArticles) >= minDailyArticles {
 		log.Printf("[FeedCore.GenerateDailyFeedForUser] Already have %d articles today, skipping generation", len(existingArticles))
 		return nil
 	}
 
-	// 3. Run ADK Agent (V2 Workflow)
-	log.Printf("[FeedCore.GenerateDailyFeedForUser] Starting Feed V2 Agent for user %s...", userID)
+	// 3. Use simple FeedGenerator (bypasses agent, stores ALL articles)
+	log.Printf("[FeedCore.GenerateDailyFeedForUser] Starting FeedGenerator for user %s...", userID)
 
-	deps := feedagent.Dependencies{
-		Store:           c.store,
-		SearchProviders: c.searchRegistry.GetAll(),
-		Scraper:         c.scraper,
-		AIProvider:      c.aiProvider,
-		GroqAPIKey:      c.groqAPIKey,
+	generator := NewFeedGenerator(c.store, c.searchRegistry.GetAll(), c.aiProvider)
+
+	// Get user email for logging
+	user, err := c.store.GetUserByID(ctx, userID)
+	userEmail := ""
+	if err == nil && user != nil {
+		userEmail = user.Email
 	}
 
-	result, err := feedagent.Run(ctx, deps, userID)
-	if err != nil {
-		return fmt.Errorf("feed agent failed: %w", err)
+	if err := generator.GenerateFeed(ctx, userID, userEmail); err != nil {
+		return fmt.Errorf("feed generator failed: %w", err)
 	}
 
-	log.Printf("[FeedCore.GenerateDailyFeedForUser] Agent completed: %s", result.Summary)
+	log.Printf("[FeedCore.GenerateDailyFeedForUser] FeedGenerator completed for user %s", userID)
 	return nil
 }
 
