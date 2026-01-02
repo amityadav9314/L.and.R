@@ -1,4 +1,4 @@
-.PHONY: help build test-agent start-backend start-frontend desktop deploy-desktop apk aab stop db-start db-stop migrate-up proto
+.PHONY: help build test-agent start-backend start-frontend desktop deploy-desktop apk aab stop db-start db-stop migrate-up proto prod
 
 # Variables
 BACKEND_DIR := backend
@@ -21,6 +21,7 @@ help:
 	@echo "  make android-debug   - Build debug APK only"
 	@echo "  make android-install - Install debug APK on emulator/device"
 	@echo "  make stop            - Stop all servers"
+	@echo "  make prod            - Deploy to production (desktop + backend + frontend)"
 	@echo "  make test-agent      - Run agent test with mocked Tavily/SerpApi"
 	@echo "  make db-start        - Start PostgreSQL (Docker)"
 	@echo "  make proto           - Generate proto files"
@@ -183,6 +184,31 @@ stop:
 	@lsof -ti:5173 | xargs -r kill -9 2>/dev/null || true
 	@lsof -ti:8081 | xargs -r kill -9 2>/dev/null || true
 	@echo "All servers stopped."
+
+# ============================================
+# PRODUCTION DEPLOY
+# ============================================
+prod:
+	@echo "🚀 Deploying to production..."
+	@echo "Step 1: Stopping all servers..."
+	@lsof -ti:8080 | xargs -r kill -9 2>/dev/null || true
+	@lsof -ti:50051 | xargs -r kill -9 2>/dev/null || true
+	@lsof -ti:5173 | xargs -r kill -9 2>/dev/null || true
+	@lsof -ti:8081 | xargs -r kill -9 2>/dev/null || true
+	@echo "Step 2: Deploying desktop..."
+	@nohup $(MAKE) deploy-desktop > desktop.log 2>&1 &
+	@sleep 5
+	@echo "Step 3: Starting backend..."
+	@nohup $(MAKE) start-backend > backend.log 2>&1 &
+	@sleep 3
+	@echo "Step 4: Starting frontend (Expo)..."
+	@nohup $(MAKE) start-frontend > frontend.log 2>&1 &
+	@echo ""
+	@echo "✅ Production deployment started!"
+	@echo "📋 Logs:"
+	@echo "   - Desktop:  tail -f desktop.log"
+	@echo "   - Backend:  tail -f backend.log"
+	@echo "   - Frontend: tail -f frontend.log"
 
 # ============================================
 # DATABASE

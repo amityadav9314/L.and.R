@@ -51,7 +51,8 @@ func CreateCombinedHandler(httpHandler, restHandler http.HandlerFunc) http.Handl
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/feed/refresh" ||
 			r.URL.Path == "/api/notification/test" ||
-			r.URL.Path == "/api/notification/daily" {
+			r.URL.Path == "/api/notification/daily" ||
+			r.URL.Path == "/api/privacy-policy" {
 			restHandler.ServeHTTP(w, r)
 			return
 		}
