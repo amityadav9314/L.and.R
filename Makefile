@@ -1,4 +1,4 @@
-.PHONY: help build test-agent start-backend start-frontend desktop deploy-desktop apk stop db-start db-stop migrate-up proto
+.PHONY: help build test-agent start-backend start-frontend desktop deploy-desktop apk aab stop db-start db-stop migrate-up proto
 
 # Variables
 BACKEND_DIR := backend
@@ -16,6 +16,7 @@ help:
 	@echo "  make desktop         - Type check and start desktop frontend (Vite dev server)"
 	@echo "  make deploy-desktop  - Build and deploy desktop to production (/var/www/landr/desktop)"
 	@echo "  make apk             - Build release APK"
+	@echo "  make aab             - Build AAB for Google Play"
 	@echo "  make android         - Rebuild debug APK and install (use after adding Expo packages)"
 	@echo "  make android-debug   - Build debug APK only"
 	@echo "  make android-install - Install debug APK on emulator/device"
@@ -111,7 +112,7 @@ deploy-desktop:
 	@sudo cp -r $(DESKTOP_DIR)/dist/* $(DEPLOY_DIR)/
 	@sudo chown -R www-data:www-data $(DEPLOY_DIR)
 	@echo "✅ Desktop deployed successfully!"
-	@echo "🌐 Access at: https://43.205.81.60.nip.io (from desktop browser)"
+	@echo "🌐 Access at: https://landr.aky.net.in (from desktop browser)"
 
 # ============================================
 # APK BUILD
@@ -127,6 +128,33 @@ apk:
 	@echo ""
 	@echo "✅ APK built successfully!"
 	@echo "📦 Location: $(FRONTEND_DIR)/android/app/build/outputs/apk/release/app-release.apk"
+
+# Build AAB (Android App Bundle) for Google Play - PRODUCTION SIGNED
+aab:
+	@echo "🔨 Building Android App Bundle (AAB) for Google Play..."
+	@echo "Step 1: Cleaning previous build..."
+	@rm -rf $(FRONTEND_DIR)/android 2>/dev/null || true
+	@echo "Step 2: Running expo prebuild..."
+	@cd $(FRONTEND_DIR) && npx expo prebuild --platform android --clean
+	@echo "Step 3: Applying production signing config..."
+	@echo "" >> $(FRONTEND_DIR)/android/app/build.gradle
+	@echo "// Production Signing Configuration" >> $(FRONTEND_DIR)/android/app/build.gradle
+	@echo "def keystorePropertiesFile = rootProject.file('../keystore/keystore.properties')" >> $(FRONTEND_DIR)/android/app/build.gradle
+	@echo "def keystoreProperties = new Properties()" >> $(FRONTEND_DIR)/android/app/build.gradle
+	@echo "if (keystorePropertiesFile.exists()) { keystoreProperties.load(new FileInputStream(keystorePropertiesFile)) }" >> $(FRONTEND_DIR)/android/app/build.gradle
+	@echo "android.signingConfigs.create('release') {" >> $(FRONTEND_DIR)/android/app/build.gradle
+	@echo "    storeFile file(keystoreProperties['LANDR_UPLOAD_STORE_FILE'])" >> $(FRONTEND_DIR)/android/app/build.gradle
+	@echo "    storePassword keystoreProperties['LANDR_UPLOAD_STORE_PASSWORD']" >> $(FRONTEND_DIR)/android/app/build.gradle
+	@echo "    keyAlias keystoreProperties['LANDR_UPLOAD_KEY_ALIAS']" >> $(FRONTEND_DIR)/android/app/build.gradle
+	@echo "    keyPassword keystoreProperties['LANDR_UPLOAD_KEY_PASSWORD']" >> $(FRONTEND_DIR)/android/app/build.gradle
+	@echo "}" >> $(FRONTEND_DIR)/android/app/build.gradle
+	@echo "android.buildTypes.release.signingConfig = android.signingConfigs.release" >> $(FRONTEND_DIR)/android/app/build.gradle
+	@echo "Step 4: Building release AAB..."
+	@cd $(FRONTEND_DIR)/android && ./gradlew bundleRelease
+	@echo ""
+	@echo "✅ AAB built successfully (PRODUCTION SIGNED)!"
+	@echo "📦 Location: $(FRONTEND_DIR)/android/app/build/outputs/bundle/release/app-release.aab"
+	@echo "🚀 Upload this file to Google Play Console"
 
 # Build debug APK with native modules (use after adding new Expo packages)
 android-debug:

@@ -1,46 +1,54 @@
-# L.and.R Production Nginx Configuration with Smart Device Detection
-# Automatically serves desktop or mobile frontend based on User-Agent
+# L.and.R Production Nginx Configuration
+# landr.aky.net.in (NO www)
 
-# HTTP to HTTPS redirect
+# -------------------------
+# HTTP → HTTPS
+# -------------------------
 server {
+    if ($host = landr.aky.net.in) {
+        return 301 https://$host$request_uri;
+    } # managed by Certbot
+
+
     listen 80;
     listen [::]:80;
-    server_name 43.205.81.60.nip.io;
-    return 301 https://$host$request_uri;
+    server_name landr.aky.net.in;
+    return 301 https://landr.aky.net.in$request_uri;
+
+
 }
 
-# Main HTTPS server with smart routing
+# -------------------------
+# HTTPS MAIN SERVER
+# -------------------------
 server {
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
-    server_name 43.205.81.60.nip.io;
-
-    ssl_certificate /etc/letsencrypt/live/43.205.81.60.nip.io/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/43.205.81.60.nip.io/privkey.pem;
+    server_name landr.aky.net.in;
+    ssl_certificate /etc/letsencrypt/live/landr.aky.net.in/fullchain.pem; # managed by Certbot
+    ssl_certificate_key /etc/letsencrypt/live/landr.aky.net.in/privkey.pem; # managed by Certbot
     include /etc/letsencrypt/options-ssl-nginx.conf;
     ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
 
-    # Detect mobile devices using regex
+    # Detect mobile devices
     set $mobile_request "";
     if ($http_user_agent ~* "(mobile|android|iphone|ipad|ipod|blackberry|iemobile|kindle|silk|opera mini)") {
         set $mobile_request "1";
     }
 
-    # FRONTEND - Smart routing based on device
+    # FRONTEND
     location / {
-        # Mobile devices: proxy to Expo web (port 8081)
         if ($mobile_request = "1") {
             proxy_pass http://localhost:8081;
             break;
         }
 
-        # Desktop devices: serve static React build
         root /var/www/landr/desktop;
         index index.html;
         try_files $uri $uri/ /index.html;
     }
 
-    # Static assets caching (for desktop build)
+    # Static assets
     location ~* \.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot)$ {
         root /var/www/landr/desktop;
         expires 1y;
@@ -55,9 +63,9 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-    }   
+    }
 
-    # BACKEND - gRPC-Web (let Go handle CORS)
+    # gRPC / backend
     location ~ ^/(auth\.|learning\.|feed\.) {
         proxy_pass http://localhost:8080;
         proxy_http_version 1.1;
@@ -68,13 +76,12 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header Origin $http_origin;
 
-        # Disable buffering for gRPC
         proxy_buffering off;
         proxy_request_buffering off;
 
-        # Timeouts
         proxy_connect_timeout 300s;
         proxy_send_timeout 300s;
         proxy_read_timeout 300s;
     }
+
 }

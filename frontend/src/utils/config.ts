@@ -8,7 +8,7 @@ const LOCALHOST = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
 export const BYPASS_AUTH = false;
 
 // export const API_URL = `http://${LOCALHOST}:8080`;
-export const API_URL = `https://43.205.81.60.nip.io`;
+export const API_URL = `https://landr.aky.net.in`;
 
 // TODO: Get your Google OAuth credentials from https://console.cloud.google.com/
 // 1. Create a new project or select existing one
