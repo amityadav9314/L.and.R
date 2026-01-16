@@ -6,6 +6,7 @@ import Login from './pages/Login.tsx';
 import Dashboard from './pages/Dashboard.tsx';
 import DailyFeed from './pages/DailyFeed.tsx';
 import Settings from './pages/Settings.tsx';
+import AdminUsers from './pages/AdminUsers.tsx';
 import Layout from './components/Layout.tsx';
 
 const queryClient = new QueryClient();
@@ -37,6 +38,7 @@ function App() {
             <Route path="vault" element={<Dashboard />} />
             <Route path="feed" element={<DailyFeed />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="admin/users" element={<AdminUsers />} />
           </Route>
         </Routes>
       </Router>

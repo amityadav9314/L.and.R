@@ -24,6 +24,7 @@ export interface UserProfile {
   email: string;
   name: string;
   picture: string;
+  isAdmin: boolean;
 }
 
 function createBaseLoginRequest(): LoginRequest {
@@ -163,7 +164,7 @@ export const LoginResponse: MessageFns<LoginResponse> = {
 };
 
 function createBaseUserProfile(): UserProfile {
-  return { id: "", email: "", name: "", picture: "" };
+  return { id: "", email: "", name: "", picture: "", isAdmin: false };
 }
 
 export const UserProfile: MessageFns<UserProfile> = {
@@ -179,6 +180,9 @@ export const UserProfile: MessageFns<UserProfile> = {
     }
     if (message.picture !== "") {
       writer.uint32(34).string(message.picture);
+    }
+    if (message.isAdmin !== false) {
+      writer.uint32(40).bool(message.isAdmin);
     }
     return writer;
   },
@@ -222,6 +226,14 @@ export const UserProfile: MessageFns<UserProfile> = {
           message.picture = reader.string();
           continue;
         }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.isAdmin = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -237,6 +249,7 @@ export const UserProfile: MessageFns<UserProfile> = {
       email: isSet(object.email) ? globalThis.String(object.email) : "",
       name: isSet(object.name) ? globalThis.String(object.name) : "",
       picture: isSet(object.picture) ? globalThis.String(object.picture) : "",
+      isAdmin: isSet(object.isAdmin) ? globalThis.Boolean(object.isAdmin) : false,
     };
   },
 
@@ -254,6 +267,9 @@ export const UserProfile: MessageFns<UserProfile> = {
     if (message.picture !== "") {
       obj.picture = message.picture;
     }
+    if (message.isAdmin !== false) {
+      obj.isAdmin = message.isAdmin;
+    }
     return obj;
   },
 
@@ -266,6 +282,7 @@ export const UserProfile: MessageFns<UserProfile> = {
     message.email = object.email ?? "";
     message.name = object.name ?? "";
     message.picture = object.picture ?? "";
+    message.isAdmin = object.isAdmin ?? false;
     return message;
   },
 };

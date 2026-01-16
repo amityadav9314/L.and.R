@@ -36,34 +36,113 @@ func (s *PostgresStore) CreateUser(ctx context.Context, email, name, googleID, p
         VALUES ($1, $2, $3, $4)
         ON CONFLICT (google_id) DO UPDATE
         SET name = EXCLUDED.name, picture = EXCLUDED.picture, updated_at = NOW()
-        RETURNING id, email, name, picture;
+        RETURNING id, email, name, picture, COALESCE(is_admin, FALSE);
     `
 	row := s.db.QueryRow(ctx, query, email, name, googleID, picture)
 	var user auth.UserProfile
-	if err := row.Scan(&user.Id, &user.Email, &user.Name, &user.Picture); err != nil {
+	if err := row.Scan(&user.Id, &user.Email, &user.Name, &user.Picture, &user.IsAdmin); err != nil {
 		return nil, fmt.Errorf("failed to create/update user: %w", err)
 	}
 	return &user, nil
 }
 
 func (s *PostgresStore) GetUserByGoogleID(ctx context.Context, googleID string) (*auth.UserProfile, error) {
-	query := `SELECT id, email, name, picture FROM users WHERE google_id = $1`
+	query := `SELECT id, email, name, picture, COALESCE(is_admin, FALSE) FROM users WHERE google_id = $1`
 	row := s.db.QueryRow(ctx, query, googleID)
 	var user auth.UserProfile
-	if err := row.Scan(&user.Id, &user.Email, &user.Name, &user.Picture); err != nil {
+	if err := row.Scan(&user.Id, &user.Email, &user.Name, &user.Picture, &user.IsAdmin); err != nil {
 		return nil, fmt.Errorf("failed to get user: %w", err)
 	}
 	return &user, nil
 }
 
 func (s *PostgresStore) GetUserByID(ctx context.Context, userID string) (*auth.UserProfile, error) {
-	query := `SELECT id, email, name, picture FROM users WHERE id = $1`
+	query := `SELECT id, email, name, picture, COALESCE(is_admin, FALSE) FROM users WHERE id = $1`
 	row := s.db.QueryRow(ctx, query, userID)
 	var user auth.UserProfile
-	if err := row.Scan(&user.Id, &user.Email, &user.Name, &user.Picture); err != nil {
+	if err := row.Scan(&user.Id, &user.Email, &user.Name, &user.Picture, &user.IsAdmin); err != nil {
 		return nil, fmt.Errorf("failed to get user: %w", err)
 	}
 	return &user, nil
+}
+
+// AdminUser represents a user for admin display with extra fields
+type AdminUser struct {
+	ID        string
+	Email     string
+	Name      string
+	Picture   string
+	IsAdmin   bool
+	CreatedAt time.Time
+}
+
+// GetAllUsersForAdmin returns paginated users with created_at for admin display
+func (s *PostgresStore) GetAllUsersForAdmin(ctx context.Context, page, pageSize int) ([]*AdminUser, int, error) {
+	log.Printf("[Store.GetAllUsersForAdmin] Fetching users page=%d, pageSize=%d", page, pageSize)
+
+	// Get total count
+	var totalCount int
+	countQuery := `SELECT COUNT(*) FROM users`
+	if err := s.db.QueryRow(ctx, countQuery).Scan(&totalCount); err != nil {
+		return nil, 0, fmt.Errorf("failed to count users: %w", err)
+	}
+
+	// Get paginated users
+	offset := (page - 1) * pageSize
+	query := `SELECT id, email, name, picture, COALESCE(is_admin, FALSE), created_at FROM users ORDER BY created_at DESC LIMIT $1 OFFSET $2`
+	rows, err := s.db.Query(ctx, query, pageSize, offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to query users: %w", err)
+	}
+	defer rows.Close()
+
+	var users []*AdminUser
+	for rows.Next() {
+		var user AdminUser
+		if err := rows.Scan(&user.ID, &user.Email, &user.Name, &user.Picture, &user.IsAdmin, &user.CreatedAt); err != nil {
+			return nil, 0, fmt.Errorf("failed to scan user: %w", err)
+		}
+		users = append(users, &user)
+	}
+	log.Printf("[Store.GetAllUsersForAdmin] Found %d users (total: %d)", len(users), totalCount)
+	return users, totalCount, nil
+}
+
+// GetAllUsers returns all users in the system
+func (s *PostgresStore) GetAllUsers(ctx context.Context) ([]*auth.UserProfile, error) {
+	log.Printf("[Store.GetAllUsers] Fetching all users")
+	query := `SELECT id, email, name, picture, COALESCE(is_admin, FALSE) FROM users ORDER BY created_at DESC`
+	rows, err := s.db.Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query users: %w", err)
+	}
+	defer rows.Close()
+
+	var users []*auth.UserProfile
+	for rows.Next() {
+		var user auth.UserProfile
+		if err := rows.Scan(&user.Id, &user.Email, &user.Name, &user.Picture, &user.IsAdmin); err != nil {
+			return nil, fmt.Errorf("failed to scan user: %w", err)
+		}
+		users = append(users, &user)
+	}
+	log.Printf("[Store.GetAllUsers] Found %d users", len(users))
+	return users, nil
+}
+
+// SetUserAdminStatus sets the admin status for a user by email
+func (s *PostgresStore) SetUserAdminStatus(ctx context.Context, email string, isAdmin bool) error {
+	log.Printf("[Store.SetUserAdminStatus] Setting admin=%v for email: %s", isAdmin, email)
+	query := `UPDATE users SET is_admin = $1, updated_at = NOW() WHERE email = $2`
+	result, err := s.db.Exec(ctx, query, isAdmin, email)
+	if err != nil {
+		return fmt.Errorf("failed to update admin status: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("user not found with email: %s", email)
+	}
+	log.Printf("[Store.SetUserAdminStatus] Admin status updated successfully")
+	return nil
 }
 
 func (s *PostgresStore) CreateMaterial(ctx context.Context, userID, matType, content, title, sourceURL string) (string, error) {

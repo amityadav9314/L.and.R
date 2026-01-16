@@ -123,6 +123,7 @@ type UserProfile struct {
 	Email         string                 `protobuf:"bytes,2,opt,name=email,proto3" json:"email,omitempty"`
 	Name          string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
 	Picture       string                 `protobuf:"bytes,4,opt,name=picture,proto3" json:"picture,omitempty"`
+	IsAdmin       bool                   `protobuf:"varint,5,opt,name=is_admin,json=isAdmin,proto3" json:"is_admin,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -185,6 +186,13 @@ func (x *UserProfile) GetPicture() string {
 	return ""
 }
 
+func (x *UserProfile) GetIsAdmin() bool {
+	if x != nil {
+		return x.IsAdmin
+	}
+	return false
+}
+
 var File_backend_proto_auth_auth_proto protoreflect.FileDescriptor
 
 const file_backend_proto_auth_auth_proto_rawDesc = "" +
@@ -194,12 +202,13 @@ const file_backend_proto_auth_auth_proto_rawDesc = "" +
 	"\x0fgoogle_id_token\x18\x01 \x01(\tR\rgoogleIdToken\"[\n" +
 	"\rLoginResponse\x12#\n" +
 	"\rsession_token\x18\x01 \x01(\tR\fsessionToken\x12%\n" +
-	"\x04user\x18\x02 \x01(\v2\x11.auth.UserProfileR\x04user\"a\n" +
+	"\x04user\x18\x02 \x01(\v2\x11.auth.UserProfileR\x04user\"|\n" +
 	"\vUserProfile\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05email\x18\x02 \x01(\tR\x05email\x12\x12\n" +
 	"\x04name\x18\x03 \x01(\tR\x04name\x12\x18\n" +
-	"\apicture\x18\x04 \x01(\tR\apicture2?\n" +
+	"\apicture\x18\x04 \x01(\tR\apicture\x12\x19\n" +
+	"\bis_admin\x18\x05 \x01(\bR\aisAdmin2?\n" +
 	"\vAuthService\x120\n" +
 	"\x05Login\x12\x12.auth.LoginRequest\x1a\x13.auth.LoginResponseB(Z&github.com/amityadav/landr/pkg/pb/authb\x06proto3"
 

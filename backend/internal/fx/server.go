@@ -76,6 +76,7 @@ type ServerParams struct {
 	FeedService     *service.FeedService  `optional:"true"`
 	FeedCore        *core.FeedCore        `optional:"true"`
 	NotifWorker     *notifications.Worker `optional:"true"`
+	TokenManager    *token.Manager
 	Config          config.Config
 }
 
@@ -108,6 +109,7 @@ func StartServers(p ServerParams) {
 				FeedService:     p.FeedService,
 				FeedCore:        p.FeedCore,
 				NotifWorker:     p.NotifWorker,
+				TokenManager:    p.TokenManager,
 			}
 			restHandler := server.CreateRESTHandler(serverServices, p.Config)
 			combinedHandler := server.CreateCombinedHandler(httpHandler, restHandler)

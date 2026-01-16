@@ -2,8 +2,10 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/amityadav/landr/internal/config"
@@ -11,6 +13,7 @@ import (
 	"github.com/amityadav/landr/internal/notifications"
 	"github.com/amityadav/landr/internal/service"
 	"github.com/amityadav/landr/internal/store"
+	"github.com/amityadav/landr/internal/token"
 )
 
 // Services groups all service dependencies for REST handlers
@@ -21,14 +24,15 @@ type Services struct {
 	FeedService     *service.FeedService
 	FeedCore        *core.FeedCore
 	NotifWorker     *notifications.Worker
+	TokenManager    *token.Manager
 }
 
 // CreateRESTHandler creates REST API endpoints
 func CreateRESTHandler(services Services, cfg config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-API-Key")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-API-Key, Authorization")
 
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(http.StatusNoContent)
@@ -44,6 +48,10 @@ func CreateRESTHandler(services Services, cfg config.Config) http.HandlerFunc {
 			handleNotificationDaily(w, r, services.NotifWorker, cfg.FeedAPIKey)
 		case "/api/privacy-policy":
 			handlePrivacyPolicy(w, r)
+		case "/api/admin/users":
+			handleGetAllUsers(w, r, services.Store, services.TokenManager)
+		case "/api/admin/set-admin":
+			handleSetAdminStatus(w, r, services.Store, cfg.FeedAPIKey)
 		default:
 			http.NotFound(w, r)
 		}
@@ -206,4 +214,128 @@ func handlePrivacyPolicy(w http.ResponseWriter, r *http.Request) {
 </html>`
 
 	w.Write([]byte(html))
+}
+
+func handleGetAllUsers(w http.ResponseWriter, r *http.Request, st *store.PostgresStore, tm *token.Manager) {
+	if r.Method != "GET" {
+		http.Error(w, `{"error": "method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Verify the user is authenticated and is an admin
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		http.Error(w, `{"error": "unauthorized - missing Authorization header"}`, http.StatusUnauthorized)
+		return
+	}
+
+	// Extract token from "Bearer <token>"
+	tokenStr := authHeader
+	if len(authHeader) > 7 && authHeader[:7] == "Bearer " {
+		tokenStr = authHeader[7:]
+	}
+
+	// Validate token and get user ID
+	userID, err := tm.Verify(tokenStr)
+	if err != nil {
+		log.Printf("[REST] handleGetAllUsers - token validation failed: %v", err)
+		http.Error(w, `{"error": "unauthorized - invalid token"}`, http.StatusUnauthorized)
+		return
+	}
+
+	// Get user from store to check admin status
+	user, err := st.GetUserByID(r.Context(), userID)
+	if err != nil {
+		log.Printf("[REST] handleGetAllUsers - failed to get user: %v", err)
+		http.Error(w, `{"error": "unauthorized - user not found"}`, http.StatusUnauthorized)
+		return
+	}
+
+	if !user.IsAdmin {
+		log.Printf("[REST] handleGetAllUsers - non-admin user attempted access: %s", user.Email)
+		http.Error(w, `{"error": "forbidden - admin access required"}`, http.StatusForbidden)
+		return
+	}
+
+	// Parse pagination params
+	page := 1
+	pageSize := 10
+	if p := r.URL.Query().Get("page"); p != "" {
+		if parsed, err := strconv.Atoi(p); err == nil && parsed > 0 {
+			page = parsed
+		}
+	}
+	if ps := r.URL.Query().Get("page_size"); ps != "" {
+		if parsed, err := strconv.Atoi(ps); err == nil && parsed > 0 && parsed <= 100 {
+			pageSize = parsed
+		}
+	}
+
+	users, totalCount, err := st.GetAllUsersForAdmin(r.Context(), page, pageSize)
+	if err != nil {
+		log.Printf("[REST] handleGetAllUsers - failed to get users: %v", err)
+		http.Error(w, `{"error": "failed to get users"}`, http.StatusInternalServerError)
+		return
+	}
+
+	// Build JSON response manually
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	jsonUsers := "["
+	for i, u := range users {
+		if i > 0 {
+			jsonUsers += ","
+		}
+		jsonUsers += `{"id":"` + u.ID + `","email":"` + u.Email + `","name":"` + u.Name + `","picture":"` + u.Picture + `","is_admin":` + boolToString(u.IsAdmin) + `,"created_at":"` + u.CreatedAt.Format("2006-01-02T15:04:05Z07:00") + `"}`
+	}
+	jsonUsers += "]"
+
+	totalPages := (totalCount + pageSize - 1) / pageSize
+	response := fmt.Sprintf(`{"users":%s,"page":%d,"page_size":%d,"total_count":%d,"total_pages":%d}`, jsonUsers, page, pageSize, totalCount, totalPages)
+	w.Write([]byte(response))
+}
+
+func handleSetAdminStatus(w http.ResponseWriter, r *http.Request, st *store.PostgresStore, feedAPIKey string) {
+	if r.Method != "POST" {
+		http.Error(w, `{"error": "method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+
+	if feedAPIKey == "" || r.Header.Get("X-API-Key") != feedAPIKey {
+		http.Error(w, `{"error": "unauthorized - invalid or missing X-API-Key header"}`, http.StatusUnauthorized)
+		return
+	}
+
+	email := r.URL.Query().Get("email")
+	if email == "" {
+		http.Error(w, `{"error": "email query parameter is required"}`, http.StatusBadRequest)
+		return
+	}
+
+	isAdminStr := r.URL.Query().Get("is_admin")
+	if isAdminStr == "" {
+		http.Error(w, `{"error": "is_admin query parameter is required"}`, http.StatusBadRequest)
+		return
+	}
+
+	isAdmin := isAdminStr == "true" || isAdminStr == "1"
+
+	if err := st.SetUserAdminStatus(r.Context(), email, isAdmin); err != nil {
+		log.Printf("[REST] handleSetAdminStatus - failed: %v", err)
+		http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("[REST] handleSetAdminStatus - set admin=%v for email: %s", isAdmin, email)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"status": "success", "message": "Admin status updated", "email": "` + email + `", "is_admin": ` + boolToString(isAdmin) + `}`))
+}
+
+func boolToString(b bool) string {
+	if b {
+		return "true"
+	}
+	return "false"
 }

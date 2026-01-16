@@ -22,4 +22,5 @@ message UserProfile {
   string email = 2;
   string name = 3;
   string picture = 4;
+  bool is_admin = 5;
 }
