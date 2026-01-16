@@ -2,7 +2,7 @@ package server
 
 import (
 	"context"
-	"fmt"
+	"encoding/json"
 	"log"
 	"net/http"
 	"strconv"
@@ -278,22 +278,50 @@ func handleGetAllUsers(w http.ResponseWriter, r *http.Request, st *store.Postgre
 		return
 	}
 
-	// Build JSON response manually
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-
-	jsonUsers := "["
-	for i, u := range users {
-		if i > 0 {
-			jsonUsers += ","
-		}
-		jsonUsers += `{"id":"` + u.ID + `","email":"` + u.Email + `","name":"` + u.Name + `","picture":"` + u.Picture + `","is_admin":` + boolToString(u.IsAdmin) + `,"created_at":"` + u.CreatedAt.Format("2006-01-02T15:04:05Z07:00") + `"}`
+	// Build response using proper JSON marshaling
+	type userResponse struct {
+		ID            string `json:"id"`
+		Email         string `json:"email"`
+		Name          string `json:"name"`
+		Picture       string `json:"picture"`
+		IsAdmin       bool   `json:"is_admin"`
+		CreatedAt     string `json:"created_at"`
+		MaterialCount int    `json:"material_count"`
 	}
-	jsonUsers += "]"
+
+	type paginatedResponse struct {
+		Users      []userResponse `json:"users"`
+		Page       int            `json:"page"`
+		PageSize   int            `json:"page_size"`
+		TotalCount int            `json:"total_count"`
+		TotalPages int            `json:"total_pages"`
+	}
+
+	userList := make([]userResponse, 0, len(users))
+	for _, u := range users {
+		userList = append(userList, userResponse{
+			ID:            u.ID,
+			Email:         u.Email,
+			Name:          u.Name,
+			Picture:       u.Picture,
+			IsAdmin:       u.IsAdmin,
+			CreatedAt:     u.CreatedAt.Format(time.RFC3339),
+			MaterialCount: u.MaterialCount,
+		})
+	}
 
 	totalPages := (totalCount + pageSize - 1) / pageSize
-	response := fmt.Sprintf(`{"users":%s,"page":%d,"page_size":%d,"total_count":%d,"total_pages":%d}`, jsonUsers, page, pageSize, totalCount, totalPages)
-	w.Write([]byte(response))
+	response := paginatedResponse{
+		Users:      userList,
+		Page:       page,
+		PageSize:   pageSize,
+		TotalCount: totalCount,
+		TotalPages: totalPages,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(response)
 }
 
 func handleSetAdminStatus(w http.ResponseWriter, r *http.Request, st *store.PostgresStore, feedAPIKey string) {

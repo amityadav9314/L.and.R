@@ -68,12 +68,13 @@ func (s *PostgresStore) GetUserByID(ctx context.Context, userID string) (*auth.U
 
 // AdminUser represents a user for admin display with extra fields
 type AdminUser struct {
-	ID        string
-	Email     string
-	Name      string
-	Picture   string
-	IsAdmin   bool
-	CreatedAt time.Time
+	ID            string
+	Email         string
+	Name          string
+	Picture       string
+	IsAdmin       bool
+	CreatedAt     time.Time
+	MaterialCount int
 }
 
 // GetAllUsersForAdmin returns paginated users with created_at for admin display
@@ -87,9 +88,15 @@ func (s *PostgresStore) GetAllUsersForAdmin(ctx context.Context, page, pageSize 
 		return nil, 0, fmt.Errorf("failed to count users: %w", err)
 	}
 
-	// Get paginated users
+	// Get paginated users with material count
 	offset := (page - 1) * pageSize
-	query := `SELECT id, email, name, picture, COALESCE(is_admin, FALSE), created_at FROM users ORDER BY created_at DESC LIMIT $1 OFFSET $2`
+	query := `
+		SELECT u.id, u.email, u.name, u.picture, COALESCE(u.is_admin, FALSE), u.created_at,
+		       (SELECT COUNT(*) FROM materials m WHERE m.user_id = u.id AND (m.is_deleted = FALSE OR m.is_deleted IS NULL)) as material_count
+		FROM users u
+		ORDER BY u.created_at DESC
+		LIMIT $1 OFFSET $2
+	`
 	rows, err := s.db.Query(ctx, query, pageSize, offset)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to query users: %w", err)
@@ -99,7 +106,7 @@ func (s *PostgresStore) GetAllUsersForAdmin(ctx context.Context, page, pageSize 
 	var users []*AdminUser
 	for rows.Next() {
 		var user AdminUser
-		if err := rows.Scan(&user.ID, &user.Email, &user.Name, &user.Picture, &user.IsAdmin, &user.CreatedAt); err != nil {
+		if err := rows.Scan(&user.ID, &user.Email, &user.Name, &user.Picture, &user.IsAdmin, &user.CreatedAt, &user.MaterialCount); err != nil {
 			return nil, 0, fmt.Errorf("failed to scan user: %w", err)
 		}
 		users = append(users, &user)

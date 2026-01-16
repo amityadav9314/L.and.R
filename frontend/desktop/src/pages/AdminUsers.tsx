@@ -12,6 +12,7 @@ interface User {
     picture: string;
     is_admin: boolean;
     created_at: string;
+    material_count: number;
 }
 
 interface PaginatedResponse {
@@ -126,6 +127,7 @@ const AdminUsers = () => {
                                     <th className="border-0 py-3 ps-4">User</th>
                                     <th className="border-0 py-3">Email</th>
                                     <th className="border-0 py-3">Joined</th>
+                                    <th className="border-0 py-3 text-center">Materials</th>
                                     <th className="border-0 py-3 text-center">Role</th>
                                 </tr>
                             </thead>
@@ -151,6 +153,11 @@ const AdminUsers = () => {
                                                 month: 'short',
                                                 day: 'numeric'
                                             })}
+                                        </td>
+                                        <td className="py-3 text-center">
+                                            <Badge bg="info" className="rounded-pill px-2 py-1">
+                                                {u.material_count}
+                                            </Badge>
                                         </td>
                                         <td className="py-3 text-center">
                                             {u.is_admin ? (
