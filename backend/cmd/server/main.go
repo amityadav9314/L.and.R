@@ -31,6 +31,7 @@ func main() {
 		appfx.CoreModule,         // Provides: *core.AuthCore, *core.LearningCore, *core.FeedCore
 		appfx.ServiceModule,      // Provides: *service.AuthService, *service.LearningService, *service.FeedService
 		appfx.NotificationModule, // Provides: *firebase.Sender, *notifications.Worker
+		appfx.PaymentModule,      // Provides: *payment.Service (Razorpay)
 		appfx.ServerModule,       // Starts gRPC + HTTP servers, registers services
 
 		// Use simple console logger for cleaner output
