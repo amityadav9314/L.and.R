@@ -19,12 +19,12 @@ type Config struct {
 	RazorpayPaymentFlow   string
 	SerpAPIKey            string
 	FeedAPIKey            string
-	FeedAPIKey            string
 	FirebaseCredPath      string
 	LimitFreeLink         int
 	LimitFreeText         int
 	LimitProLink          int
 	LimitProText          int
+	FrontendURL           string
 }
 
 // Load loads configuration from environment variables
@@ -42,12 +42,12 @@ func Load() Config {
 		RazorpayKeySecret:     getEnv("RAZORPAY_KEY_SECRET", ""),
 		RazorpayWebhookSecret: getEnv("RAZORPAY_WEBHOOK_SECRET", ""),
 		RazorpayPaymentFlow:   getEnv("RAZORPAY_PAYMENT_FLOW", "popup"),
-		RazorpayPaymentFlow:   getEnv("RAZORPAY_PAYMENT_FLOW", "popup"),
 		FirebaseCredPath:      "firebase/service-account.json",
 		LimitFreeLink:         getEnvInt("LIMIT_FREE_LINK", 3),     // Default 5? No, sticking to safe default 3
 		LimitFreeText:         getEnvInt("LIMIT_FREE_TEXT", 10),    // Default 10
 		LimitProLink:          getEnvInt("LIMIT_PRO_LINK", 20),     // **Changed default to 20 as discussed**
 		LimitProText:          getEnvInt("LIMIT_PRO_TEXT", 100000), // Unlimited
+		FrontendURL:           getEnv("FRONTEND_URL", "https://landr.aky.net.in"),
 	}
 }
 

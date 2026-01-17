@@ -19,18 +19,20 @@ import (
 type PaymentService struct {
 	payment_pb.UnimplementedPaymentServiceServer
 	payment *payment.Service
-	store   *store.PostgresStore
-	keyID   string
-	flow    string
+	store       *store.PostgresStore
+	keyID       string
+	flow        string
+	frontendURL string
 }
 
 // NewPaymentService creates a new payment service
-func NewPaymentService(p *payment.Service, s *store.PostgresStore, keyID, flow string) *PaymentService {
+func NewPaymentService(p *payment.Service, s *store.PostgresStore, keyID, flow, frontendURL string) *PaymentService {
 	return &PaymentService{
-		payment: p,
-		store:   s,
-		keyID:   keyID,
-		flow:    flow, // "redirect" or "popup"
+		payment:     p,
+		store:       s,
+		keyID:       keyID,
+		flow:        flow, // "redirect" or "popup"
+		frontendURL: frontendURL,
 	}
 }
 
@@ -85,7 +87,9 @@ func (s *PaymentService) CreateSubscriptionOrder(ctx context.Context, req *payme
 			log.Printf("[PaymentService] Warning: Could not fetch user details for payment link: %v", err)
 		}
 
-		callbackURL := "https://landr.aky.net.in/upgrade?status=success" // simplified
+		}
+
+		callbackURL := fmt.Sprintf("%s/upgrade?status=success", s.frontendURL)
 
 		link, err := s.payment.CreatePaymentLink(amount, currency, refID, "L.and.R Pro Upgrade", customer, notes, callbackURL)
 		if err != nil {
