@@ -51,6 +51,35 @@ func (s *Service) CreateOrder(amount float64, currency, receipt string, notes ma
 	return orderID, nil
 }
 
+// CreatePaymentLink creates a Razorpay Payment Link
+func (s *Service) CreatePaymentLink(amount float64, currency, reference, description string, customer map[string]interface{}, notes map[string]interface{}, callbackURL string) (string, error) {
+	amountPaise := amount * 100
+
+	data := map[string]interface{}{
+		"amount":          amountPaise,
+		"currency":        currency,
+		"reference_id":    reference,
+		"description":     description,
+		"customer":        customer,
+		"notes":           notes,
+		"callback_url":    callbackURL,
+		"callback_method": "get",
+	}
+
+	body, err := s.client.PaymentLink.Create(data, nil)
+	if err != nil {
+		log.Printf("[Payment] Failed to create payment link: %v", err)
+		return "", fmt.Errorf("failed to create payment link: %v", err)
+	}
+
+	shortURL, ok := body["short_url"].(string)
+	if !ok {
+		return "", fmt.Errorf("invalid response from razorpay (no short_url)")
+	}
+
+	return shortURL, nil
+}
+
 // VerifySignature verifies the Razorpay signature
 func (s *Service) VerifySignature(orderID, paymentID, signature string) error {
 	payload := orderID + "|" + paymentID

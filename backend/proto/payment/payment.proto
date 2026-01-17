@@ -17,4 +17,5 @@ message CreateSubscriptionOrderResponse {
   float amount = 2;
   string currency = 3;
   string key_id = 4;
+  string payment_link = 5;
 }

@@ -1,6 +1,7 @@
-import { useState } from 'react';
 import { paymentClient } from '../services/api';
 import { useAuthStore } from '../store/authStore';
+import { useEffect, useState } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Alert, Button, Card, Col, Container, Row, Spinner } from 'react-bootstrap';
 import { CheckCircle } from 'lucide-react';
 
@@ -14,6 +15,18 @@ const UpgradePage = () => {
     const { user } = useAuthStore();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [searchParams] = useSearchParams();
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        const status = searchParams.get('status');
+        if (status === 'success') {
+            alert("Payment Successful! Your plan will be updated shortly.");
+            navigate('/');
+        } else if (status === 'failed') {
+            setError("Payment Failed. Please try again.");
+        }
+    }, [searchParams, navigate]);
 
     const handleUpgrade = async () => {
         setLoading(true);
@@ -21,6 +34,13 @@ const UpgradePage = () => {
         try {
             const response = await paymentClient.createSubscriptionOrder({ planId: 'PRO' });
 
+            // If backend returned a Payment Link (Redirect Flow)
+            if (response.paymentLink) {
+                window.location.href = response.paymentLink;
+                return;
+            }
+
+            // Otherwise, Standard Popup Flow
             const options = {
                 key: response.keyId,
                 amount: response.amount * 100, // Razorpay expects paise, but API might return amount in INR. Wait, backend returns amount in INR.

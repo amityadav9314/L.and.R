@@ -2,7 +2,10 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"os"
+	"time"
 
 	"github.com/amityadav/landr/internal/payment"
 	"github.com/amityadav/landr/internal/store"
@@ -48,16 +51,43 @@ func (s *PaymentService) CreateSubscriptionOrder(ctx context.Context, req *payme
 		"plan":    req.PlanId,
 	}
 
-	orderID, err := s.payment.CreateOrder(amount, currency, userID, notes)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to create order: %v", err)
+	// Check Payment Flow (popup vs redirect)
+	flow := os.Getenv("RAZORPAY_PAYMENT_FLOW") // "redirect" or "popup"
+
+	var paymentLink string
+	var orderID string
+
+	if flow == "redirect" {
+		// Generate Payment Link
+		// Create a unique reference ID
+		refID := fmt.Sprintf("pay_%s_%d", userID, time.Now().Unix())
+
+		// Ideally fetch user email, but for MVP we skip or pass empty
+		customer := map[string]interface{}{}
+
+		callbackURL := "https://landr.aky.net.in/upgrade?status=success" // simplified
+
+		link, err := s.payment.CreatePaymentLink(amount, currency, refID, "L.and.R Pro Upgrade", customer, notes, callbackURL)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to create payment link: %v", err)
+		}
+		paymentLink = link
+		log.Printf("[PaymentService] Generated Payment Link: %s", link)
+	} else {
+		// Standard Order (Popup)
+		oid, err := s.payment.CreateOrder(amount, currency, userID, notes)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to create order: %v", err)
+		}
+		orderID = oid
 	}
 
 	return &payment_pb.CreateSubscriptionOrderResponse{
-		OrderId:  orderID,
-		Amount:   float32(amount),
-		Currency: currency,
-		KeyId:    s.keyID,
+		OrderId:     orderID,
+		Amount:      float32(amount),
+		Currency:    currency,
+		KeyId:       s.keyID,
+		PaymentLink: paymentLink,
 	}, nil
 }
 
