@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import RazorpayCheckout from 'react-native-razorpay';
 import { paymentClient } from '../services/directApi';
+import { API_URL } from '../utils/config';
 import { useAuthStore } from '../store/authStore';
 import { Ionicons } from '@expo/vector-icons';
 import { CommonActions, useNavigation } from '@react-navigation/native';
@@ -20,7 +21,7 @@ export const UpgradeScreen = () => {
             // 2. Open Razorpay Checkout
             const options = {
                 description: 'Upgrade to Pro Plan',
-                image: 'https://landr.aky.net.in/logo.png', // Optional: Add app logo URL
+                image: `${API_URL}/logo.png`, // Optional: Add app logo URL
                 currency: order.currency,
                 key: order.keyId, // Key ID from backend
                 amount: order.amount * 100, // Amount in paise (Backend returns INR float, so * 100)
