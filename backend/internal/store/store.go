@@ -12,6 +12,7 @@ type Store interface {
 	// User
 	CreateUser(ctx context.Context, email, name, googleID, picture string) (*auth.UserProfile, error)
 	GetUserByGoogleID(ctx context.Context, googleID string) (*auth.UserProfile, error)
+	GetUserByID(ctx context.Context, userID string) (*auth.UserProfile, error)
 	GetAllUsers(ctx context.Context) ([]*auth.UserProfile, error)
 	SetUserAdminStatus(ctx context.Context, email string, isAdmin bool) error
 

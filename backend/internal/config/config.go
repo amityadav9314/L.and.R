@@ -13,6 +13,7 @@ type Config struct {
 	RazorpayKeyID         string
 	RazorpayKeySecret     string
 	RazorpayWebhookSecret string
+	RazorpayPaymentFlow   string
 	SerpAPIKey            string
 	FeedAPIKey            string
 	FirebaseCredPath      string
@@ -32,6 +33,7 @@ func Load() Config {
 		RazorpayKeyID:         getEnv("RAZORPAY_KEY_ID", ""),
 		RazorpayKeySecret:     getEnv("RAZORPAY_KEY_SECRET", ""),
 		RazorpayWebhookSecret: getEnv("RAZORPAY_WEBHOOK_SECRET", ""),
+		RazorpayPaymentFlow:   getEnv("RAZORPAY_PAYMENT_FLOW", "popup"),
 		FirebaseCredPath:      "firebase/service-account.json",
 	}
 }

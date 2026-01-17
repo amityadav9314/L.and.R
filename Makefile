@@ -250,7 +250,7 @@ proto:
 	--ts_proto_out=./frontend/desktop/src/proto/backend \
 	--ts_proto_opt=esModuleInterop=true,outputServices=nice-grpc,env=browser,useExactTypes=false \
 	--proto_path=./backend \
-	backend/proto/auth/auth.proto backend/proto/learning/learning.proto backend/proto/feed/feed.proto
+	backend/proto/auth/auth.proto backend/proto/learning/learning.proto backend/proto/feed/feed.proto backend/proto/payment/payment.proto
 	@echo "✅ Desktop TypeScript proto files generated"
 	
 	@echo ""

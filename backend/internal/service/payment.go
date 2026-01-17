@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
 	"time"
 
 	"github.com/amityadav/landr/internal/payment"
@@ -22,14 +21,16 @@ type PaymentService struct {
 	payment *payment.Service
 	store   *store.PostgresStore
 	keyID   string
+	flow    string
 }
 
 // NewPaymentService creates a new payment service
-func NewPaymentService(p *payment.Service, s *store.PostgresStore, keyID string) *PaymentService {
+func NewPaymentService(p *payment.Service, s *store.PostgresStore, keyID, flow string) *PaymentService {
 	return &PaymentService{
 		payment: p,
 		store:   s,
 		keyID:   keyID,
+		flow:    flow, // "redirect" or "popup"
 	}
 }
 
@@ -52,18 +53,37 @@ func (s *PaymentService) CreateSubscriptionOrder(ctx context.Context, req *payme
 	}
 
 	// Check Payment Flow (popup vs redirect)
-	flow := os.Getenv("RAZORPAY_PAYMENT_FLOW") // "redirect" or "popup"
+	// Check Payment Flow (popup vs redirect)
+	flow := s.flow
+	if flow == "" {
+		flow = "popup"
+	}
+	log.Printf("[PaymentService] Flow Configured: '%s'", flow)
 
 	var paymentLink string
 	var orderID string
 
 	if flow == "redirect" {
 		// Generate Payment Link
-		// Create a unique reference ID
-		refID := fmt.Sprintf("pay_%s_%d", userID, time.Now().Unix())
+		// Create a unique reference ID (Max 40 chars)
+		// UserID is 36 chars, timestamp is 10. "pay_" + UUID + "_" + TS > 40.
+		// We use shorter ref: "pay_" + last8(UserID) + "_" + TS
+		shortUser := userID
+		if len(userID) > 8 {
+			shortUser = userID[len(userID)-8:]
+		}
+		refID := fmt.Sprintf("pay_%s_%d", shortUser, time.Now().Unix())
 
-		// Ideally fetch user email, but for MVP we skip or pass empty
+		// Fetch user details for the Payment Link
+		user, err := s.store.GetUserByID(ctx, userID)
 		customer := map[string]interface{}{}
+		if err == nil && user != nil {
+			customer["name"] = user.Name
+			customer["email"] = user.Email
+			// customer["contact"] = ... // We don't have phone number
+		} else {
+			log.Printf("[PaymentService] Warning: Could not fetch user details for payment link: %v", err)
+		}
 
 		callbackURL := "https://landr.aky.net.in/upgrade?status=success" // simplified
 

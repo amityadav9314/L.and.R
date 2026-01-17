@@ -20,6 +20,7 @@ export interface CreateSubscriptionOrderResponse {
   amount: number;
   currency: string;
   keyId: string;
+  paymentLink: string;
 }
 
 function createBaseCreateSubscriptionOrderRequest(): CreateSubscriptionOrderRequest {
@@ -81,7 +82,7 @@ export const CreateSubscriptionOrderRequest: MessageFns<CreateSubscriptionOrderR
 };
 
 function createBaseCreateSubscriptionOrderResponse(): CreateSubscriptionOrderResponse {
-  return { orderId: "", amount: 0, currency: "", keyId: "" };
+  return { orderId: "", amount: 0, currency: "", keyId: "", paymentLink: "" };
 }
 
 export const CreateSubscriptionOrderResponse: MessageFns<CreateSubscriptionOrderResponse> = {
@@ -97,6 +98,9 @@ export const CreateSubscriptionOrderResponse: MessageFns<CreateSubscriptionOrder
     }
     if (message.keyId !== "") {
       writer.uint32(34).string(message.keyId);
+    }
+    if (message.paymentLink !== "") {
+      writer.uint32(42).string(message.paymentLink);
     }
     return writer;
   },
@@ -140,6 +144,14 @@ export const CreateSubscriptionOrderResponse: MessageFns<CreateSubscriptionOrder
           message.keyId = reader.string();
           continue;
         }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.paymentLink = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -155,6 +167,7 @@ export const CreateSubscriptionOrderResponse: MessageFns<CreateSubscriptionOrder
       amount: isSet(object.amount) ? globalThis.Number(object.amount) : 0,
       currency: isSet(object.currency) ? globalThis.String(object.currency) : "",
       keyId: isSet(object.keyId) ? globalThis.String(object.keyId) : "",
+      paymentLink: isSet(object.paymentLink) ? globalThis.String(object.paymentLink) : "",
     };
   },
 
@@ -172,6 +185,9 @@ export const CreateSubscriptionOrderResponse: MessageFns<CreateSubscriptionOrder
     if (message.keyId !== "") {
       obj.keyId = message.keyId;
     }
+    if (message.paymentLink !== "") {
+      obj.paymentLink = message.paymentLink;
+    }
     return obj;
   },
 
@@ -184,6 +200,7 @@ export const CreateSubscriptionOrderResponse: MessageFns<CreateSubscriptionOrder
     message.amount = object.amount ?? 0;
     message.currency = object.currency ?? "";
     message.keyId = object.keyId ?? "";
+    message.paymentLink = object.paymentLink ?? "";
     return message;
   },
 };

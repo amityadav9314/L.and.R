@@ -253,8 +253,8 @@ func NewPaymentService(p *payment.Service, st *store.PostgresStore, cfg config.C
 		log.Printf("[FX] PaymentService disabled (no Payment provider)")
 		return nil
 	}
-	svc := service.NewPaymentService(p, st, cfg.RazorpayKeyID)
-	log.Printf("[FX] PaymentService initialized")
+	svc := service.NewPaymentService(p, st, cfg.RazorpayKeyID, cfg.RazorpayPaymentFlow)
+	log.Printf("[FX] PaymentService initialized (Flow: %s)", cfg.RazorpayPaymentFlow)
 	return svc
 }
 

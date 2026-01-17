@@ -71,6 +71,7 @@ type CreateSubscriptionOrderResponse struct {
 	Amount        float32                `protobuf:"fixed32,2,opt,name=amount,proto3" json:"amount,omitempty"`
 	Currency      string                 `protobuf:"bytes,3,opt,name=currency,proto3" json:"currency,omitempty"`
 	KeyId         string                 `protobuf:"bytes,4,opt,name=key_id,json=keyId,proto3" json:"key_id,omitempty"`
+	PaymentLink   string                 `protobuf:"bytes,5,opt,name=payment_link,json=paymentLink,proto3" json:"payment_link,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -133,18 +134,26 @@ func (x *CreateSubscriptionOrderResponse) GetKeyId() string {
 	return ""
 }
 
+func (x *CreateSubscriptionOrderResponse) GetPaymentLink() string {
+	if x != nil {
+		return x.PaymentLink
+	}
+	return ""
+}
+
 var File_backend_proto_payment_payment_proto protoreflect.FileDescriptor
 
 const file_backend_proto_payment_payment_proto_rawDesc = "" +
 	"\n" +
 	"#backend/proto/payment/payment.proto\x12\apayment\"9\n" +
 	"\x1eCreateSubscriptionOrderRequest\x12\x17\n" +
-	"\aplan_id\x18\x01 \x01(\tR\x06planId\"\x87\x01\n" +
+	"\aplan_id\x18\x01 \x01(\tR\x06planId\"\xaa\x01\n" +
 	"\x1fCreateSubscriptionOrderResponse\x12\x19\n" +
 	"\border_id\x18\x01 \x01(\tR\aorderId\x12\x16\n" +
 	"\x06amount\x18\x02 \x01(\x02R\x06amount\x12\x1a\n" +
 	"\bcurrency\x18\x03 \x01(\tR\bcurrency\x12\x15\n" +
-	"\x06key_id\x18\x04 \x01(\tR\x05keyId2~\n" +
+	"\x06key_id\x18\x04 \x01(\tR\x05keyId\x12!\n" +
+	"\fpayment_link\x18\x05 \x01(\tR\vpaymentLink2~\n" +
 	"\x0ePaymentService\x12l\n" +
 	"\x17CreateSubscriptionOrder\x12'.payment.CreateSubscriptionOrderRequest\x1a(.payment.CreateSubscriptionOrderResponseB.Z,github.com/amityadav/landr/pkg/pb/payment_pbb\x06proto3"
 
