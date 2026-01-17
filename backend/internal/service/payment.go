@@ -18,13 +18,15 @@ type PaymentService struct {
 	payment_pb.UnimplementedPaymentServiceServer
 	payment *payment.Service
 	store   *store.PostgresStore
+	keyID   string
 }
 
 // NewPaymentService creates a new payment service
-func NewPaymentService(p *payment.Service, s *store.PostgresStore) *PaymentService {
+func NewPaymentService(p *payment.Service, s *store.PostgresStore, keyID string) *PaymentService {
 	return &PaymentService{
 		payment: p,
 		store:   s,
+		keyID:   keyID,
 	}
 }
 
@@ -55,7 +57,7 @@ func (s *PaymentService) CreateSubscriptionOrder(ctx context.Context, req *payme
 		OrderId:  orderID,
 		Amount:   float32(amount),
 		Currency: currency,
-		KeyId:    "rzp_test_KEY_ID_SHOULD_BE_IN_FRONTEND", // Usually passed to frontend via config or environment
+		KeyId:    s.keyID,
 	}, nil
 }
 

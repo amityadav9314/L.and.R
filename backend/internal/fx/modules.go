@@ -248,12 +248,12 @@ func NewFeedService(c *core.FeedCore) *service.FeedService {
 }
 
 // NewPaymentService creates payment gRPC service (optional)
-func NewPaymentService(p *payment.Service, st *store.PostgresStore) *service.PaymentService {
+func NewPaymentService(p *payment.Service, st *store.PostgresStore, cfg config.Config) *service.PaymentService {
 	if p == nil {
 		log.Printf("[FX] PaymentService disabled (no Payment provider)")
 		return nil
 	}
-	svc := service.NewPaymentService(p, st)
+	svc := service.NewPaymentService(p, st, cfg.RazorpayKeyID)
 	log.Printf("[FX] PaymentService initialized")
 	return svc
 }
