@@ -10,6 +10,7 @@ import (
 	"github.com/amityadav/landr/internal/core"
 	"github.com/amityadav/landr/internal/middleware"
 	"github.com/amityadav/landr/internal/notifications"
+	"github.com/amityadav/landr/internal/quota"
 	"github.com/amityadav/landr/internal/server"
 	"github.com/amityadav/landr/internal/service"
 	"github.com/amityadav/landr/internal/store"
@@ -17,6 +18,7 @@ import (
 	"github.com/amityadav/landr/pkg/pb/auth"
 	"github.com/amityadav/landr/pkg/pb/feed"
 	"github.com/amityadav/landr/pkg/pb/learning"
+	"github.com/amityadav/landr/pkg/pb/payment_pb"
 	"go.uber.org/fx"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -33,10 +35,15 @@ var ServerModule = fx.Module("server",
 )
 
 // NewGRPCServer creates configured gRPC server with auth interceptor
-func NewGRPCServer(tm *token.Manager) *grpc.Server {
+func NewGRPCServer(tm *token.Manager, s *store.PostgresStore) *grpc.Server {
 	authInterceptor := middleware.NewAuthInterceptor(tm)
+	quotaInterceptor := quota.NewInterceptor(s)
+
 	srv := grpc.NewServer(
-		grpc.UnaryInterceptor(authInterceptor.Unary()),
+		grpc.ChainUnaryInterceptor(
+			authInterceptor.Unary(),
+			quotaInterceptor.Unary(),
+		),
 	)
 	reflection.Register(srv)
 	log.Printf("[FX] gRPC Server created")
@@ -49,7 +56,8 @@ type GRPCServicesParams struct {
 	Server          *grpc.Server
 	AuthService     *service.AuthService
 	LearningService *service.LearningService
-	FeedService     *service.FeedService `optional:"true"` // Optional
+	FeedService     *service.FeedService    `optional:"true"`
+	PaymentService  *service.PaymentService `optional:"true"`
 }
 
 // RegisterGRPCServices registers all gRPC services with the server
@@ -59,10 +67,14 @@ func RegisterGRPCServices(p GRPCServicesParams) {
 
 	if p.FeedService != nil {
 		feed.RegisterFeedServiceServer(p.Server, p.FeedService)
-		log.Printf("[FX] Registered: AuthService, LearningService, FeedService")
-	} else {
-		log.Printf("[FX] Registered: AuthService, LearningService (FeedService disabled)")
 	}
+
+	if p.PaymentService != nil {
+		payment_pb.RegisterPaymentServiceServer(p.Server, p.PaymentService)
+		log.Printf("[FX] Registered: PaymentService")
+	}
+
+	log.Printf("[FX] Registered Services")
 }
 
 // ServerParams groups dependencies for starting servers
@@ -73,9 +85,10 @@ type ServerParams struct {
 	Store           *store.PostgresStore
 	AuthService     *service.AuthService
 	LearningService *service.LearningService
-	FeedService     *service.FeedService  `optional:"true"`
-	FeedCore        *core.FeedCore        `optional:"true"`
-	NotifWorker     *notifications.Worker `optional:"true"`
+	FeedService     *service.FeedService    `optional:"true"`
+	PaymentService  *service.PaymentService `optional:"true"`
+	FeedCore        *core.FeedCore          `optional:"true"`
+	NotifWorker     *notifications.Worker   `optional:"true"`
 	TokenManager    *token.Manager
 	Config          config.Config
 }
@@ -107,6 +120,7 @@ func StartServers(p ServerParams) {
 				AuthService:     p.AuthService,
 				LearningService: p.LearningService,
 				FeedService:     p.FeedService,
+				PaymentService:  p.PaymentService,
 				FeedCore:        p.FeedCore,
 				NotifWorker:     p.NotifWorker,
 				TokenManager:    p.TokenManager,

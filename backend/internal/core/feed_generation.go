@@ -44,10 +44,96 @@ func NewFeedGenerator(s *store.PostgresStore, providers []search.SearchProvider,
 	}
 }
 
-// GenerateFeed generates and stores daily feed for a user
+// GenerateFeed generates search-based feed for a user
 func (g *FeedGenerator) GenerateFeed(ctx context.Context, userID, userEmail string) error {
 	log.Printf("[FeedGenerator] Starting for user: %s (%s)", userEmail, userID)
 
+	// 1. Check Subscription
+	sub, err := g.store.GetSubscription(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("failed to get subscription: %w", err)
+	}
+
+	// 2. Route based on Plan
+	if sub.Plan == store.PlanPro {
+		return g.GeneratePersonalizedFeed(ctx, userID)
+	}
+
+	// Free users get the Global Feed which is generated separately.
+	// But if this is called manually, we could perhaps generate a fallback or do nothing.
+	log.Printf("[FeedGenerator] User %s is Free tier. Skipping personalized generation.", userID)
+	return nil
+}
+
+// GenerateGlobalFeed generates a generic tech/learning feed for all free users
+func (g *FeedGenerator) GenerateGlobalFeed(ctx context.Context) error {
+	log.Printf("[FeedGenerator] Starting Global Feed Generation")
+
+	// 1. Generic Tech/Learning Interests
+	interests := []string{
+		"latest technology trends 2024",
+		"best coding practices and software architecture",
+		"new programming languages and frameworks",
+		"artificial intelligence developments",
+		"productivity tips for developers",
+	}
+
+	// 2. Search
+	articles, err := g.searchArticles(ctx, interests)
+	if err != nil {
+		return fmt.Errorf("global search failed: %w", err)
+	}
+	log.Printf("[FeedGenerator] Global: Found %d articles", len(articles))
+
+	// 3. Evaluate (Generic criteria)
+	criteria := "Focus on high-quality, educational technical content. Avoid clickbait."
+	scoredArticles, err := g.evaluateArticles(ctx, articles, "Technology, Coding, AI", criteria)
+	if err != nil {
+		log.Printf("[FeedGenerator] Global evaluation failed: %v", err)
+		return nil
+	}
+
+	// 4. Store with NULL userID (indicating Global)
+	// We need a way to represent Global. Using a fixed UUID or NULL.
+	// Let's use a special UUID constant or Handle it in Store.
+	// For now, let's use a well-known UUID: "00000000-0000-0000-0000-000000000000" (Nil UUID)
+	globalID := "00000000-0000-0000-0000-000000000000"
+
+	stored := 0
+	today := time.Now().Truncate(24 * time.Hour)
+
+	for _, sa := range scoredArticles {
+		exists, _ := g.store.ArticleURLExists(ctx, globalID, sa.URL)
+		if exists {
+			continue
+		}
+
+		article := &store.DailyArticle{
+			Title:          sa.Title,
+			URL:            sa.URL,
+			Snippet:        sa.Snippet,
+			RelevanceScore: sa.Score,
+			SuggestedDate:  today,
+			Provider:       sa.Provider,
+		}
+		// We need to ensure the DB constraint allows this.
+		// If users table has FK, we need a 'System' user.
+		// BETTER: Update schema to allow NULL user_id?
+		// OR: Just create a "System User" in migration?
+		// Let's assume we use a System User that exists.
+		if err := g.store.StoreDailyArticle(ctx, globalID, article); err != nil {
+			log.Printf("[FeedGenerator] Failed to store global article: %v", err)
+			continue
+		}
+		stored++
+	}
+
+	log.Printf("[FeedGenerator] Stored %d Global articles", stored)
+	return nil
+}
+
+// GeneratePersonalizedFeed generates feed for a specific PRO user
+func (g *FeedGenerator) GeneratePersonalizedFeed(ctx context.Context, userID string) error {
 	// 1. Get user preferences
 	prefs, err := g.store.GetFeedPreferences(ctx, userID)
 	if err != nil {
@@ -55,40 +141,33 @@ func (g *FeedGenerator) GenerateFeed(ctx context.Context, userID, userEmail stri
 	}
 
 	if !prefs.FeedEnabled {
-		log.Printf("[FeedGenerator] Feed disabled for user %s", userID)
 		return nil
 	}
 
 	interests := strings.Split(prefs.InterestPrompt, ",")
-	log.Printf("[FeedGenerator] User interests: %v", interests)
+	log.Printf("[FeedGenerator] Generating Personalized for %s, interests: %v", userID, interests)
 
-	// 2. Search for articles
+	// 2. Search
 	articles, err := g.searchArticles(ctx, interests)
 	if err != nil {
 		return fmt.Errorf("search failed: %w", err)
 	}
-	log.Printf("[FeedGenerator] Found %d unique articles", len(articles))
 
-	// 3. Evaluate articles in batches
+	// 3. Evaluate
 	scoredArticles, err := g.evaluateArticles(ctx, articles, prefs.InterestPrompt, prefs.FeedEvalPrompt)
 	if err != nil {
-		log.Printf("[FeedGenerator] Evaluation failed, using default scores: %v", err)
-		// On failure, assign default score to all
-		scoredArticles = make([]ScoredArticle, len(articles))
-		for i, a := range articles {
-			scoredArticles[i] = ScoredArticle{Article: a, Score: 0.5}
-		}
+		log.Printf("[FeedGenerator] Evaluation failed, using default scores")
+		// Fallback
+		return nil
 	}
 
-	// 4. Store ALL articles
+	// 4. Store
 	stored := 0
 	today := time.Now().Truncate(24 * time.Hour)
 
 	for _, sa := range scoredArticles {
-		// Check if already exists
 		exists, _ := g.store.ArticleURLExists(ctx, userID, sa.URL)
 		if exists {
-			log.Printf("[FeedGenerator] Skipping duplicate URL: %s", sa.URL)
 			continue
 		}
 
@@ -101,13 +180,12 @@ func (g *FeedGenerator) GenerateFeed(ctx context.Context, userID, userEmail stri
 			Provider:       sa.Provider,
 		}
 		if err := g.store.StoreDailyArticle(ctx, userID, article); err != nil {
-			log.Printf("[FeedGenerator] Failed to store article %s: %v", sa.URL, err)
+			log.Printf("[FeedGenerator] Failed to store article: %v", err)
 			continue
 		}
 		stored++
 	}
-
-	log.Printf("[FeedGenerator] Stored %d articles for user %s", stored, userID)
+	log.Printf("[FeedGenerator] Stored %d articles for User %s", stored, userID)
 	return nil
 }
 

@@ -11,6 +11,7 @@ import {
     GetMaterialSummaryRequest, GetMaterialSummaryResponse,
     RegisterPushTokenRequest,
 } from './backend/proto/learning/learning';
+import { CreateSubscriptionOrderRequest, CreateSubscriptionOrderResponse } from './backend/proto/payment/payment';
 import { Empty } from './backend/google/protobuf/empty';
 
 export const AuthServiceDefinition = {
@@ -164,6 +165,21 @@ export const FeedServiceDefinition = {
             requestType: GetFeedCalendarStatusRequest,
             requestStream: false,
             responseType: GetFeedCalendarStatusResponse,
+            responseStream: false,
+            options: {},
+        },
+    },
+} as const;
+
+export const PaymentServiceDefinition = {
+    name: 'PaymentService',
+    fullName: 'payment.PaymentService',
+    methods: {
+        createSubscriptionOrder: {
+            name: 'CreateSubscriptionOrder',
+            requestType: CreateSubscriptionOrderRequest,
+            requestStream: false,
+            responseType: CreateSubscriptionOrderResponse,
             responseStream: false,
             options: {},
         },

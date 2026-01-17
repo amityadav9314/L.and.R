@@ -19,6 +19,7 @@ LandR is a SaaS application for learning and revision, allowing users to convert
 - **State Management**: Zustand (`authStore.ts`)
 - **Data Fetching**: TanStack Query (React Query)
 - **Navigation**: Custom manual router
+- **Payments**: Razorpay (Checkout.js on Web, Native SDK on Mobile)
 
 ## Database Schema
 
@@ -57,6 +58,19 @@ LandR is a SaaS application for learning and revision, allowing users to convert
     *   `title`, `url`, `snippet`, `suggested_date`, `relevance_score`, `provider` (google/tavily)
     *   Stores personalized news/articles for the Daily Feed.
 
+7.  **`subscriptions`**
+    *   `user_id` (FK -> `users.id`, PK, One-to-One)
+    *   `plan` (FREE/PRO), `status` (ACTIVE, CANCELLED, etc.)
+    *   `razorpay_subscription_id` (or `pay_` ID for one-time MVP)
+    *   `current_period_end`
+    *   Stores user subscription status and validity.
+
+8.  **`usage_quotas`**
+    *   `user_id` (FK -> `users.id`)
+    *   `resource` (e.g., "generated_cards_daily")
+    *   `count`, `last_reset_at`
+    *   Tracks daily usage for rate limiting and plan enforcement.
+
 ### Relationships
 -   **User -> Materials**: One-to-Many (Cascade Delete)
 -   **Material -> Flashcards**: One-to-Many (Cascade Delete)
@@ -78,6 +92,8 @@ graph TB
         AUTH[AuthService]
         LEARN[LearningService]
         FEED[FeedService]
+        PAY[PaymentService]
+    end
     end
     
     subgraph "Business Logic"
@@ -97,6 +113,8 @@ graph TB
         TAVILY[Tavily Search API]
         SERPAPI[SerpApi Google Search]
         FCM[Firebase Cloud Messaging]
+        RAZOR[Razorpay API]
+    end
     end
     
     subgraph "Data Layer"
@@ -109,6 +127,7 @@ graph TB
     AUTH --> ACORE
     LEARN --> LCORE
     FEED --> FCORE
+    PAY --> RAZOR
     LCORE --> AI
     FCORE --> TAVILY & SERPAPI
     WORKER --> CRON1 & CRON2

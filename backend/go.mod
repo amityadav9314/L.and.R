@@ -9,6 +9,7 @@ require (
 	github.com/improbable-eng/grpc-web v0.15.0
 	github.com/jackc/pgx/v5 v5.7.6
 	github.com/joho/godotenv v1.5.1
+	github.com/razorpay/razorpay-go v1.4.0
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/serpapi/google-search-results-golang v0.0.0-20240325113416-ec93f510648e
 	go.uber.org/fx v1.24.0

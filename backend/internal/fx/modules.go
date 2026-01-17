@@ -16,6 +16,8 @@ import (
 	"github.com/amityadav/landr/internal/serpapi"
 	"github.com/amityadav/landr/internal/service"
 	"github.com/amityadav/landr/internal/store"
+
+	"github.com/amityadav/landr/internal/payment"
 	"github.com/amityadav/landr/internal/tavily"
 	"github.com/amityadav/landr/internal/token"
 	"go.uber.org/fx"
@@ -73,6 +75,7 @@ var ServiceModule = fx.Module("service",
 		service.NewAuthService,
 		NewLearningService,
 		NewFeedService,
+		NewPaymentService,
 	),
 )
 
@@ -82,6 +85,11 @@ var NotificationModule = fx.Module("notification",
 		NewFirebaseSender,
 		NewNotificationWorker,
 	),
+)
+
+// PaymentModule provides payment service
+var PaymentModule = fx.Module("payment",
+	fx.Provide(NewRazorpayService),
 )
 
 // ============================================================================
@@ -239,6 +247,17 @@ func NewFeedService(c *core.FeedCore) *service.FeedService {
 	return svc
 }
 
+// NewPaymentService creates payment gRPC service (optional)
+func NewPaymentService(p *payment.Service, st *store.PostgresStore) *service.PaymentService {
+	if p == nil {
+		log.Printf("[FX] PaymentService disabled (no Payment provider)")
+		return nil
+	}
+	svc := service.NewPaymentService(p, st)
+	log.Printf("[FX] PaymentService initialized")
+	return svc
+}
+
 // NewFirebaseSender creates Firebase Cloud Messaging sender (optional)
 func NewFirebaseSender(cfg config.Config) *firebase.Sender {
 	if _, err := os.Stat(cfg.FirebaseCredPath); err != nil {
@@ -279,4 +298,15 @@ func NewNotificationWorker(p NotificationWorkerParams) *notifications.Worker {
 
 	log.Printf("[FX] NotificationWorker initialized")
 	return worker
+}
+
+// NewRazorpayService creates Razorpay service
+func NewRazorpayService(cfg config.Config) *payment.Service {
+	if cfg.RazorpayKeyID == "" {
+		log.Printf("[FX] PaymentService disabled (no Razorpay key)")
+		return nil
+	}
+	svc := payment.NewService(cfg.RazorpayKeyID, cfg.RazorpayKeySecret)
+	log.Printf("[FX] PaymentService initialized")
+	return svc
 }

@@ -14,6 +14,7 @@ import { SearchHeader } from '../components/SearchHeader';
 import { useFilterStore } from '../store/filterStore';
 
 export const HomeScreen = () => {
+    // @ts-ignore
     const navigation = useNavigation();
     const { user } = useAuthStore();
     const { colors } = useTheme();
@@ -264,6 +265,14 @@ export const HomeScreen = () => {
                 colors={colors}
                 styles={styles}
             />
+            <View style={{ marginBottom: 10 }}>
+                <TouchableOpacity
+                    style={styles.upgradeButton}
+                    onPress={() => navigation.navigate('Upgrade')}
+                >
+                    <Text style={[styles.addButtonText, { color: 'black' }]}>Upgrade to Pro</Text>
+                </TouchableOpacity>
+            </View>
             {isFetchingPreviousPage && (
                 <View style={styles.headerLoader}>
                     <ActivityIndicator size="small" color={colors.primary} />
@@ -348,11 +357,6 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         alignItems: 'center',
         marginBottom: 15,
     },
-    titleWithBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 10,
-    },
     mainTitle: {
         fontSize: 24,
         fontWeight: 'bold',
@@ -374,6 +378,17 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     },
     addButton: {
         backgroundColor: colors.primary,
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 8,
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.2,
+        shadowRadius: 1.41,
+    },
+    upgradeButton: {
+        backgroundColor: colors.warning || '#ffc107',
         paddingHorizontal: 16,
         paddingVertical: 10,
         borderRadius: 8,

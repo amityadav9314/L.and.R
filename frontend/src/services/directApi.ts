@@ -18,6 +18,7 @@ import {
 } from '../../proto/backend/proto/learning/learning';
 import { Empty } from '../../proto/backend/google/protobuf/empty';
 import { API_URL } from '../utils/config';
+import { CreateSubscriptionOrderRequest, CreateSubscriptionOrderResponse } from '../../proto/backend/proto/payment/payment';
 
 // Storage helper
 const getToken = async (): Promise<string | null> => {
@@ -327,6 +328,21 @@ export const feedClient = {
             req,
             (r) => GetFeedCalendarStatusRequest.encode(r).finish(),
             (data) => GetFeedCalendarStatusResponse.decode(data),
+        );
+    },
+};
+
+// ============================================
+// Payment Service Client
+// ============================================
+export const paymentClient = {
+    async createSubscriptionOrder(request: Partial<CreateSubscriptionOrderRequest>): Promise<CreateSubscriptionOrderResponse> {
+        const req = CreateSubscriptionOrderRequest.fromPartial(request);
+        return grpcRequest(
+            '/payment.PaymentService/CreateSubscriptionOrder',
+            req,
+            (r) => CreateSubscriptionOrderRequest.encode(r).finish(),
+            (data) => CreateSubscriptionOrderResponse.decode(data),
         );
     },
 };

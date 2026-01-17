@@ -62,7 +62,20 @@ func (c *FeedCore) GetDailyFeed(ctx context.Context, userID, dateStr string) (*f
 		return nil, fmt.Errorf("invalid date format: %w", err)
 	}
 
-	articles, err := c.store.GetDailyArticles(ctx, userID, date)
+	// Check Subscription
+	sub, err := c.store.GetSubscription(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get subscription: %w", err)
+	}
+
+	// Determine which UserID to use for fetching articles
+	targetUserID := userID
+	if sub.Plan != store.PlanPro {
+		// Free users see Global Feed
+		targetUserID = "00000000-0000-0000-0000-000000000000"
+	}
+
+	articles, err := c.store.GetDailyArticles(ctx, targetUserID, date)
 	if err != nil {
 		return nil, err
 	}
@@ -204,4 +217,11 @@ func (c *FeedCore) GenerateDailyFeedForAllUsers(ctx context.Context) error {
 
 	log.Printf("[FeedCore] Feed generation completed. Success: %d/%d users", successCount, len(userIDs))
 	return nil
+}
+
+// GenerateGlobalFeed generates the shared feed for free users
+func (c *FeedCore) GenerateGlobalFeed(ctx context.Context) error {
+	log.Printf("[FeedCore] generating global feed...")
+	generator := NewFeedGenerator(c.store, c.searchRegistry.GetAll(), c.aiProvider)
+	return generator.GenerateGlobalFeed(ctx)
 }

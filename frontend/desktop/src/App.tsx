@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard.tsx';
 import DailyFeed from './pages/DailyFeed.tsx';
 import Settings from './pages/Settings.tsx';
 import AdminUsers from './pages/AdminUsers.tsx';
+import UpgradePage from './pages/UpgradePage.tsx';
 import Layout from './components/Layout.tsx';
 
 const queryClient = new QueryClient();
@@ -39,6 +40,7 @@ function App() {
             <Route path="feed" element={<DailyFeed />} />
             <Route path="settings" element={<Settings />} />
             <Route path="admin/users" element={<AdminUsers />} />
+            <Route path="upgrade" element={<UpgradePage />} />
           </Route>
         </Routes>
       </Router>

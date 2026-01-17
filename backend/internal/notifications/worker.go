@@ -54,10 +54,23 @@ func (w *Worker) Start() {
 				}
 			}()
 		})
+
+		// Also schedule Global Feed generation (once daily)
+		// We can run this separately or as part of the same block. Let's make it explicit.
+		_, _ = w.cron.AddFunc("0 6 * * *", func() {
+			go func() {
+				log.Println("[Worker] Running Global Feed generation (async)...")
+				ctx := context.Background()
+				if err := w.feedCore.GenerateGlobalFeed(ctx); err != nil {
+					log.Printf("[Worker] Global Feed generation failed: %v", err)
+				}
+			}()
+		})
+
 		if err != nil {
 			log.Printf("[Worker] Failed to schedule feed job: %v", err)
 		} else {
-			log.Println("[Worker] Scheduled daily feed generation at 6:00 AM IST")
+			log.Println("[Worker] Scheduled daily feed generation (Global + Personal) at 6:00 AM IST")
 		}
 	}
 

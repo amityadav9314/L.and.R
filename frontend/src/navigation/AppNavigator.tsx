@@ -8,6 +8,7 @@ import { HomeScreen } from '../screens/HomeScreen';
 import { AddMaterialScreen } from '../screens/AddMaterialScreen';
 import { ReviewScreen } from '../screens/ReviewScreen';
 import { MaterialDetailScreen } from '../screens/MaterialDetailScreen';
+import { UpgradeScreen } from '../screens/UpgradeScreen';
 import { useAuthStore } from '../store/authStore';
 
 const Stack = createStackNavigator();
@@ -36,6 +37,7 @@ export const AppNavigator = () => {
                         <Stack.Screen name="AddMaterial" component={AddMaterialScreen} />
                         <Stack.Screen name="Review" component={ReviewScreen} />
                         <Stack.Screen name="MaterialDetail" component={MaterialDetailScreen} />
+                        <Stack.Screen name="Upgrade" component={UpgradeScreen} />
                     </>
                 ) : (
                     <Stack.Screen name="Login" component={LoginScreen} />

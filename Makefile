@@ -234,7 +234,7 @@ proto:
 	@echo "🔧 Generating Go proto files (backend)..."
 	@protoc --go_out=backend --go_opt=module=github.com/amityadav/landr \
 	--go-grpc_out=backend --go-grpc_opt=module=github.com/amityadav/landr \
-	backend/proto/auth/*.proto backend/proto/learning/*.proto backend/proto/feed/*.proto
+	backend/proto/auth/*.proto backend/proto/learning/*.proto backend/proto/feed/*.proto backend/proto/payment/*.proto
 	@echo "✅ Go proto files generated"
 	
 	@echo "🔧 Generating TypeScript proto files (mobile)..."
@@ -242,7 +242,7 @@ proto:
 	--ts_proto_out=./frontend/proto/backend \
 	--ts_proto_opt=esModuleInterop=true,outputServices=nice-grpc,env=browser,useExactTypes=false \
 	--proto_path=./backend \
-	backend/proto/auth/auth.proto backend/proto/learning/learning.proto backend/proto/feed/feed.proto
+	backend/proto/auth/auth.proto backend/proto/learning/learning.proto backend/proto/feed/feed.proto backend/proto/payment/payment.proto
 	@echo "✅ Mobile TypeScript proto files generated"
 	
 	@echo "🔧 Generating TypeScript proto files (desktop)..."

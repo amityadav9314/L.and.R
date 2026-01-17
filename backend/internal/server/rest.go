@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"log"
 	"net/http"
 	"strconv"
@@ -22,6 +23,7 @@ type Services struct {
 	AuthService     *service.AuthService
 	LearningService *service.LearningService
 	FeedService     *service.FeedService
+	PaymentService  *service.PaymentService
 	FeedCore        *core.FeedCore
 	NotifWorker     *notifications.Worker
 	TokenManager    *token.Manager
@@ -52,6 +54,8 @@ func CreateRESTHandler(services Services, cfg config.Config) http.HandlerFunc {
 			handleGetAllUsers(w, r, services.Store, services.TokenManager)
 		case "/api/admin/set-admin":
 			handleSetAdminStatus(w, r, services.Store, cfg.FeedAPIKey)
+		case "/api/payment/webhook":
+			handlePaymentWebhook(w, r, services.PaymentService, cfg.RazorpayWebhookSecret)
 		default:
 			http.NotFound(w, r)
 		}
@@ -366,4 +370,111 @@ func boolToString(b bool) string {
 		return "true"
 	}
 	return "false"
+}
+
+func handlePaymentWebhook(w http.ResponseWriter, r *http.Request, paymentService *service.PaymentService, webhookSecret string) {
+	if r.Method != "POST" {
+		http.Error(w, `{"error": "method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+
+	if paymentService == nil {
+		log.Printf("[REST] Payment service not enabled, ignoring webhook")
+		w.WriteHeader(http.StatusOK) // Return 200 to acknowledge but ignore
+		return
+	}
+
+	// Read body
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.Printf("[REST] Failed to read webhook body: %v", err)
+		http.Error(w, `{"error": "failed to read body"}`, http.StatusBadRequest)
+		return
+	}
+	defer r.Body.Close()
+
+	// Verify signature
+	signature := r.Header.Get("X-Razorpay-Signature")
+	if signature == "" {
+		http.Error(w, `{"error": "missing signature"}`, http.StatusBadRequest)
+		return
+	}
+
+	if err := paymentService.VerifyWebhookSignature(body, signature, webhookSecret); err != nil {
+		log.Printf("[REST] Webhook signature verification failed: %v", err)
+		http.Error(w, `{"error": "invalid signature"}`, http.StatusUnauthorized)
+		return
+	}
+
+	// Parse JSON
+	var payload struct {
+		Event   string `json:"event"`
+		Payload struct {
+			Subscription struct {
+				Entity struct {
+					ID     string `json:"id"`
+					Status string `json:"status"`
+					Notes  struct {
+						UserID string `json:"user_id"`
+					} `json:"notes"`
+				} `json:"entity"`
+			} `json:"subscription"`
+			Payment struct {
+				Entity struct {
+					ID    string `json:"id"`
+					Notes struct {
+						UserID string `json:"user_id"`
+					} `json:"notes"`
+				} `json:"entity"`
+			} `json:"payment"`
+		} `json:"payload"`
+	}
+
+	if err := json.Unmarshal(body, &payload); err != nil {
+		log.Printf("[REST] Failed to parse webhook JSON: %v", err)
+		http.Error(w, `{"error": "invalid json"}`, http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("[REST] Received webhook event: %s", payload.Event)
+
+	// Handle Subscription Events
+	if payload.Event == "subscription.activated" || payload.Event == "subscription.charged" {
+		sub := payload.Payload.Subscription.Entity
+		userID := sub.Notes.UserID
+		if userID != "" {
+			if err := paymentService.HandleSubscriptionActivated(r.Context(), userID, "PRO", "active", sub.ID); err != nil {
+				log.Printf("[REST] Failed to handle subscription activation: %v", err)
+				http.Error(w, `{"error": "internal error"}`, http.StatusInternalServerError)
+				return
+			}
+		} else {
+			log.Printf("[REST] Webhook received for subscription but no user_id found. SubID: %s", sub.ID)
+		}
+	}
+
+	// Handle One-Time Payment Events (Order based)
+	if payload.Event == "payment.captured" {
+		pay := payload.Payload.Payment.Entity
+		userID := pay.Notes.UserID
+		// For one-time payment, we treat it as "active" subscription for MVP.
+		// We use payment ID as reference if no subscription ID.
+		if userID != "" {
+			log.Printf("[REST] Payment captured for user: %s (PaymentID: %s)", userID, pay.ID)
+			// Logic: Set status to ACTIVE.
+			// Ideally we should track "Pro until..." logic. For now, just set to PRO.
+			// Using "order_payment" prefix for ID to distinguish.
+			fakeSubID := "pay_" + pay.ID
+
+			if err := paymentService.HandleSubscriptionActivated(r.Context(), userID, "PRO", "active", fakeSubID); err != nil {
+				log.Printf("[REST] Failed to activate pro from payment: %v", err)
+				http.Error(w, `{"error": "internal error"}`, http.StatusInternalServerError)
+				return
+			}
+		} else {
+			log.Printf("[REST] Webhook received for payment but no user_id found. PayID: %s", pay.ID)
+		}
+	}
+
+	w.WriteHeader(http.StatusOK)
 }

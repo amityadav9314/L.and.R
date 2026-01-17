@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Nav, Badge } from 'react-bootstrap';
 import { NavLink } from 'react-router-dom';
-import { Home, Database, Newspaper, Settings, LogOut, Shield } from 'lucide-react';
+import { Home, Database, Newspaper, Settings, LogOut, Shield, Sparkles } from 'lucide-react';
 import { useAuthStore } from '../store/authStore.ts';
 import { learningClient } from '../services/api.ts';
 
@@ -19,6 +19,7 @@ const Sidebar = () => {
         { name: 'Due for Revise', path: '/', icon: Home, count: notificationStatus?.dueFlashcardsCount },
         { name: 'Vault', path: '/vault', icon: Database },
         { name: 'Daily Feed', path: '/feed', icon: Newspaper },
+        { name: 'Upgrade to Pro', path: '/upgrade', icon: Sparkles },
         { name: 'Settings', path: '/settings', icon: Settings },
         // Admin menu item - only shown if user is admin
         ...(user?.isAdmin ? [{ name: 'Admin', path: '/admin/users', icon: Shield }] : []),

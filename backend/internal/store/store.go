@@ -46,6 +46,15 @@ type Store interface {
 	GetFeedCalendarStatus(ctx context.Context, userID string, year, month int) ([]*CalendarDay, error)
 	GetUsersWithFeedEnabled(ctx context.Context) ([]string, error)
 
+	// Subscriptions
+	GetSubscription(ctx context.Context, userID string) (*Subscription, error)
+	UpsertSubscription(ctx context.Context, sub *Subscription) error
+
+	// Quotas
+	CheckQuota(ctx context.Context, userID, resource string, limit int) (bool, error)
+	IncrementQuota(ctx context.Context, userID, resource string) error
+	GetUsage(ctx context.Context, userID, resource string) (int, error)
+
 	// General
 	Close()
 }
