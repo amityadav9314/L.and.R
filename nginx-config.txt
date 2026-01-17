@@ -66,7 +66,7 @@ server {
     }
 
     # gRPC / backend
-    location ~ ^/(auth\.|learning\.|feed\.) {
+    location ~ ^/(auth\.|learning\.|feed\.|payment\.) {
         proxy_pass http://localhost:8080;
         proxy_http_version 1.1;
 
