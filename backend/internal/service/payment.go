@@ -9,6 +9,8 @@ import (
 	"github.com/amityadav/landr/pkg/pb/payment_pb"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/amityadav/landr/internal/middleware"
 )
 
 // PaymentService implements the gRPC service for payments
@@ -28,7 +30,10 @@ func NewPaymentService(p *payment.Service, s *store.PostgresStore) *PaymentServi
 
 // CreateSubscriptionOrder creates a Razorpay order for subscription
 func (s *PaymentService) CreateSubscriptionOrder(ctx context.Context, req *payment_pb.CreateSubscriptionOrderRequest) (*payment_pb.CreateSubscriptionOrderResponse, error) {
-	userID := ctx.Value("user_id").(string)
+	userID, err := middleware.GetUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
 	log.Printf("[PaymentService] Creating order for user: %s, plan: %s", userID, req.PlanId)
 
 	// In a real app, we'd look up Plan ID to get amount.
