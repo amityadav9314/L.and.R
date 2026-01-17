@@ -1,7 +1,7 @@
 import { paymentClient } from '../services/api';
 import { useAuthStore } from '../store/authStore';
 import { useEffect, useState } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { Alert, Button, Card, Col, Container, Row, Spinner } from 'react-bootstrap';
 import { CheckCircle } from 'lucide-react';
 
@@ -131,6 +131,12 @@ const UpgradePage = () => {
                             >
                                 {loading ? <Spinner as="span" animation="border" size="sm" /> : 'Upgrade Now'}
                             </Button>
+
+                            <div className="text-center mt-3">
+                                <small className="text-muted">
+                                    By upgrading, you agree to our <Link to="/terms">Terms</Link> and <Link to="/privacy">Privacy Policy</Link>.
+                                </small>
+                            </div>
                         </Card.Body>
                     </Card>
                 </Col>

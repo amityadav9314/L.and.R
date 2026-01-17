@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 
+	"github.com/amityadav/landr/internal/config"
 	"github.com/amityadav/landr/internal/middleware"
 	"github.com/amityadav/landr/internal/store"
 	"github.com/amityadav/landr/pkg/pb/learning"
@@ -13,11 +14,15 @@ import (
 )
 
 type Interceptor struct {
-	store store.Store
+	store  store.Store
+	config config.Config
 }
 
-func NewInterceptor(s store.Store) *Interceptor {
-	return &Interceptor{store: s}
+func NewInterceptor(s store.Store, cfg config.Config) *Interceptor {
+	return &Interceptor{
+		store:  s,
+		config: cfg,
+	}
 }
 
 func (i *Interceptor) Unary() grpc.UnaryServerInterceptor {
@@ -48,7 +53,7 @@ func (i *Interceptor) Unary() grpc.UnaryServerInterceptor {
 		}
 
 		// 4. Check Quota
-		limit := GetLimit(sub.Plan, resource)
+		limit := i.getLimit(sub.Plan, resource)
 		allowed, err := i.store.CheckQuota(ctx, userID, resource, limit)
 		if err != nil {
 			log.Printf("Failed to check quota for user %s: %v", userID, err)
@@ -90,5 +95,27 @@ func (i *Interceptor) getResourceForRequest(method string, req interface{}) stri
 			return ResourceTextImport
 		}
 	}
+	}
 	return ""
+}
+
+// getLimit returns the limit for a resource based on the plan and config
+func (i *Interceptor) getLimit(plan store.SubscriptionPlan, resource string) int {
+	if plan == store.PlanPro {
+		switch resource {
+		case ResourceLinkImport:
+			return i.config.LimitProLink
+		case ResourceTextImport:
+			return i.config.LimitProText
+		}
+	} else {
+		// Default to Free
+		switch resource {
+		case ResourceLinkImport:
+			return i.config.LimitFreeLink
+		case ResourceTextImport:
+			return i.config.LimitFreeText
+		}
+	}
+	return 0
 }

@@ -35,9 +35,9 @@ var ServerModule = fx.Module("server",
 )
 
 // NewGRPCServer creates configured gRPC server with auth interceptor
-func NewGRPCServer(tm *token.Manager, s *store.PostgresStore) *grpc.Server {
+func NewGRPCServer(tm *token.Manager, s *store.PostgresStore, cfg config.Config) *grpc.Server {
 	authInterceptor := middleware.NewAuthInterceptor(tm)
-	quotaInterceptor := quota.NewInterceptor(s)
+	quotaInterceptor := quota.NewInterceptor(s, cfg)
 
 	srv := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(

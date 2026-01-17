@@ -237,12 +237,12 @@ func NewLearningService(c *core.LearningCore, st *store.PostgresStore) *service.
 }
 
 // NewFeedService creates feed gRPC service (optional)
-func NewFeedService(c *core.FeedCore) *service.FeedService {
+func NewFeedService(c *core.FeedCore, st *store.PostgresStore) *service.FeedService {
 	if c == nil {
 		log.Printf("[FX] FeedService disabled (no FeedCore)")
 		return nil
 	}
-	svc := service.NewFeedService(c)
+	svc := service.NewFeedService(c, st)
 	log.Printf("[FX] FeedService initialized")
 	return svc
 }
