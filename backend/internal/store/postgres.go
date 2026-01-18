@@ -205,8 +205,8 @@ func (s *PostgresStore) SetUserBlockStatus(ctx context.Context, email string, is
 }
 
 // SetUserProStatus sets the pro status for a user by ID
-func (s *PostgresStore) SetUserProStatus(ctx context.Context, userID string, isPro bool) error {
-	log.Printf("[Store.SetUserProStatus] Setting pro=%v for userID: %s", isPro, userID)
+func (s *PostgresStore) SetUserProStatus(ctx context.Context, userID string, isPro bool, days int) error {
+	log.Printf("[Store.SetUserProStatus] Setting pro=%v for userID: %s, days=%d", isPro, userID, days)
 
 	var plan SubscriptionPlan
 	var status SubscriptionStatus
@@ -219,8 +219,14 @@ func (s *PostgresStore) SetUserProStatus(ctx context.Context, userID string, isP
 		status = StatusActive
 	}
 
-	// Set far future for manual pro assignments (e.g., 100 years)
-	periodEnd := time.Now().AddDate(100, 0, 0)
+	var periodEnd time.Time
+	if isPro {
+		// Set days for admin-granted pro
+		periodEnd = time.Now().AddDate(0, 0, days)
+	} else {
+		// Set to now (expired) if removing pro
+		periodEnd = time.Now()
+	}
 
 	// Use UpsertSubscription
 	sub := &Subscription{

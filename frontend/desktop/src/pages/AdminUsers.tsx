@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Navigate } from 'react-router-dom';
-import { Table, Card, Badge, Spinner, Alert, Button, Dropdown } from 'react-bootstrap';
+import { Table, Card, Badge, Spinner, Alert, Button, Dropdown, Modal, Form } from 'react-bootstrap';
 import { Users, Shield, ShieldOff, ChevronLeft, ChevronRight, MoreVertical, Ban, CheckCircle, Crown } from 'lucide-react';
 import { useAuthStore } from '../store/authStore.ts';
 
@@ -87,15 +87,42 @@ const AdminUsers = () => {
         }
     };
 
+    const [showProModal, setShowProModal] = useState(false);
+    const [proDays, setProDays] = useState(30);
+    const [selectedUser, setSelectedUser] = useState<User | null>(null);
+
     // Action handler
     const updateUserStatus = async (targetUser: User, action: 'pro' | 'block' | 'admin', value: boolean) => {
         if (!token) return;
 
+        // If setting Pro status to TRUE, show modal instead of immediate update
+        if (action === 'pro' && value === true) {
+            setSelectedUser(targetUser);
+            setProDays(30); // Default
+            setShowProModal(true);
+            return;
+        }
+
+        performUpdate(targetUser, action, value);
+    };
+
+    const confirmProStatus = async () => {
+        if (!selectedUser) return;
+        performUpdate(selectedUser, 'pro', true, proDays);
+        setShowProModal(false);
+    };
+
+    const performUpdate = async (targetUser: User, action: 'pro' | 'block' | 'admin', value: boolean, days?: number) => {
+        if (!token) return;
         // Optimistic update
         const originalUsers = [...users];
         setUsers(users.map(u => {
             if (u.id === targetUser.id) {
-                if (action === 'pro') return { ...u, is_pro: value };
+                if (action === 'pro') {
+                    const expiry = new Date();
+                    expiry.setDate(expiry.getDate() + (days || 30));
+                    return { ...u, is_pro: value, current_period_end: value ? expiry.toISOString() : undefined };
+                }
                 if (action === 'block') return { ...u, is_blocked: value };
                 if (action === 'admin') return { ...u, is_admin: value };
             }
@@ -110,7 +137,7 @@ const AdminUsers = () => {
             // Blocking self would logout, but let's handle prop update
             if (action === 'block') updatedProfile.isBlocked = value;
 
-            login(updatedProfile, token);
+            login(updatedProfile, token!);
         }
 
         let endpoint = '';
@@ -119,6 +146,9 @@ const AdminUsers = () => {
         if (action === 'pro') {
             endpoint = '/api/admin/set-pro';
             queryParams = `?user_id=${targetUser.id}&is_pro=${value}`;
+            if (value && days) {
+                queryParams += `&days=${days}`;
+            }
         } else if (action === 'block') {
             endpoint = '/api/admin/set-block';
             queryParams = `?email=${targetUser.email}&is_blocked=${value}`;
@@ -145,7 +175,7 @@ const AdminUsers = () => {
 
             // Revert auth store if it was self
             if (currentUser && targetUser.id === currentUser.id) {
-                login(currentUser, token);
+                login(currentUser, token!);
             }
 
             alert('Failed to update user status');
@@ -357,6 +387,32 @@ const AdminUsers = () => {
                     </Card.Footer>
                 )}
             </Card>
+
+            <Modal show={showProModal} onHide={() => setShowProModal(false)} centered>
+                <Modal.Header closeButton>
+                    <Modal.Title>Grant Pro Access</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    <p>Enter the duration for Pro access (in days). Default is 30.</p>
+                    <Form.Group>
+                        <Form.Label>Duration (Days)</Form.Label>
+                        <Form.Control
+                            type="number"
+                            min="1"
+                            value={proDays}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProDays(parseInt(e.target.value) || 0)}
+                        />
+                    </Form.Group>
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button variant="secondary" onClick={() => setShowProModal(false)}>
+                        Cancel
+                    </Button>
+                    <Button variant="primary" onClick={confirmProStatus}>
+                        Grant Access
+                    </Button>
+                </Modal.Footer>
+            </Modal>
 
         </div>
     );

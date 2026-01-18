@@ -24,6 +24,7 @@ type Config struct {
 	LimitFreeText         int
 	LimitProLink          int
 	LimitProText          int
+	ProAccessDays         int
 }
 
 // Load loads configuration from environment variables
@@ -46,6 +47,7 @@ func Load() Config {
 		LimitFreeText:         getEnvIntOrPanic("LIMIT_FREE_TEXT"),
 		LimitProLink:          getEnvIntOrPanic("LIMIT_PRO_LINK"),
 		LimitProText:          getEnvIntOrPanic("LIMIT_PRO_TEXT"),
+		ProAccessDays:         getEnvInt("PRO_ACCESS_DAYS", 30),
 	}
 }
 

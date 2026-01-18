@@ -56,7 +56,7 @@ func CreateRESTHandler(services Services, cfg config.Config) http.HandlerFunc {
 		case "/api/admin/set-admin":
 			handleSetAdminStatus(w, r, services.Store, services.TokenManager, cfg.FeedAPIKey)
 		case "/api/admin/set-pro":
-			handleSetUserProStatus(w, r, services.Store, services.TokenManager, cfg.FeedAPIKey)
+			handleSetUserProStatus(w, r, services.Store, services.TokenManager, cfg.FeedAPIKey, cfg.ProAccessDays)
 		case "/api/admin/set-block":
 			handleSetUserBlockStatus(w, r, services.Store, services.TokenManager, cfg.FeedAPIKey)
 		case "/api/payment/webhook":
@@ -425,7 +425,7 @@ func boolToString(b bool) string {
 	return "false"
 }
 
-func handleSetUserProStatus(w http.ResponseWriter, r *http.Request, st *store.PostgresStore, tm *token.Manager, feedAPIKey string) {
+func handleSetUserProStatus(w http.ResponseWriter, r *http.Request, st *store.PostgresStore, tm *token.Manager, feedAPIKey string, defaultDays int) {
 	if r.Method != "POST" {
 		http.Error(w, `{"error": "method not allowed"}`, http.StatusMethodNotAllowed)
 		return
@@ -436,30 +436,35 @@ func handleSetUserProStatus(w http.ResponseWriter, r *http.Request, st *store.Po
 		return
 	}
 
-	userID := r.URL.Query().Get("user_id")
-	if userID == "" {
-		http.Error(w, `{"error": "user_id query parameter is required"}`, http.StatusBadRequest)
-		return
-	}
-
+	targetUserID := r.URL.Query().Get("user_id")
 	isProStr := r.URL.Query().Get("is_pro")
-	if isProStr == "" {
-		http.Error(w, `{"error": "is_pro query parameter is required"}`, http.StatusBadRequest)
+	daysStr := r.URL.Query().Get("days")
+
+	if targetUserID == "" || isProStr == "" {
+		http.Error(w, `{"error": "user_id and is_pro query parameters are required"}`, http.StatusBadRequest)
 		return
 	}
 
 	isPro := isProStr == "true" || isProStr == "1"
 
-	if err := st.SetUserProStatus(r.Context(), userID, isPro); err != nil {
+	// Determine days
+	days := defaultDays
+	if daysStr != "" {
+		if d, err := strconv.Atoi(daysStr); err == nil && d > 0 {
+			days = d
+		}
+	}
+
+	if err := st.SetUserProStatus(r.Context(), targetUserID, isPro, days); err != nil {
 		log.Printf("[REST] handleSetUserProStatus - failed: %v", err)
 		http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusInternalServerError)
 		return
 	}
 
-	log.Printf("[REST] handleSetUserProStatus - set pro=%v for userID: %s", isPro, userID)
+	log.Printf("[REST] handleSetUserProStatus - set pro=%v for userID: %s (days: %d)", isPro, targetUserID, days)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"status": "success", "message": "Pro status updated", "user_id": "` + userID + `", "is_pro": ` + boolToString(isPro) + `}`))
+	w.Write([]byte(`{"status": "success", "message": "Pro status updated", "user_id": "` + targetUserID + `", "is_pro": ` + boolToString(isPro) + `, "days": ` + strconv.Itoa(days) + `}`))
 }
 
 func handleSetUserBlockStatus(w http.ResponseWriter, r *http.Request, st *store.PostgresStore, tm *token.Manager, feedAPIKey string) {
