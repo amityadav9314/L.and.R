@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, RefreshControl, TextInput, FlatList, ActivityIndicator, Alert, NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigation } from '../navigation/ManualRouter';
@@ -267,10 +268,17 @@ export const HomeScreen = () => {
             />
             <View style={{ marginBottom: 10 }}>
                 <TouchableOpacity
-                    style={styles.upgradeButton}
                     onPress={() => navigation.navigate('Upgrade')}
+                    activeOpacity={0.8}
                 >
-                    <Text style={[styles.addButtonText, { color: 'black' }]}>Upgrade to Pro</Text>
+                    <LinearGradient
+                        colors={['#FFD700', '#FFA500']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.upgradeButton}
+                    >
+                        <Text style={styles.upgradeButtonText}>✨ Upgrade to Pro</Text>
+                    </LinearGradient>
                 </TouchableOpacity>
             </View>
             {isFetchingPreviousPage && (
@@ -363,18 +371,24 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         color: colors.textPrimary,
     },
     notificationBadge: {
-        backgroundColor: colors.notificationBadgeBg,
-        borderRadius: 12,
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        minWidth: 24,
+        backgroundColor: '#FF6B35',
+        borderRadius: 16,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        minWidth: 32,
         alignItems: 'center',
         justifyContent: 'center',
+        shadowColor: '#FF6B35',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+        elevation: 3,
     },
     notificationBadgeText: {
-        color: colors.textInverse,
-        fontSize: 12,
-        fontWeight: 'bold',
+        color: '#FFFFFF',
+        fontSize: 13,
+        fontWeight: '700',
+        letterSpacing: 0.5,
     },
     addButton: {
         backgroundColor: colors.primary,
@@ -388,15 +402,22 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         shadowRadius: 1.41,
     },
     upgradeButton: {
-        backgroundColor: colors.warning || '#ffc107',
-        paddingHorizontal: 16,
-        paddingVertical: 10,
-        borderRadius: 8,
-        elevation: 2,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.2,
-        shadowRadius: 1.41,
+        paddingHorizontal: 20,
+        paddingVertical: 14,
+        borderRadius: 12,
+        elevation: 4,
+        shadowColor: '#FFD700',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.4,
+        shadowRadius: 6,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    upgradeButtonText: {
+        color: '#000000',
+        fontWeight: '700',
+        fontSize: 16,
+        letterSpacing: 0.5,
     },
     addButtonText: {
         color: colors.textInverse,
