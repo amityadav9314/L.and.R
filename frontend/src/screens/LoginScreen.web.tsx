@@ -73,9 +73,13 @@ export const LoginScreen = () => {
 
             <TouchableOpacity
                 style={[styles.button, (!request || isLoggingIn) && styles.buttonDisabled]}
-                onPress={() => {
+                onPress={async () => {
+                    // Call promptAsync FIRST while we still have user activation
+                    const result = promptAsync();
+                    // THEN set loading state
                     setIsLoggingIn(true);
-                    promptAsync();
+                    // Wait for the result
+                    await result;
                 }}
                 disabled={!request || isLoggingIn}
             >
