@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Navigate } from 'react-router-dom';
-import { Table, Card, Badge, Spinner, Alert, Button, Dropdown, Modal, Form } from 'react-bootstrap';
-import { Users, Shield, ShieldOff, ChevronLeft, ChevronRight, MoreVertical, Ban, CheckCircle, Crown } from 'lucide-react';
+import { Table, Card, Badge, Spinner, Alert, Button, Dropdown, Modal, Form, InputGroup } from 'react-bootstrap';
+import { Users, Shield, ShieldOff, ChevronLeft, ChevronRight, MoreVertical, Ban, CheckCircle, Crown, Search, X } from 'lucide-react';
 import { useAuthStore } from '../store/authStore.ts';
 
 import { API_URL } from '../utils/config.ts';
@@ -38,13 +38,20 @@ const AdminUsers = () => {
     const [page, setPage] = useState(1);
     const [totalCount, setTotalCount] = useState(0);
     const [totalPages, setTotalPages] = useState(0);
+    const [filterEmail, setFilterEmail] = useState('');
+    const [searchInput, setSearchInput] = useState('');
 
     const fetchUsers = useCallback(async (pageNum: number) => {
         if (!token) return;
 
         setLoading(true);
         try {
-            const response = await fetch(`${API_URL}/api/admin/users?page=${pageNum}&page_size=${PAGE_SIZE}`, {
+            const query = new URLSearchParams({
+                page: pageNum.toString(),
+                page_size: PAGE_SIZE.toString(),
+                email: filterEmail
+            });
+            const response = await fetch(`${API_URL}/api/admin/users?${query.toString()}`, {
                 headers: {
                     'Authorization': `Bearer ${token}`,
                 },
@@ -69,7 +76,7 @@ const AdminUsers = () => {
         } finally {
             setLoading(false);
         }
-    }, [token]);
+    }, [token, filterEmail]);
 
     useEffect(() => {
         fetchUsers(1);
@@ -212,10 +219,44 @@ const AdminUsers = () => {
             <Card className="shadow-sm border-0 flex-grow-1" style={{ overflow: 'visible' }}>
                 <Card.Header className="bg-white border-bottom py-3">
                     <div className="d-flex justify-content-between align-items-center">
-                        <span className="fw-semibold">All Users</span>
-                        <Badge bg="primary" className="rounded-pill px-3 py-2">
-                            {totalCount} users
-                        </Badge>
+                        <div className="d-flex align-items-center gap-3">
+                            <span className="fw-semibold">All Users</span>
+                            <Badge bg="primary" className="rounded-pill px-3 py-2">
+                                {totalCount} users
+                            </Badge>
+                        </div>
+                        <div style={{ maxWidth: '300px', width: '100%' }}>
+                            <InputGroup>
+                                <InputGroup.Text className="bg-white border-end-0">
+                                    <Search size={16} className="text-muted" />
+                                </InputGroup.Text>
+                                <Form.Control
+                                    className="border-start-0 ps-0"
+                                    type="text"
+                                    placeholder="Search by email..."
+                                    value={searchInput}
+                                    onChange={(e) => setSearchInput(e.target.value)}
+                                    onKeyDown={(e) => { if (e.key === 'Enter') { setPage(1); setFilterEmail(searchInput); } }}
+                                />
+                                {filterEmail ? (
+                                    <Button
+                                        variant="outline-secondary"
+                                        className="border-start-0"
+                                        onClick={() => {
+                                            setSearchInput('');
+                                            setFilterEmail('');
+                                            setPage(1);
+                                        }}
+                                    >
+                                        <X size={16} />
+                                    </Button>
+                                ) : (
+                                    <Button variant="primary" onClick={() => { setFilterEmail(searchInput); setPage(1); }}>
+                                        Search
+                                    </Button>
+                                )}
+                            </InputGroup>
+                        </div>
                     </div>
                 </Card.Header>
                 <Card.Body className="p-0" style={{ overflow: 'visible' }}>

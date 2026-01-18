@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strconv"
 	"time"
 
 	"github.com/amityadav/landr/pkg/pb/auth"
@@ -109,16 +110,26 @@ type AdminUser struct {
 }
 
 // GetAllUsersForAdmin returns paginated users with created_at for admin display
-func (s *PostgresStore) GetAllUsersForAdmin(ctx context.Context, page, pageSize int) ([]*AdminUser, int, error) {
+func (s *PostgresStore) GetAllUsersForAdmin(ctx context.Context, page, pageSize int, emailFilter string) ([]*AdminUser, int, error) {
 	log.Printf("[Store.GetAllUsersForAdmin] Fetching users page=%d, pageSize=%d", page, pageSize)
 
 	// Get total count
 	var totalCount int
-	countQuery := `SELECT COUNT(*) FROM users`
-	if err := s.db.QueryRow(ctx, countQuery).Scan(&totalCount); err != nil {
+	// Build filter
+	var args []interface{}
+	whereClause := ""
+	if emailFilter != "" {
+		whereClause = "WHERE u.email ILIKE $1"
+		args = append(args, "%"+emailFilter+"%")
+	}
+
+	countQuery := "SELECT COUNT(*) FROM users u " + whereClause
+	if err := s.db.QueryRow(ctx, countQuery, args...).Scan(&totalCount); err != nil {
 		return nil, 0, fmt.Errorf("failed to count users: %w", err)
 	}
 
+	limitIdx := len(args) + 1
+	offsetIdx := len(args) + 2
 	offset := (page - 1) * pageSize
 	query := `
 		SELECT u.id, u.email, u.name, u.picture, COALESCE(u.is_admin, FALSE),
@@ -131,10 +142,12 @@ func (s *PostgresStore) GetAllUsersForAdmin(ctx context.Context, page, pageSize 
 		       s.current_period_end
 		FROM users u
 		LEFT JOIN subscriptions s ON u.id = s.user_id
+		` + whereClause + `
 		ORDER BY u.created_at DESC
-		LIMIT $1 OFFSET $2
+		LIMIT $` + strconv.Itoa(limitIdx) + ` OFFSET $` + strconv.Itoa(offsetIdx) + `
 	`
-	rows, err := s.db.Query(ctx, query, pageSize, offset)
+	args = append(args, pageSize, offset)
+	rows, err := s.db.Query(ctx, query, args...)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to query users: %w", err)
 	}

@@ -282,7 +282,8 @@ func handleGetAllUsers(w http.ResponseWriter, r *http.Request, st *store.Postgre
 		}
 	}
 
-	users, totalCount, err := st.GetAllUsersForAdmin(r.Context(), page, pageSize)
+	emailFilter := r.URL.Query().Get("email")
+	users, totalCount, err := st.GetAllUsersForAdmin(r.Context(), page, pageSize, emailFilter)
 	if err != nil {
 		log.Printf("[REST] handleGetAllUsers - failed to get users: %v", err)
 		http.Error(w, `{"error": "failed to get users"}`, http.StatusInternalServerError)
