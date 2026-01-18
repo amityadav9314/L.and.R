@@ -69,11 +69,27 @@ export const SearchHeader = memo(({
     });
     const dueFlashcardsCount = notificationData?.dueFlashcardsCount || 0;
 
+    // Sync Pro/Blocked status from notification polling
+    React.useEffect(() => {
+        if (notificationData) {
+            // @ts-ignore - Fields added to proto but TS might not be fully updated in IDE yet
+            const { isPro, isBlocked } = notificationData;
+            // Only sync if fields are present (proto update might lag or return defaults)
+            if (isPro !== undefined && isBlocked !== undefined) {
+                // Determine if local state needs update
+                const currentUser = useAuthStore.getState().user;
+                if (currentUser && (currentUser.isPro !== isPro || currentUser.isBlocked !== isBlocked)) {
+                    useAuthStore.getState().syncUserStatus(isPro, isBlocked);
+                }
+            }
+        }
+    }, [notificationData]);
+
     return (
         <View>
             <View style={styles.titleRow}>
-                <View style={styles.titleWithBadge}>
-                    <Text style={styles.mainTitle}>{onlyDue ? 'Due for Review' : 'All Materials'}</Text>
+                <View style={localStyles.titleWithBadge}>
+                    <Text style={styles.mainTitle}>{onlyDue ? 'Review' : 'All Materials'}</Text>
                     {onlyDue && dueFlashcardsCount > 0 && (
                         <View style={styles.notificationBadge}>
                             <Text style={styles.notificationBadgeText}>{dueFlashcardsCount}</Text>
@@ -156,4 +172,11 @@ export const SearchHeader = memo(({
             </View>
         </View>
     );
+});
+
+const localStyles = StyleSheet.create({
+    titleWithBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
 });

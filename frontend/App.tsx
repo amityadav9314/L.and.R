@@ -15,6 +15,8 @@ import { ReviewScreen } from './src/screens/ReviewScreen';
 import { SummaryScreen } from './src/screens/SummaryScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { DailyFeedScreen } from './src/screens/DailyFeedScreen';
+import { UpgradeScreen } from './src/screens/UpgradeScreen';
+import { WebViewScreen } from './src/screens/WebViewScreen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { NavigationProvider, useNavigation } from './src/navigation/ManualRouter';
@@ -68,6 +70,8 @@ const ScreenRenderer = () => {
             {currentScreen === 'Summary' && <SummaryScreen />}
             {currentScreen === 'Settings' && <SettingsScreen />}
             {currentScreen === 'DailyFeed' && <DailyFeedScreen />}
+            {currentScreen === 'Upgrade' && <UpgradeScreen />}
+            {currentScreen === 'WebView' && <WebViewScreen />}
           </View>
         )}
       </View>

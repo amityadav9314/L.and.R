@@ -97,6 +97,8 @@ message NotificationStatusResponse {
   bool has_due_materials = 2;
   int32 due_materials_count = 3;
   string first_due_material_title = 4;
+  bool is_pro = 5;
+  bool is_blocked = 6;
 }
 
 message GetMaterialSummaryRequest {

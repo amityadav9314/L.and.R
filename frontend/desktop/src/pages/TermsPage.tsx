@@ -1,12 +1,15 @@
 import React from 'react';
-import { Card, Table } from 'react-bootstrap';
+import { Card, Table, Container } from 'react-bootstrap';
 import { FileText } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { PageHeader } from '../components/PageHeader.tsx';
 
 export const TermsPage: React.FC = () => {
     return (
-        <div>
+        <Container className="py-4">
+            <div className="mb-3">
+                <Link to="/" className="text-decoration-none">← Back to Home</Link>
+            </div>
             <PageHeader
                 title="Terms & Conditions"
                 subtitle="Please read carefully"
@@ -83,6 +86,6 @@ export const TermsPage: React.FC = () => {
             <div className="text-center text-muted mt-5">
                 <small>&copy; {new Date().getFullYear()} L.and.R. All rights reserved.</small>
             </div>
-        </div>
+        </Container>
     );
 };

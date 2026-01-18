@@ -10,11 +10,15 @@ import { useFilterStore } from '../store/filterStore';
 import { APP_NAME } from '../utils/constants';
 
 export const AppHeader = () => {
-    const { goBack, canGoBack, navigate } = useNavigation();
+    const { goBack, canGoBack, navigate, currentScreen } = useNavigation();
     const { colors, toggleTheme, isDark } = useTheme();
     const { user } = useAuthStore();
     const { resetAll } = useFilterStore();
     const insets = useSafeAreaInsets();
+
+    // Screens that should not show a back button (top-level tabs)
+    const isMainScreen = ['Home', 'DailyFeed', 'AddMaterial', 'Settings', 'Review'].includes(currentScreen);
+    const showBack = canGoBack && !isMainScreen;
 
     const handleLogoPress = () => {
         resetAll();
@@ -36,12 +40,19 @@ export const AppHeader = () => {
                     onPress={handleLogoPress}
                     activeOpacity={0.7}
                 >
-                    {canGoBack && (
+                    {showBack && (
                         <TouchableOpacity onPress={goBack} style={styles.backButton}>
                             <Ionicons name="arrow-back" size={20} color={colors.textPrimary} />
                         </TouchableOpacity>
                     )}
-                    <Text style={[styles.logo, { color: colors.primary }]}>{APP_NAME}</Text>
+                    <View style={styles.logoContainer}>
+                        <Text style={[styles.logo, { color: colors.primary }]}>{APP_NAME}</Text>
+                        {user?.isPro && (
+                            <View style={styles.proBadge}>
+                                <Text style={styles.proText}>PRO</Text>
+                            </View>
+                        )}
+                    </View>
                     {user && (
                         <Text style={[styles.welcomeText, { color: colors.textSecondary }]}>
                             Welcome, {user.name.split(' ')[0]}
@@ -82,10 +93,29 @@ const styles = StyleSheet.create({
         padding: 4,
         marginRight: 2,
     },
+    logoContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
     logo: {
         fontSize: 26,
         fontWeight: 'bold',
         letterSpacing: -0.5,
+    },
+    proBadge: {
+        backgroundColor: '#FFB800',
+        borderRadius: 8,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderWidth: 1,
+        borderColor: '#FFA000',
+    },
+    proText: {
+        color: '#000000',
+        fontSize: 10,
+        fontWeight: '700',
+        letterSpacing: 0.5,
     },
     welcomeText: {
         fontSize: 14,

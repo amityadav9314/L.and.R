@@ -5,10 +5,11 @@ import { paymentClient } from '../services/directApi';
 import { API_URL } from '../utils/config';
 import { useAuthStore } from '../store/authStore';
 import { Ionicons } from '@expo/vector-icons';
-import { CommonActions, useNavigation } from '@react-navigation/native';
+import { useNavigation } from '../navigation/ManualRouter';
 
 export const UpgradeScreen = () => {
     const { user } = useAuthStore();
+    // @ts-ignore
     const navigation = useNavigation();
     const [loading, setLoading] = useState(false);
 
@@ -42,7 +43,7 @@ export const UpgradeScreen = () => {
                 // handle success
                 console.log(`Success: ${data.razorpay_payment_id}`);
                 Alert.alert('Payment Successful', 'Your plan has been upgraded to Pro!', [
-                    { text: 'OK', onPress: () => navigation.dispatch(CommonActions.goBack()) }
+                    { text: 'OK', onPress: () => navigation.goBack() }
                 ]);
             }).catch((error: any) => {
                 // handle failure
@@ -103,6 +104,23 @@ export const UpgradeScreen = () => {
                         <Text style={styles.buttonText}>Upgrade Now</Text>
                     )}
                 </TouchableOpacity>
+
+                <Text style={styles.disclaimer}>
+                    By upgrading, you agree to our{' '}
+                    <Text
+                        style={styles.link}
+                        onPress={() => navigation.navigate('WebView', { url: 'https://landr.aky.net.in/terms' })}
+                    >
+                        Terms
+                    </Text>{' '}
+                    and{' '}
+                    <Text
+                        style={styles.link}
+                        onPress={() => navigation.navigate('WebView', { url: 'https://landr.aky.net.in/privacy' })}
+                    >
+                        Privacy Policy
+                    </Text>.
+                </Text>
             </View>
         </ScrollView>
     );
@@ -202,5 +220,16 @@ const styles = StyleSheet.create({
         color: 'white',
         fontSize: 18,
         fontWeight: 'bold',
+    },
+    disclaimer: {
+        marginTop: 16,
+        fontSize: 12,
+        color: '#6c757d',
+        textAlign: 'center',
+        paddingHorizontal: 20,
+    },
+    link: {
+        color: '#0d6efd',
+        textDecorationLine: 'underline',
     },
 });

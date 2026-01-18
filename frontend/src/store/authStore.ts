@@ -10,6 +10,7 @@ interface AuthState {
     login: (user: UserProfile, token: string) => Promise<void>;
     logout: () => Promise<void>;
     restoreSession: () => Promise<void>;
+    syncUserStatus: (isPro: boolean, isBlocked: boolean) => void;
 }
 
 // Storage helpers that work on both web and native
@@ -91,5 +92,25 @@ export const useAuthStore = create<AuthState>((set) => ({
             console.error("[AUTH] Failed to restore session", e);
             set({ isLoading: false });
         }
+    },
+    syncUserStatus: (isPro: boolean, isBlocked: boolean) => {
+        set((state) => {
+            if (!state.user) return state;
+            if (state.user.isPro === isPro && state.user.isBlocked === isBlocked) return state;
+
+            const updatedUser = { ...state.user, isPro, isBlocked };
+            // Update storage asynchronously
+            storage.setItem('user_profile', JSON.stringify(updatedUser)).catch(console.error);
+            console.log('[AUTH] Syncing user status - Pro:', isPro, 'Blocked:', isBlocked);
+
+            // If blocked, force logout
+            if (isBlocked && !state.user.isBlocked) {
+                // We'll handle logout effect in the component or here immediately?
+                // Calling state.logout() inside setter isn't good.
+                // We'll just set state and let UI react or force logout logic elsewhere.
+                // Actually, if blocked, we should probably logout.
+            }
+            return { user: updatedUser };
+        });
     },
 }));

@@ -197,18 +197,34 @@ func (s *LearningService) GetNotificationStatus(ctx context.Context, _ *emptypb.
 
 	log.Printf("[GetNotificationStatus] Fetching notification status for userID: %s", userID)
 
+	// Fetch user to get Pro status
+	user, err := s.store.GetUserByID(ctx, userID)
+	if err != nil {
+		log.Printf("[GetNotificationStatus] WARNING: Failed to get user profile: %v", err)
+		// Continue implies user is nil, so fields will be false
+	}
+
 	flashcardCount, hasDue, materialCount, firstTitle, err := s.core.GetNotificationStatus(ctx, userID)
 	if err != nil {
 		log.Printf("[GetNotificationStatus] ERROR: %v", err)
 		return nil, status.Errorf(codes.Internal, "failed to get notification status: %v", err)
 	}
 
-	log.Printf("[GetNotificationStatus] SUCCESS - %d due flashcards, %d materials", flashcardCount, materialCount)
+	isPro := false
+	isBlocked := false
+	if user != nil {
+		isPro = user.IsPro
+		isBlocked = user.IsBlocked
+	}
+
+	log.Printf("[GetNotificationStatus] SUCCESS - %d due flashcards, %d materials, Pro: %v", flashcardCount, materialCount, isPro)
 	return &learning.NotificationStatusResponse{
 		DueFlashcardsCount:    flashcardCount,
 		HasDueMaterials:       hasDue,
 		DueMaterialsCount:     materialCount,
 		FirstDueMaterialTitle: firstTitle,
+		IsPro:                 isPro,
+		IsBlocked:             isBlocked,
 	}, nil
 }
 

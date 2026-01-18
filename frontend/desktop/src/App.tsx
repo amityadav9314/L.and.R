@@ -37,6 +37,12 @@ function App() {
       <Router>
         <Routes>
           <Route path="/login" element={!user ? <Login /> : <Navigate to="/" />} />
+
+          {/* Public routes - no login required */}
+          <Route path="/terms" element={<TermsPage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
+
+          {/* Protected routes - require login */}
           <Route path="/" element={user ? <Layout /> : <Navigate to="/login" />}>
             <Route index element={<Dashboard />} />
             <Route path="vault" element={<Dashboard />} />
@@ -44,9 +50,6 @@ function App() {
             <Route path="settings" element={<Settings />} />
             <Route path="admin/users" element={<AdminUsers />} />
             <Route path="upgrade" element={<UpgradePage />} />
-            <Route path="terms" element={<TermsPage />} />
-            <Route path="privacy" element={<PrivacyPage />} />
-
           </Route>
         </Routes>
       </Router>

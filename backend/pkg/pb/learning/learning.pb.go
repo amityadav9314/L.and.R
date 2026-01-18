@@ -741,6 +741,8 @@ type NotificationStatusResponse struct {
 	HasDueMaterials       bool                   `protobuf:"varint,2,opt,name=has_due_materials,json=hasDueMaterials,proto3" json:"has_due_materials,omitempty"`
 	DueMaterialsCount     int32                  `protobuf:"varint,3,opt,name=due_materials_count,json=dueMaterialsCount,proto3" json:"due_materials_count,omitempty"`
 	FirstDueMaterialTitle string                 `protobuf:"bytes,4,opt,name=first_due_material_title,json=firstDueMaterialTitle,proto3" json:"first_due_material_title,omitempty"`
+	IsPro                 bool                   `protobuf:"varint,5,opt,name=is_pro,json=isPro,proto3" json:"is_pro,omitempty"`
+	IsBlocked             bool                   `protobuf:"varint,6,opt,name=is_blocked,json=isBlocked,proto3" json:"is_blocked,omitempty"`
 	unknownFields         protoimpl.UnknownFields
 	sizeCache             protoimpl.SizeCache
 }
@@ -801,6 +803,20 @@ func (x *NotificationStatusResponse) GetFirstDueMaterialTitle() string {
 		return x.FirstDueMaterialTitle
 	}
 	return ""
+}
+
+func (x *NotificationStatusResponse) GetIsPro() bool {
+	if x != nil {
+		return x.IsPro
+	}
+	return false
+}
+
+func (x *NotificationStatusResponse) GetIsBlocked() bool {
+	if x != nil {
+		return x.IsBlocked
+	}
+	return false
 }
 
 type GetMaterialSummaryRequest struct {
@@ -1094,12 +1110,15 @@ const file_backend_proto_learning_learning_proto_rawDesc = "" +
 	"\x11FailReviewRequest\x12!\n" +
 	"\fflashcard_id\x18\x01 \x01(\tR\vflashcardId\"(\n" +
 	"\x12GetAllTagsResponse\x12\x12\n" +
-	"\x04tags\x18\x01 \x03(\tR\x04tags\"\xe3\x01\n" +
+	"\x04tags\x18\x01 \x03(\tR\x04tags\"\x99\x02\n" +
 	"\x1aNotificationStatusResponse\x120\n" +
 	"\x14due_flashcards_count\x18\x01 \x01(\x05R\x12dueFlashcardsCount\x12*\n" +
 	"\x11has_due_materials\x18\x02 \x01(\bR\x0fhasDueMaterials\x12.\n" +
 	"\x13due_materials_count\x18\x03 \x01(\x05R\x11dueMaterialsCount\x127\n" +
-	"\x18first_due_material_title\x18\x04 \x01(\tR\x15firstDueMaterialTitle\"<\n" +
+	"\x18first_due_material_title\x18\x04 \x01(\tR\x15firstDueMaterialTitle\x12\x15\n" +
+	"\x06is_pro\x18\x05 \x01(\bR\x05isPro\x12\x1d\n" +
+	"\n" +
+	"is_blocked\x18\x06 \x01(\bR\tisBlocked\"<\n" +
 	"\x19GetMaterialSummaryRequest\x12\x1f\n" +
 	"\vmaterial_id\x18\x01 \x01(\tR\n" +
 	"materialId\"\xaa\x01\n" +

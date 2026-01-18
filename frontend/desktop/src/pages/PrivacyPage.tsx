@@ -1,11 +1,15 @@
 import React from 'react';
-import { Card } from 'react-bootstrap';
+import { Card, Container } from 'react-bootstrap';
 import { Shield } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { PageHeader } from '../components/PageHeader.tsx';
 
 export const PrivacyPage: React.FC = () => {
     return (
-        <div>
+        <Container className="py-4">
+            <div className="mb-3">
+                <Link to="/" className="text-decoration-none">← Back to Home</Link>
+            </div>
             <PageHeader
                 title="Privacy Policy"
                 subtitle="Effective Date: January 1, 2025"
@@ -52,6 +56,6 @@ export const PrivacyPage: React.FC = () => {
                     </Card.Text>
                 </Card.Body>
             </Card>
-        </div>
+        </Container>
     );
 };

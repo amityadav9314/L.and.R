@@ -90,6 +90,8 @@ export interface NotificationStatusResponse {
   hasDueMaterials: boolean;
   dueMaterialsCount: number;
   firstDueMaterialTitle: string;
+  isPro: boolean;
+  isBlocked: boolean;
 }
 
 export interface GetMaterialSummaryRequest {
@@ -1203,7 +1205,14 @@ export const GetAllTagsResponse: MessageFns<GetAllTagsResponse> = {
 };
 
 function createBaseNotificationStatusResponse(): NotificationStatusResponse {
-  return { dueFlashcardsCount: 0, hasDueMaterials: false, dueMaterialsCount: 0, firstDueMaterialTitle: "" };
+  return {
+    dueFlashcardsCount: 0,
+    hasDueMaterials: false,
+    dueMaterialsCount: 0,
+    firstDueMaterialTitle: "",
+    isPro: false,
+    isBlocked: false,
+  };
 }
 
 export const NotificationStatusResponse: MessageFns<NotificationStatusResponse> = {
@@ -1219,6 +1228,12 @@ export const NotificationStatusResponse: MessageFns<NotificationStatusResponse> 
     }
     if (message.firstDueMaterialTitle !== "") {
       writer.uint32(34).string(message.firstDueMaterialTitle);
+    }
+    if (message.isPro !== false) {
+      writer.uint32(40).bool(message.isPro);
+    }
+    if (message.isBlocked !== false) {
+      writer.uint32(48).bool(message.isBlocked);
     }
     return writer;
   },
@@ -1262,6 +1277,22 @@ export const NotificationStatusResponse: MessageFns<NotificationStatusResponse> 
           message.firstDueMaterialTitle = reader.string();
           continue;
         }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.isPro = reader.bool();
+          continue;
+        }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.isBlocked = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1277,6 +1308,8 @@ export const NotificationStatusResponse: MessageFns<NotificationStatusResponse> 
       hasDueMaterials: isSet(object.hasDueMaterials) ? globalThis.Boolean(object.hasDueMaterials) : false,
       dueMaterialsCount: isSet(object.dueMaterialsCount) ? globalThis.Number(object.dueMaterialsCount) : 0,
       firstDueMaterialTitle: isSet(object.firstDueMaterialTitle) ? globalThis.String(object.firstDueMaterialTitle) : "",
+      isPro: isSet(object.isPro) ? globalThis.Boolean(object.isPro) : false,
+      isBlocked: isSet(object.isBlocked) ? globalThis.Boolean(object.isBlocked) : false,
     };
   },
 
@@ -1294,6 +1327,12 @@ export const NotificationStatusResponse: MessageFns<NotificationStatusResponse> 
     if (message.firstDueMaterialTitle !== "") {
       obj.firstDueMaterialTitle = message.firstDueMaterialTitle;
     }
+    if (message.isPro !== false) {
+      obj.isPro = message.isPro;
+    }
+    if (message.isBlocked !== false) {
+      obj.isBlocked = message.isBlocked;
+    }
     return obj;
   },
 
@@ -1306,6 +1345,8 @@ export const NotificationStatusResponse: MessageFns<NotificationStatusResponse> 
     message.hasDueMaterials = object.hasDueMaterials ?? false;
     message.dueMaterialsCount = object.dueMaterialsCount ?? 0;
     message.firstDueMaterialTitle = object.firstDueMaterialTitle ?? "";
+    message.isPro = object.isPro ?? false;
+    message.isBlocked = object.isBlocked ?? false;
     return message;
   },
 };

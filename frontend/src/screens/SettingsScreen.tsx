@@ -6,8 +6,11 @@ import { useAuthStore } from '../store/authStore';
 import { useTheme, ThemeColors } from '../utils/theme';
 import { AppHeader } from '../components/AppHeader';
 import { feedClient } from '../services/api';
+import { useNavigation } from '../navigation/ManualRouter';
 
 export const SettingsScreen = () => {
+    // @ts-ignore
+    const navigation = useNavigation();
     const { user, logout } = useAuthStore();
     const { colors, isDark, toggleTheme } = useTheme();
     const insets = useSafeAreaInsets();
@@ -61,6 +64,23 @@ export const SettingsScreen = () => {
             <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 80 }]}>
                 <AppHeader />
                 <Text style={styles.title}>Settings</Text>
+
+                {/* Upgrade to Pro Section - Only show for non-Pro users */}
+                {!user?.isPro && (
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>SUBSCRIPTION ✨</Text>
+                        <TouchableOpacity
+                            style={styles.upgradeCard}
+                            onPress={() => navigation.navigate('Upgrade')}
+                            activeOpacity={0.85}
+                        >
+                            <Text style={styles.upgradeTitle}>✨ Upgrade to Pro</Text>
+                            <Text style={styles.upgradeSubtitle}>
+                                30 days of unlimited access for ₹199
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
 
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Account</Text>
@@ -280,5 +300,31 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
         color: colors.error,
         fontSize: 16,
         fontWeight: '600',
+    },
+    upgradeCard: {
+        backgroundColor: '#FFB800',
+        borderRadius: 12,
+        padding: 20,
+        borderWidth: 2,
+        borderColor: '#FFA000',
+        elevation: 4,
+        shadowColor: '#FFD700',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.4,
+        shadowRadius: 6,
+        alignItems: 'center',
+    },
+    upgradeTitle: {
+        color: '#000000',
+        fontSize: 18,
+        fontWeight: '700',
+        marginBottom: 4,
+        letterSpacing: 0.5,
+    },
+    upgradeSubtitle: {
+        color: '#000000',
+        fontSize: 14,
+        fontWeight: '500',
+        opacity: 0.8,
     },
 });
