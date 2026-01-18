@@ -17,6 +17,7 @@ interface User {
     is_blocked: boolean;
     created_at: string;
     material_count: number;
+    current_period_end?: string;
 }
 
 interface PaginatedResponse {
@@ -239,15 +240,22 @@ const AdminUsers = () => {
                                             </Badge>
                                         </td>
                                         <td className="py-3 text-center">
-                                            {u.is_pro ? (
-                                                <Badge bg="warning" text="dark" className="rounded-pill px-2 py-1">
-                                                    PRO
-                                                </Badge>
-                                            ) : (
-                                                <Badge bg="light" text="dark" className="border rounded-pill px-2 py-1">
-                                                    FREE
-                                                </Badge>
-                                            )}
+                                            <div className="d-flex flex-column align-items-center">
+                                                {u.is_pro ? (
+                                                    <Badge bg="warning" text="dark" className="rounded-pill px-2 py-1">
+                                                        PRO
+                                                    </Badge>
+                                                ) : (
+                                                    <Badge bg="light" text="dark" className="border rounded-pill px-2 py-1">
+                                                        FREE
+                                                    </Badge>
+                                                )}
+                                                {u.is_pro && u.current_period_end && (
+                                                    <small className="text-muted mt-1" style={{ fontSize: '0.7rem' }}>
+                                                        Exp: {new Date(u.current_period_end).toLocaleDateString()}
+                                                    </small>
+                                                )}
+                                            </div>
                                         </td>
                                         <td className="py-3 text-center">
                                             {u.is_admin ? (

@@ -291,15 +291,16 @@ func handleGetAllUsers(w http.ResponseWriter, r *http.Request, st *store.Postgre
 
 	// Build response using proper JSON marshaling
 	type userResponse struct {
-		ID            string `json:"id"`
-		Email         string `json:"email"`
-		Name          string `json:"name"`
-		Picture       string `json:"picture"`
-		IsAdmin       bool   `json:"is_admin"`
-		IsPro         bool   `json:"is_pro"`
-		IsBlocked     bool   `json:"is_blocked"`
-		CreatedAt     string `json:"created_at"`
-		MaterialCount int    `json:"material_count"`
+		ID               string  `json:"id"`
+		Email            string  `json:"email"`
+		Name             string  `json:"name"`
+		Picture          string  `json:"picture"`
+		IsAdmin          bool    `json:"is_admin"`
+		IsPro            bool    `json:"is_pro"`
+		IsBlocked        bool    `json:"is_blocked"`
+		CreatedAt        string  `json:"created_at"`
+		MaterialCount    int     `json:"material_count"`
+		CurrentPeriodEnd *string `json:"current_period_end"`
 	}
 
 	type paginatedResponse struct {
@@ -312,16 +313,23 @@ func handleGetAllUsers(w http.ResponseWriter, r *http.Request, st *store.Postgre
 
 	userList := make([]userResponse, 0, len(users))
 	for _, u := range users {
+		var currentPeriodEnd *string
+		if u.CurrentPeriodEnd != nil {
+			ts := u.CurrentPeriodEnd.Format(time.RFC3339)
+			currentPeriodEnd = &ts
+		}
+
 		userList = append(userList, userResponse{
-			ID:            u.ID,
-			Email:         u.Email,
-			Name:          u.Name,
-			Picture:       u.Picture,
-			IsAdmin:       u.IsAdmin,
-			IsPro:         u.IsPro,
-			IsBlocked:     u.IsBlocked,
-			CreatedAt:     u.CreatedAt.Format(time.RFC3339),
-			MaterialCount: u.MaterialCount,
+			ID:               u.ID,
+			Email:            u.Email,
+			Name:             u.Name,
+			Picture:          u.Picture,
+			IsAdmin:          u.IsAdmin,
+			IsPro:            u.IsPro,
+			IsBlocked:        u.IsBlocked,
+			CreatedAt:        u.CreatedAt.Format(time.RFC3339),
+			MaterialCount:    u.MaterialCount,
+			CurrentPeriodEnd: currentPeriodEnd,
 		})
 	}
 

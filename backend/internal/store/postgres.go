@@ -96,15 +96,16 @@ func (s *PostgresStore) GetUserByID(ctx context.Context, userID string) (*auth.U
 
 // AdminUser represents a user for admin display with extra fields
 type AdminUser struct {
-	ID            string
-	Email         string
-	Name          string
-	Picture       string
-	IsAdmin       bool
-	IsPro         bool
-	IsBlocked     bool
-	CreatedAt     time.Time
-	MaterialCount int
+	ID               string
+	Email            string
+	Name             string
+	Picture          string
+	IsAdmin          bool
+	IsPro            bool
+	IsBlocked        bool
+	CreatedAt        time.Time
+	MaterialCount    int
+	CurrentPeriodEnd *time.Time
 }
 
 // GetAllUsersForAdmin returns paginated users with created_at for admin display
@@ -126,7 +127,8 @@ func (s *PostgresStore) GetAllUsersForAdmin(ctx context.Context, page, pageSize 
 		       AND (s.current_period_end IS NULL OR s.current_period_end > NOW()) as is_pro,
 		       COALESCE(u.is_blocked, FALSE),
 		       u.created_at,
-		       (SELECT COUNT(*) FROM materials m WHERE m.user_id = u.id AND (m.is_deleted = FALSE OR m.is_deleted IS NULL)) as material_count
+		       (SELECT COUNT(*) FROM materials m WHERE m.user_id = u.id AND (m.is_deleted = FALSE OR m.is_deleted IS NULL)) as material_count,
+		       s.current_period_end
 		FROM users u
 		LEFT JOIN subscriptions s ON u.id = s.user_id
 		ORDER BY u.created_at DESC
@@ -141,7 +143,7 @@ func (s *PostgresStore) GetAllUsersForAdmin(ctx context.Context, page, pageSize 
 	var users []*AdminUser
 	for rows.Next() {
 		var user AdminUser
-		if err := rows.Scan(&user.ID, &user.Email, &user.Name, &user.Picture, &user.IsAdmin, &user.IsPro, &user.IsBlocked, &user.CreatedAt, &user.MaterialCount); err != nil {
+		if err := rows.Scan(&user.ID, &user.Email, &user.Name, &user.Picture, &user.IsAdmin, &user.IsPro, &user.IsBlocked, &user.CreatedAt, &user.MaterialCount, &user.CurrentPeriodEnd); err != nil {
 			return nil, 0, fmt.Errorf("failed to scan user: %w", err)
 		}
 		users = append(users, &user)
