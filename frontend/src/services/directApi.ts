@@ -40,10 +40,6 @@ function encodeGrpcWebFrame(data: Uint8Array): Uint8Array {
     frame[4] = data.length & 0xff;
     frame.set(data, 5);
 
-    console.log(`[gRPC Frame] Data length: ${data.length}, Frame total: ${frame.length}`);
-    console.log(`[gRPC Frame] Length bytes: [${frame[1]}, ${frame[2]}, ${frame[3]}, ${frame[4]}]`);
-    console.log(`[gRPC Frame] First 20 bytes of frame: ${Array.from(frame.slice(0, 20)).map(b => b.toString(16).padStart(2, '0')).join(' ')}`);
-
     return frame;
 }
 
@@ -112,10 +108,6 @@ async function grpcRequest<TRequest, TResponse>(
     const url = `${API_URL}${path}`;
     const requestData = encodeGrpcWebFrame(encode(request));
 
-    console.log(`[gRPC] Making request to: ${url}`);
-    console.log(`[gRPC] API_URL: ${API_URL}`);
-    console.log(`[gRPC] Path: ${path}`);
-
     return new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open('POST', url, true);
@@ -131,23 +123,17 @@ async function grpcRequest<TRequest, TResponse>(
 
         xhr.onload = () => {
             try {
-                console.log(`[gRPC] Response status: ${xhr.status}`);
-                console.log(`[gRPC] Response size: ${xhr.response?.byteLength || 0} bytes`);
-
                 if (xhr.status !== 200) {
                     reject(new GrpcError(path, 2, `HTTP error: ${xhr.status}`));
                     return;
                 }
 
                 const responseBytes = new Uint8Array(xhr.response as ArrayBuffer);
-                console.log(`[gRPC] Response bytes length: ${responseBytes.length}`);
 
                 // If response is empty, check HTTP headers for gRPC status
                 if (responseBytes.length === 0) {
                     const grpcStatus = xhr.getResponseHeader('grpc-status');
                     const grpcMessage = xhr.getResponseHeader('grpc-message');
-
-                    console.log(`[gRPC] Empty response - checking headers: status=${grpcStatus}, message=${grpcMessage}`);
 
                     if (grpcStatus && grpcStatus !== '0') {
                         const decodedMessage = grpcMessage ? decodeURIComponent(grpcMessage) : 'Unknown error';
@@ -155,13 +141,11 @@ async function grpcRequest<TRequest, TResponse>(
                         return;
                     }
 
-                    // Still no data and no error - this is a problem
                     reject(new GrpcError(path, 2, 'No data in response and no error status'));
                     return;
                 }
 
                 const { data, status, message } = decodeGrpcWebResponse(responseBytes);
-                console.log(`[gRPC] Decoded - status: ${status}, message: ${message}, has data: ${!!data}`);
 
                 if (status !== 0) {
                     reject(new GrpcError(path, status, message || `gRPC error: ${status}`));
@@ -175,19 +159,12 @@ async function grpcRequest<TRequest, TResponse>(
 
                 resolve(decode(data));
             } catch (e) {
-                console.error(`[gRPC] Decode error:`, e);
                 reject(new GrpcError(path, 2, `Decode error: ${e}`));
             }
         };
 
-        xhr.onerror = () => {
-            console.error(`[gRPC] Network error for ${url}`);
-            reject(new GrpcError(path, 14, 'Network error'));
-        };
-        xhr.ontimeout = () => {
-            console.error(`[gRPC] Timeout for ${url}`);
-            reject(new GrpcError(path, 4, 'Timeout'));
-        };
+        xhr.onerror = () => reject(new GrpcError(path, 14, 'Network error'));
+        xhr.ontimeout = () => reject(new GrpcError(path, 4, 'Timeout'));
 
         xhr.send(requestData);
     });
