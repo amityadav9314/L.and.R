@@ -25,6 +25,8 @@ export interface UserProfile {
   name: string;
   picture: string;
   isAdmin: boolean;
+  isPro: boolean;
+  isBlocked: boolean;
 }
 
 function createBaseLoginRequest(): LoginRequest {
@@ -164,7 +166,7 @@ export const LoginResponse: MessageFns<LoginResponse> = {
 };
 
 function createBaseUserProfile(): UserProfile {
-  return { id: "", email: "", name: "", picture: "", isAdmin: false };
+  return { id: "", email: "", name: "", picture: "", isAdmin: false, isPro: false, isBlocked: false };
 }
 
 export const UserProfile: MessageFns<UserProfile> = {
@@ -183,6 +185,12 @@ export const UserProfile: MessageFns<UserProfile> = {
     }
     if (message.isAdmin !== false) {
       writer.uint32(40).bool(message.isAdmin);
+    }
+    if (message.isPro !== false) {
+      writer.uint32(48).bool(message.isPro);
+    }
+    if (message.isBlocked !== false) {
+      writer.uint32(56).bool(message.isBlocked);
     }
     return writer;
   },
@@ -234,6 +242,22 @@ export const UserProfile: MessageFns<UserProfile> = {
           message.isAdmin = reader.bool();
           continue;
         }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.isPro = reader.bool();
+          continue;
+        }
+        case 7: {
+          if (tag !== 56) {
+            break;
+          }
+
+          message.isBlocked = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -250,6 +274,8 @@ export const UserProfile: MessageFns<UserProfile> = {
       name: isSet(object.name) ? globalThis.String(object.name) : "",
       picture: isSet(object.picture) ? globalThis.String(object.picture) : "",
       isAdmin: isSet(object.isAdmin) ? globalThis.Boolean(object.isAdmin) : false,
+      isPro: isSet(object.isPro) ? globalThis.Boolean(object.isPro) : false,
+      isBlocked: isSet(object.isBlocked) ? globalThis.Boolean(object.isBlocked) : false,
     };
   },
 
@@ -270,6 +296,12 @@ export const UserProfile: MessageFns<UserProfile> = {
     if (message.isAdmin !== false) {
       obj.isAdmin = message.isAdmin;
     }
+    if (message.isPro !== false) {
+      obj.isPro = message.isPro;
+    }
+    if (message.isBlocked !== false) {
+      obj.isBlocked = message.isBlocked;
+    }
     return obj;
   },
 
@@ -283,6 +315,8 @@ export const UserProfile: MessageFns<UserProfile> = {
     message.name = object.name ?? "";
     message.picture = object.picture ?? "";
     message.isAdmin = object.isAdmin ?? false;
+    message.isPro = object.isPro ?? false;
+    message.isBlocked = object.isBlocked ?? false;
     return message;
   },
 };

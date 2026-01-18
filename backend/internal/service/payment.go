@@ -19,20 +19,18 @@ import (
 type PaymentService struct {
 	payment_pb.UnimplementedPaymentServiceServer
 	payment *payment.Service
-	store       *store.PostgresStore
-	keyID       string
-	flow        string
-	frontendURL string
+	store   *store.PostgresStore
+	keyID   string
+	flow    string
 }
 
 // NewPaymentService creates a new payment service
-func NewPaymentService(p *payment.Service, s *store.PostgresStore, keyID, flow, frontendURL string) *PaymentService {
+func NewPaymentService(p *payment.Service, s *store.PostgresStore, keyID, flow string) *PaymentService {
 	return &PaymentService{
-		payment:     p,
-		store:       s,
-		keyID:       keyID,
-		flow:        flow, // "redirect" or "popup"
-		frontendURL: frontendURL,
+		payment: p,
+		store:   s,
+		keyID:   keyID,
+		flow:    flow, // "redirect" or "popup"
 	}
 }
 
@@ -87,9 +85,11 @@ func (s *PaymentService) CreateSubscriptionOrder(ctx context.Context, req *payme
 			log.Printf("[PaymentService] Warning: Could not fetch user details for payment link: %v", err)
 		}
 
+		// Use the Redirect URL provided by the frontend
+		callbackURL := req.RedirectUrl
+		if callbackURL == "" {
+			return nil, status.Errorf(codes.InvalidArgument, "redirect_url is required for redirect payment flow")
 		}
-
-		callbackURL := fmt.Sprintf("%s/upgrade?status=success", s.frontendURL)
 
 		link, err := s.payment.CreatePaymentLink(amount, currency, refID, "L.and.R Pro Upgrade", customer, notes, callbackURL)
 		if err != nil {
@@ -126,10 +126,14 @@ func (s *PaymentService) HandleSubscriptionActivated(ctx context.Context, userID
 	// In the real world, we'd map plan_id to store.PlanPro etc.
 	// For now we assume if we get this callback, it's for PRO.
 
+	// Set subscription to expire 30 days from now
+	periodEnd := time.Now().Add(30 * 24 * time.Hour)
+
 	sub := &store.Subscription{
 		UserID:                 userID,
 		Plan:                   store.PlanPro,
 		Status:                 store.SubscriptionStatus(status),
+		CurrentPeriodEnd:       &periodEnd,
 		RazorpaySubscriptionID: subscriptionID,
 	}
 	err := s.store.UpsertSubscription(ctx, sub)
@@ -137,6 +141,6 @@ func (s *PaymentService) HandleSubscriptionActivated(ctx context.Context, userID
 		log.Printf("[PaymentService] Failed to upsert subscription: %v", err)
 		return err
 	}
-	log.Printf("[PaymentService] Subscription activated for user %s: %s", userID, subscriptionID)
+	log.Printf("[PaymentService] Subscription activated for user %s: %s (expires: %s)", userID, subscriptionID, periodEnd.Format(time.RFC3339))
 	return nil
 }

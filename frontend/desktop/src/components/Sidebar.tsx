@@ -19,7 +19,8 @@ const Sidebar = () => {
         { name: 'Due for Revise', path: '/', icon: Home, count: notificationStatus?.dueFlashcardsCount },
         { name: 'Vault', path: '/vault', icon: Database },
         { name: 'Daily Feed', path: '/feed', icon: Newspaper },
-        { name: 'Upgrade to Pro', path: '/upgrade', icon: Sparkles },
+        // Only show upgrade if user is NOT pro
+        ...(!user?.isPro ? [{ name: 'Upgrade to Pro', path: '/upgrade', icon: Sparkles }] : []),
         { name: 'Settings', path: '/settings', icon: Settings },
         // Admin menu item - only shown if user is admin
         ...(user?.isAdmin ? [{ name: 'Admin', path: '/admin/users', icon: Shield }] : []),
@@ -29,8 +30,15 @@ const Sidebar = () => {
         <div className="d-flex flex-column flex-shrink-0 p-3 bg-white border-end shadow-sm" style={{ width: '280px', height: '100vh', position: 'fixed' }}>
             <NavLink to="/" className="d-flex align-items-center mb-4 mb-md-0 me-md-auto link-dark text-decoration-none gap-2">
                 <img src="/logo.png" alt="L.and.R" width="40" height="40" className="rounded" />
-                <div className="d-flex flex-column">
-                    <span className="fs-5 fw-bold text-primary">L.and.R</span>
+                <div className="d-flex flex-column flex-grow-1">
+                    <div className="d-flex align-items-center justify-content-between">
+                        <span className="fs-5 fw-bold text-primary">L.and.R</span>
+                        {user?.isPro && (
+                            <Badge bg="warning" text="dark" className="ms-2 px-2 py-1" style={{ fontSize: '0.65rem' }}>
+                                PRO
+                            </Badge>
+                        )}
+                    </div>
                     <span className="text-secondary" style={{ fontSize: '0.7rem' }}>Desktop</span>
                 </div>
             </NavLink>
@@ -58,7 +66,18 @@ const Sidebar = () => {
             <hr />
             <div className="d-flex flex-column gap-2">
                 <div className="d-flex align-items-center gap-2 px-2">
-                    <img src={user?.picture || 'https://via.placeholder.com/32'} alt="" width="40" height="40" className="rounded-circle" />
+                    <img
+                        src={user?.picture || 'https://via.placeholder.com/32'}
+                        alt=""
+                        referrerPolicy="no-referrer"
+                        onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.src = 'https://via.placeholder.com/32';
+                        }}
+                        width="40"
+                        height="40"
+                        className="rounded-circle"
+                    />
                     <div className="d-flex flex-column text-truncate flex-grow-1">
                         <strong className="text-truncate small">{user?.name}</strong>
                         <span className="small text-muted text-truncate" style={{ fontSize: '0.75rem' }}>{user?.email}</span>

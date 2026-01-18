@@ -1,19 +1,23 @@
 import React from 'react';
-import { Container, Card, Table } from 'react-bootstrap';
-import { FileText, Shield, CheckCircle } from 'lucide-react';
+import { Card, Table } from 'react-bootstrap';
+import { FileText } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { PageHeader } from '../components/PageHeader.tsx';
 
 export const TermsPage: React.FC = () => {
     return (
-        <Container className="py-5" style={{ maxWidth: '800px' }}>
-            <h1 className="mb-4 d-flex align-items-center gap-2">
-                <FileText size={32} /> Terms & Conditions
-            </h1>
+        <div>
+            <PageHeader
+                title="Terms & Conditions"
+                subtitle="Please read carefully"
+                icon={FileText}
+            />
 
             <Card className="mb-4 shadow-sm">
                 <Card.Body>
                     <Card.Title>1. Introduction</Card.Title>
                     <Card.Text>
-                        Welcome to InkGrid (Application). By using our services, you agree to these terms.
+                        Welcome to L.and.R (Application). By using our services, you agree to these terms.
                         Please read them carefully.
                     </Card.Text>
 
@@ -27,7 +31,7 @@ export const TermsPage: React.FC = () => {
                             <tr>
                                 <th>Feature</th>
                                 <th>Free Plan</th>
-                                <th>Pro Plan (₹199/mo)</th>
+                                <th>Pro Plan (₹199 for 30 days)</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -55,9 +59,15 @@ export const TermsPage: React.FC = () => {
 
                     <Card.Title className="mt-4">3. Pro Subscription</Card.Title>
                     <Card.Text>
-                        - Subscriptions are billed monthly or yearly.
-                        - You can cancel anytime. Access continues until the end of the billing period.
-                        - Refunds are generally not provided for partial months, but contact support if you have issues.
+                        <strong>Subscription Duration:</strong> One-time payment of ₹199 grants you Pro access for exactly 30 days from the date of payment.
+                        <br /><br />
+                        <strong>No Automatic Renewal:</strong> Your Pro features will automatically expire after 30 days. There is no automatic billing or renewal.
+                        <br /><br />
+                        <strong>Renewal:</strong> You can renew your Pro access at any time by making another payment of ₹199, which will grant another 30 days of access.
+                        <br /><br />
+                        <strong>Feature Downgrade:</strong> After your Pro subscription expires, you will automatically revert to the Free plan. All your data (flashcards, materials, etc.) will be preserved.
+                        <br /><br />
+                        <strong>Refunds:</strong> Refunds are generally not provided once Pro access has been activated, but please contact support if you experience technical issues.
                     </Card.Text>
 
                     <Card.Title className="mt-4">4. Privacy & Data</Card.Title>
@@ -65,14 +75,14 @@ export const TermsPage: React.FC = () => {
                         We respect your privacy. We store your flashcards and learning progress securely.
                         We do not sell your personal data.
                         <br />
-                        <a href="/privacy" className="btn btn-link px-0">View full Privacy Policy</a>
+                        <Link to="/privacy" className="btn btn-link px-0">View full Privacy Policy</Link>
                     </Card.Text>
                 </Card.Body>
             </Card>
 
             <div className="text-center text-muted mt-5">
-                <small>&copy; {new Date().getFullYear()} InkGrid. All rights reserved.</small>
+                <small>&copy; {new Date().getFullYear()} L.and.R. All rights reserved.</small>
             </div>
-        </Container>
+        </div>
     );
 };

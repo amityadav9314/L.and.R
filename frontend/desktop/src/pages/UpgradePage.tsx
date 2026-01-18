@@ -2,8 +2,9 @@ import { paymentClient } from '../services/api';
 import { useAuthStore } from '../store/authStore';
 import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
-import { Alert, Button, Card, Col, Container, Row, Spinner } from 'react-bootstrap';
-import { CheckCircle } from 'lucide-react';
+import { Alert, Button, Card, Col, Row, Spinner, Badge } from 'react-bootstrap';
+import { CheckCircle, Zap } from 'lucide-react';
+import { PageHeader } from '../components/PageHeader.tsx';
 
 declare global {
     interface Window {
@@ -32,7 +33,10 @@ const UpgradePage = () => {
         setLoading(true);
         setError('');
         try {
-            const response = await paymentClient.createSubscriptionOrder({ planId: 'PRO' });
+            const response = await paymentClient.createSubscriptionOrder({
+                planId: 'PRO',
+                redirectUrl: window.location.origin + '/upgrade?status=success'
+            });
 
             // If backend returned a Payment Link (Redirect Flow)
             if (response.paymentLink) {
@@ -90,15 +94,22 @@ const UpgradePage = () => {
     };
 
     return (
-        <Container className="py-5">
-            <h2 className="text-center mb-4">Upgrade to Pro</h2>
+        <div>
+            <PageHeader
+                title="Upgrade to Pro"
+                subtitle="Unlock the full power of your learning vault"
+                icon={Zap}
+            />
             <Row className="justify-content-center">
                 <Col md={6} lg={5}>
                     <Card className="shadow-lg border-primary">
                         <Card.Body className="p-5">
                             <div className="text-center mb-4">
                                 <h3 className="display-4 fw-bold">₹199</h3>
-                                <p className="text-muted">per month</p>
+                                <p className="text-muted mb-2">One-time payment</p>
+                                <Badge bg="warning" text="dark" className="px-3 py-2">
+                                    30 Days Pro Access
+                                </Badge>
                             </div>
 
                             <ul className="list-unstyled mb-4">
@@ -119,6 +130,13 @@ const UpgradePage = () => {
                                     <span>Priority Support</span>
                                 </li>
                             </ul>
+
+                            <Alert variant="info" className="mb-4">
+                                <small>
+                                    <strong>Note:</strong> Your Pro access will be valid for 30 days from the date of payment.
+                                    No automatic renewal. You can renew anytime by making another payment.
+                                </small>
+                            </Alert>
 
                             {error && <Alert variant="danger">{error}</Alert>}
 
@@ -141,7 +159,7 @@ const UpgradePage = () => {
                     </Card>
                 </Col>
             </Row>
-        </Container>
+        </div>
     );
 };
 

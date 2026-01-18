@@ -124,6 +124,8 @@ type UserProfile struct {
 	Name          string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
 	Picture       string                 `protobuf:"bytes,4,opt,name=picture,proto3" json:"picture,omitempty"`
 	IsAdmin       bool                   `protobuf:"varint,5,opt,name=is_admin,json=isAdmin,proto3" json:"is_admin,omitempty"`
+	IsPro         bool                   `protobuf:"varint,6,opt,name=is_pro,json=isPro,proto3" json:"is_pro,omitempty"`
+	IsBlocked     bool                   `protobuf:"varint,7,opt,name=is_blocked,json=isBlocked,proto3" json:"is_blocked,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -193,6 +195,20 @@ func (x *UserProfile) GetIsAdmin() bool {
 	return false
 }
 
+func (x *UserProfile) GetIsPro() bool {
+	if x != nil {
+		return x.IsPro
+	}
+	return false
+}
+
+func (x *UserProfile) GetIsBlocked() bool {
+	if x != nil {
+		return x.IsBlocked
+	}
+	return false
+}
+
 var File_backend_proto_auth_auth_proto protoreflect.FileDescriptor
 
 const file_backend_proto_auth_auth_proto_rawDesc = "" +
@@ -202,13 +218,16 @@ const file_backend_proto_auth_auth_proto_rawDesc = "" +
 	"\x0fgoogle_id_token\x18\x01 \x01(\tR\rgoogleIdToken\"[\n" +
 	"\rLoginResponse\x12#\n" +
 	"\rsession_token\x18\x01 \x01(\tR\fsessionToken\x12%\n" +
-	"\x04user\x18\x02 \x01(\v2\x11.auth.UserProfileR\x04user\"|\n" +
+	"\x04user\x18\x02 \x01(\v2\x11.auth.UserProfileR\x04user\"\xb2\x01\n" +
 	"\vUserProfile\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05email\x18\x02 \x01(\tR\x05email\x12\x12\n" +
 	"\x04name\x18\x03 \x01(\tR\x04name\x12\x18\n" +
 	"\apicture\x18\x04 \x01(\tR\apicture\x12\x19\n" +
-	"\bis_admin\x18\x05 \x01(\bR\aisAdmin2?\n" +
+	"\bis_admin\x18\x05 \x01(\bR\aisAdmin\x12\x15\n" +
+	"\x06is_pro\x18\x06 \x01(\bR\x05isPro\x12\x1d\n" +
+	"\n" +
+	"is_blocked\x18\a \x01(\bR\tisBlocked2?\n" +
 	"\vAuthService\x120\n" +
 	"\x05Login\x12\x12.auth.LoginRequest\x1a\x13.auth.LoginResponseB(Z&github.com/amityadav/landr/pkg/pb/authb\x06proto3"
 

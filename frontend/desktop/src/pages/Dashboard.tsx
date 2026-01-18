@@ -3,7 +3,8 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 import { Button, Card, Col, Row, Badge, Modal, Form, Spinner } from 'react-bootstrap';
 import { useLocation } from 'react-router-dom';
 import { learningClient } from '../services/api.ts';
-import { Type, Link as LinkIcon, Image as ImageIcon, Youtube, Plus, BookOpen, Clock, Search } from 'lucide-react';
+import { PageHeader } from '../components/PageHeader.tsx';
+import { Type, Link as LinkIcon, Image as ImageIcon, Youtube, Plus, BookOpen, Clock, Search, Archive, ListTodo } from 'lucide-react';
 import RevisionModal from '../components/RevisionModal.tsx';
 
 const Dashboard = () => {
@@ -101,54 +102,55 @@ const Dashboard = () => {
 
     return (
         <div>
-            <div className="d-flex justify-content-between align-items-center mb-4">
-                <div>
-                    <h1 className="h3 fw-bold mb-1">{isVault ? 'Learning Vault' : 'Due for Revise'}</h1>
-                    <p className="text-muted mb-0">Manage and review your materials</p>
-                </div>
-                <div className="d-flex gap-3 align-items-center">
-                    <div className="position-relative d-flex gap-2" style={{ width: '350px' }}>
-                        <div className="position-relative flex-grow-1">
-                            <Search className="position-absolute top-50 translate-middle-y ms-3 text-muted" size={18} />
-                            <Form.Control
-                                type="text"
-                                placeholder="Search title or tags..."
-                                className="rounded-pill ps-5 bg-white border-0 shadow-sm"
-                                value={searchInput}
-                                onChange={(e) => setSearchInput(e.target.value)}
-                                onKeyDown={handleSearchKeyDown}
-                            />
+            <PageHeader
+                title={isVault ? 'Learning Vault' : 'Due for Revise'}
+                subtitle="Manage and review your materials"
+                icon={isVault ? Archive : ListTodo}
+                actions={
+                    <div className="d-flex gap-3 align-items-center">
+                        <div className="position-relative d-flex gap-2" style={{ width: '350px' }}>
+                            <div className="position-relative flex-grow-1">
+                                <Search className="position-absolute top-50 translate-middle-y ms-3 text-muted" size={18} />
+                                <Form.Control
+                                    type="text"
+                                    placeholder="Search title or tags..."
+                                    className="rounded-pill ps-5 bg-white border-0 shadow-sm"
+                                    value={searchInput}
+                                    onChange={(e) => setSearchInput(e.target.value)}
+                                    onKeyDown={handleSearchKeyDown}
+                                />
+                            </div>
+                            <Button
+                                variant="primary"
+                                className="rounded-pill px-4"
+                                onClick={handleSearch}
+                            >
+                                Search
+                            </Button>
                         </div>
-                        <Button
-                            variant="primary"
-                            className="rounded-pill px-4"
-                            onClick={handleSearch}
-                        >
-                            Search
-                        </Button>
+                        <div className="d-flex gap-2">
+                            <Button
+                                variant={onlyDue ? 'primary' : 'outline-primary'}
+                                onClick={() => setOnlyDue(true)}
+                                className="rounded-pill px-4"
+                            >
+                                Due Now
+                            </Button>
+                            <Button
+                                variant={!onlyDue ? 'primary' : 'outline-primary'}
+                                onClick={() => setOnlyDue(false)}
+                                className="rounded-pill px-4"
+                            >
+                                All Materials
+                            </Button>
+                            <Button variant="success" className="rounded-pill px-4 d-flex align-items-center gap-2" onClick={() => setShowAddModal(true)}>
+                                <Plus size={18} />
+                                <span>Add New</span>
+                            </Button>
+                        </div>
                     </div>
-                    <div className="d-flex gap-2">
-                        <Button
-                            variant={onlyDue ? 'primary' : 'outline-primary'}
-                            onClick={() => setOnlyDue(true)}
-                            className="rounded-pill px-4"
-                        >
-                            Due Now
-                        </Button>
-                        <Button
-                            variant={!onlyDue ? 'primary' : 'outline-primary'}
-                            onClick={() => setOnlyDue(false)}
-                            className="rounded-pill px-4"
-                        >
-                            All Materials
-                        </Button>
-                        <Button variant="success" className="rounded-pill px-4 d-flex align-items-center gap-2" onClick={() => setShowAddModal(true)}>
-                            <Plus size={18} />
-                            <span>Add New</span>
-                        </Button>
-                    </div>
-                </div>
-            </div>
+                }
+            />
 
             {/* Tag Filter Bar */}
             <div className="mb-4">

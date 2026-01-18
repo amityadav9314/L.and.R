@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -48,12 +49,16 @@ func CreateRESTHandler(services Services, cfg config.Config) http.HandlerFunc {
 			handleNotificationTest(w, r, services.Store, services.NotifWorker, cfg.FeedAPIKey)
 		case "/api/notification/daily":
 			handleNotificationDaily(w, r, services.NotifWorker, cfg.FeedAPIKey)
-		case "/api/privacy-policy":
-			handlePrivacyPolicy(w, r)
+		// case "/api/privacy-policy":
+		// 	handlePrivacyPolicy(w, r)
 		case "/api/admin/users":
 			handleGetAllUsers(w, r, services.Store, services.TokenManager)
 		case "/api/admin/set-admin":
-			handleSetAdminStatus(w, r, services.Store, cfg.FeedAPIKey)
+			handleSetAdminStatus(w, r, services.Store, services.TokenManager, cfg.FeedAPIKey)
+		case "/api/admin/set-pro":
+			handleSetUserProStatus(w, r, services.Store, services.TokenManager, cfg.FeedAPIKey)
+		case "/api/admin/set-block":
+			handleSetUserBlockStatus(w, r, services.Store, services.TokenManager, cfg.FeedAPIKey)
 		case "/api/payment/webhook":
 			handlePaymentWebhook(w, r, services.PaymentService, cfg.RazorpayWebhookSecret)
 		default:
@@ -159,6 +164,8 @@ func handleNotificationDaily(w http.ResponseWriter, r *http.Request, notifWorker
 	w.Write([]byte(`{"status": "success", "message": "Daily notification job triggered"}`))
 }
 
+// Privacy Policy is now handled by the frontend
+/*
 func handlePrivacyPolicy(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
@@ -170,24 +177,23 @@ func handlePrivacyPolicy(w http.ResponseWriter, r *http.Request) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Privacy Policy - L.and.R</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.6; color: #333; }
-        h1 { color: #1a73e8; }
-        h2 { color: #444; margin-top: 30px; }
-        .updated { color: #666; font-size: 0.9em; }
+        body { font-family: sans-serif; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 20px; color: #333; }
+        h1 { color: #2c3e50; }
+        h2 { color: #34495e; margin-top: 20px; }
+        p { margin-bottom: 10px; }
     </style>
 </head>
 <body>
-    <h1>Privacy Policy</h1>
-    <p class="updated">Last updated: January 2, 2026</p>
-    
-    <h2>Introduction</h2>
-    <p>L.and.R ("we", "our", or "us") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, and safeguard your information when you use our mobile application.</p>
-    
+    <h1>Privacy Policy for L.and.R</h1>
+    <p><strong>Effective Date:</strong> January 1, 2025</p>
+
+    <p>Welcome to <strong>L.and.R</strong> ("we," "our," or "us"). We are committed to protecting your privacy and ensuring your personal information is handled in a safe and responsible manner. This Privacy Policy explains how we collect, use, and safeguard your information when you use our mobile application.</p>
+
     <h2>Information We Collect</h2>
     <p><strong>Account Information:</strong> When you sign in with Google, we receive your email address and profile name to create your account.</p>
     <p><strong>Learning Materials:</strong> Content you add to the app (URLs, notes, flashcards) is stored securely to provide the learning service.</p>
     <p><strong>Usage Data:</strong> We collect anonymous usage statistics to improve the app experience.</p>
-    
+
     <h2>How We Use Your Information</h2>
     <ul>
         <li>To provide and maintain our learning service</li>
@@ -195,23 +201,23 @@ func handlePrivacyPolicy(w http.ResponseWriter, r *http.Request) {
         <li>To generate personalized daily feed content based on your preferences</li>
         <li>To improve our app and user experience</li>
     </ul>
-    
+
     <h2>Data Storage and Security</h2>
     <p>Your data is stored securely on our servers. We implement industry-standard security measures to protect your information.</p>
-    
+
     <h2>Third-Party Services</h2>
     <p>We use the following third-party services:</p>
     <ul>
         <li><strong>Google Sign-In:</strong> For authentication</li>
         <li><strong>Firebase Cloud Messaging:</strong> For push notifications</li>
     </ul>
-    
+
     <h2>Your Rights</h2>
     <p>You can request deletion of your account and associated data at any time by contacting us.</p>
-    
+
     <h2>Children's Privacy</h2>
     <p>Our app is not intended for children under 13. We do not knowingly collect information from children under 13.</p>
-    
+
     <h2>Contact Us</h2>
     <p>If you have questions about this Privacy Policy, please contact us at: <a href="mailto:amityadav9314@gmail.com">amityadav9314@gmail.com</a></p>
 </body>
@@ -219,6 +225,7 @@ func handlePrivacyPolicy(w http.ResponseWriter, r *http.Request) {
 
 	w.Write([]byte(html))
 }
+*/
 
 func handleGetAllUsers(w http.ResponseWriter, r *http.Request, st *store.PostgresStore, tm *token.Manager) {
 	if r.Method != "GET" {
@@ -289,6 +296,8 @@ func handleGetAllUsers(w http.ResponseWriter, r *http.Request, st *store.Postgre
 		Name          string `json:"name"`
 		Picture       string `json:"picture"`
 		IsAdmin       bool   `json:"is_admin"`
+		IsPro         bool   `json:"is_pro"`
+		IsBlocked     bool   `json:"is_blocked"`
 		CreatedAt     string `json:"created_at"`
 		MaterialCount int    `json:"material_count"`
 	}
@@ -309,6 +318,8 @@ func handleGetAllUsers(w http.ResponseWriter, r *http.Request, st *store.Postgre
 			Name:          u.Name,
 			Picture:       u.Picture,
 			IsAdmin:       u.IsAdmin,
+			IsPro:         u.IsPro,
+			IsBlocked:     u.IsBlocked,
 			CreatedAt:     u.CreatedAt.Format(time.RFC3339),
 			MaterialCount: u.MaterialCount,
 		})
@@ -328,14 +339,48 @@ func handleGetAllUsers(w http.ResponseWriter, r *http.Request, st *store.Postgre
 	json.NewEncoder(w).Encode(response)
 }
 
-func handleSetAdminStatus(w http.ResponseWriter, r *http.Request, st *store.PostgresStore, feedAPIKey string) {
+func verifyAdminOrAPIKey(r *http.Request, st *store.PostgresStore, tm *token.Manager, feedAPIKey string) error {
+	// 1. Check API Key
+	if feedAPIKey != "" && r.Header.Get("X-API-Key") == feedAPIKey {
+		return nil
+	}
+
+	// 2. Check Bearer Token (Admin User)
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		return fmt.Errorf("missing authorization")
+	}
+
+	tokenStr := authHeader
+	if len(authHeader) > 7 && authHeader[:7] == "Bearer " {
+		tokenStr = authHeader[7:]
+	}
+
+	userID, err := tm.Verify(tokenStr)
+	if err != nil {
+		return err
+	}
+
+	user, err := st.GetUserByID(r.Context(), userID)
+	if err != nil {
+		return err
+	}
+
+	if !user.IsAdmin {
+		return fmt.Errorf("user is not admin")
+	}
+
+	return nil
+}
+
+func handleSetAdminStatus(w http.ResponseWriter, r *http.Request, st *store.PostgresStore, tm *token.Manager, feedAPIKey string) {
 	if r.Method != "POST" {
 		http.Error(w, `{"error": "method not allowed"}`, http.StatusMethodNotAllowed)
 		return
 	}
 
-	if feedAPIKey == "" || r.Header.Get("X-API-Key") != feedAPIKey {
-		http.Error(w, `{"error": "unauthorized - invalid or missing X-API-Key header"}`, http.StatusUnauthorized)
+	if err := verifyAdminOrAPIKey(r, st, tm, feedAPIKey); err != nil {
+		http.Error(w, `{"error": "unauthorized"}`, http.StatusUnauthorized)
 		return
 	}
 
@@ -370,6 +415,80 @@ func boolToString(b bool) string {
 		return "true"
 	}
 	return "false"
+}
+
+func handleSetUserProStatus(w http.ResponseWriter, r *http.Request, st *store.PostgresStore, tm *token.Manager, feedAPIKey string) {
+	if r.Method != "POST" {
+		http.Error(w, `{"error": "method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+
+	if err := verifyAdminOrAPIKey(r, st, tm, feedAPIKey); err != nil {
+		http.Error(w, `{"error": "unauthorized"}`, http.StatusUnauthorized)
+		return
+	}
+
+	userID := r.URL.Query().Get("user_id")
+	if userID == "" {
+		http.Error(w, `{"error": "user_id query parameter is required"}`, http.StatusBadRequest)
+		return
+	}
+
+	isProStr := r.URL.Query().Get("is_pro")
+	if isProStr == "" {
+		http.Error(w, `{"error": "is_pro query parameter is required"}`, http.StatusBadRequest)
+		return
+	}
+
+	isPro := isProStr == "true" || isProStr == "1"
+
+	if err := st.SetUserProStatus(r.Context(), userID, isPro); err != nil {
+		log.Printf("[REST] handleSetUserProStatus - failed: %v", err)
+		http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("[REST] handleSetUserProStatus - set pro=%v for userID: %s", isPro, userID)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"status": "success", "message": "Pro status updated", "user_id": "` + userID + `", "is_pro": ` + boolToString(isPro) + `}`))
+}
+
+func handleSetUserBlockStatus(w http.ResponseWriter, r *http.Request, st *store.PostgresStore, tm *token.Manager, feedAPIKey string) {
+	if r.Method != "POST" {
+		http.Error(w, `{"error": "method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+
+	if err := verifyAdminOrAPIKey(r, st, tm, feedAPIKey); err != nil {
+		http.Error(w, `{"error": "unauthorized"}`, http.StatusUnauthorized)
+		return
+	}
+
+	email := r.URL.Query().Get("email")
+	if email == "" {
+		http.Error(w, `{"error": "email query parameter is required"}`, http.StatusBadRequest)
+		return
+	}
+
+	isBlockedStr := r.URL.Query().Get("is_blocked")
+	if isBlockedStr == "" {
+		http.Error(w, `{"error": "is_blocked query parameter is required"}`, http.StatusBadRequest)
+		return
+	}
+
+	isBlocked := isBlockedStr == "true" || isBlockedStr == "1"
+
+	if err := st.SetUserBlockStatus(r.Context(), email, isBlocked); err != nil {
+		log.Printf("[REST] handleSetUserBlockStatus - failed: %v", err)
+		http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("[REST] handleSetUserBlockStatus - set blocked=%v for email: %s", isBlocked, email)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"status": "success", "message": "Blocked status updated", "email": "` + email + `", "is_blocked": ` + boolToString(isBlocked) + `}`))
 }
 
 func handlePaymentWebhook(w http.ResponseWriter, r *http.Request, paymentService *service.PaymentService, webhookSecret string) {

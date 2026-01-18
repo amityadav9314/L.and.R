@@ -18,6 +18,7 @@ help:
 	@echo "  make apk             - Build release APK"
 	@echo "  make aab             - Build AAB for Google Play"
 	@echo "  make android         - Rebuild debug APK and install (use after adding Expo packages)"
+	@echo "  make android-start   - Start app on Android emulator with hot-reload"
 	@echo "  make android-debug   - Build debug APK only"
 	@echo "  make android-install - Install debug APK on emulator/device"
 	@echo "  make stop            - Stop all servers"
@@ -173,6 +174,17 @@ android-install:
 # Build and install in one command
 android: android-debug android-install
 	@echo "🚀 Android app ready!"
+
+# Start Android app on emulator with hot-reload
+android-start:
+	@echo "🛑 Stopping previous frontend..."
+	@lsof -ti:8081 | xargs -r kill -9 2>/dev/null || true
+	@echo "🔍 Type checking TypeScript..."
+	@cd $(FRONTEND_DIR) && npm run tsc
+	@echo "🚀 Starting Android app with hot-reload..."
+	@echo "   This will build native code and start Metro bundler"
+	@cd $(FRONTEND_DIR) && npx expo run:android
+
 
 # ============================================
 # STOP

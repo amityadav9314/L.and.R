@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/amityadav/landr/internal/store"
 	"github.com/amityadav/landr/internal/token"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -18,13 +19,15 @@ const UserIDKey contextKey = "userID"
 // AuthInterceptor is a gRPC interceptor that extracts and verifies JWT tokens
 type AuthInterceptor struct {
 	tokenManager *token.Manager
+	store        *store.PostgresStore
 	// Methods that don't require authentication
 	publicMethods map[string]bool
 }
 
-func NewAuthInterceptor(tm *token.Manager) *AuthInterceptor {
+func NewAuthInterceptor(tm *token.Manager, s *store.PostgresStore) *AuthInterceptor {
 	return &AuthInterceptor{
 		tokenManager: tm,
+		store:        s,
 		publicMethods: map[string]bool{
 			"/auth.AuthService/Login": true, // Login doesn't require auth
 		},
@@ -67,6 +70,17 @@ func (interceptor *AuthInterceptor) Unary() grpc.UnaryServerInterceptor {
 		userID, err := interceptor.tokenManager.Verify(accessToken)
 		if err != nil {
 			return nil, status.Errorf(codes.Unauthenticated, "invalid token: %v", err)
+		}
+
+		// Check if user is blocked
+		user, err := interceptor.store.GetUserByID(ctx, userID)
+		if err != nil {
+			// If user not found, they shouldn't access
+			return nil, status.Errorf(codes.Unauthenticated, "user not found")
+		}
+
+		if user.IsBlocked {
+			return nil, status.Errorf(codes.PermissionDenied, "account blocked")
 		}
 
 		// Add user ID to context

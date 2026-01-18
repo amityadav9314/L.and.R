@@ -23,4 +23,6 @@ message UserProfile {
   string name = 3;
   string picture = 4;
   bool is_admin = 5;
+  bool is_pro = 6;
+  bool is_blocked = 7;
 }

@@ -16,7 +16,10 @@ export const UpgradeScreen = () => {
         setLoading(true);
         try {
             // 1. Create Order on Backend
-            const order = await paymentClient.createSubscriptionOrder({ planId: 'PRO' });
+            const order = await paymentClient.createSubscriptionOrder({
+                planId: 'PRO',
+                redirectUrl: 'https://landr.aky.net.in/upgrade?status=success' // Fallback for mobile if needed, though SDK handles flow
+            });
 
             // 2. Open Razorpay Checkout
             const options = {
@@ -68,7 +71,11 @@ export const UpgradeScreen = () => {
                 <Text style={styles.title}>Upgrade to Pro</Text>
                 <View style={styles.priceContainer}>
                     <Text style={styles.price}>₹199</Text>
-                    <Text style={styles.period}>/ month</Text>
+                    <Text style={styles.period}>one-time</Text>
+                </View>
+
+                <View style={styles.durationBadge}>
+                    <Text style={styles.durationText}>30 Days Pro Access</Text>
                 </View>
 
                 <View style={styles.features}>
@@ -76,6 +83,13 @@ export const UpgradeScreen = () => {
                     <FeatureItem text="Personalized Daily Feed" />
                     <FeatureItem text="Detailed Analytics" />
                     <FeatureItem text="Priority Support" />
+                </View>
+
+                <View style={styles.notice}>
+                    <Ionicons name="information-circle" size={16} color="#0d6efd" />
+                    <Text style={styles.noticeText}>
+                        Pro access valid for 30 days. No automatic renewal.
+                    </Text>
                 </View>
 
                 <TouchableOpacity
@@ -133,9 +147,36 @@ const styles = StyleSheet.create({
         color: '#6c757d',
         marginLeft: 5,
     },
+    durationBadge: {
+        backgroundColor: '#ffc107',
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+        marginBottom: 20,
+    },
+    durationText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#000',
+    },
     features: {
         width: '100%',
-        marginBottom: 30,
+        marginBottom: 20,
+    },
+    notice: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#e7f3ff',
+        padding: 12,
+        borderRadius: 8,
+        marginBottom: 20,
+        width: '100%',
+    },
+    noticeText: {
+        marginLeft: 8,
+        fontSize: 12,
+        color: '#0d6efd',
+        flex: 1,
     },
     featureItem: {
         flexDirection: 'row',

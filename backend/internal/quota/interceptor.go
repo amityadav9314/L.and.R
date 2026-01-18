@@ -95,7 +95,6 @@ func (i *Interceptor) getResourceForRequest(method string, req interface{}) stri
 			return ResourceTextImport
 		}
 	}
-	}
 	return ""
 }
 

@@ -5,8 +5,8 @@ const Layout = () => {
     return (
         <div className="d-flex bg-light min-vh-100">
             <Sidebar />
-            <main className="flex-grow-1 overflow-hidden" style={{ marginLeft: '280px', maxWidth: 'calc(100vw - 280px)' }}>
-                <div className="container-fluid py-4 px-3 px-lg-4">
+            <main className="flex-grow-1 overflow-x-hidden d-flex flex-column" style={{ marginLeft: '280px', maxWidth: 'calc(100vw - 280px)' }}>
+                <div className="container-fluid py-4 px-3 px-lg-4 flex-grow-1 d-flex flex-column">
                     <Outlet />
                 </div>
             </main>

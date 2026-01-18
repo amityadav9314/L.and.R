@@ -36,31 +36,59 @@ func (s *PostgresStore) CreateUser(ctx context.Context, email, name, googleID, p
         VALUES ($1, $2, $3, $4)
         ON CONFLICT (google_id) DO UPDATE
         SET name = EXCLUDED.name, picture = EXCLUDED.picture, updated_at = NOW()
-        RETURNING id, email, name, picture, COALESCE(is_admin, FALSE);
+        RETURNING id, email, name, picture, COALESCE(is_admin, FALSE), COALESCE(is_blocked, FALSE);
     `
 	row := s.db.QueryRow(ctx, query, email, name, googleID, picture)
 	var user auth.UserProfile
-	if err := row.Scan(&user.Id, &user.Email, &user.Name, &user.Picture, &user.IsAdmin); err != nil {
+	if err := row.Scan(&user.Id, &user.Email, &user.Name, &user.Picture, &user.IsAdmin, &user.IsBlocked); err != nil {
 		return nil, fmt.Errorf("failed to create/update user: %w", err)
 	}
+
+	// Populate subscription status
+	sub, err := s.GetSubscription(ctx, user.Id)
+	if err == nil && sub.Plan == PlanPro && sub.Status == StatusActive {
+		// Check if subscription is still valid (not expired)
+		if sub.CurrentPeriodEnd == nil || sub.CurrentPeriodEnd.After(time.Now()) {
+			user.IsPro = true
+		}
+	}
+
 	return &user, nil
 }
 
 func (s *PostgresStore) GetUserByGoogleID(ctx context.Context, googleID string) (*auth.UserProfile, error) {
-	query := `SELECT id, email, name, picture, COALESCE(is_admin, FALSE) FROM users WHERE google_id = $1`
+	query := `
+		SELECT u.id, u.email, u.name, u.picture, COALESCE(u.is_admin, FALSE),
+		       COALESCE(s.plan, 'FREE') = 'PRO' 
+		       AND COALESCE(s.status, 'ACTIVE') IN ('ACTIVE', 'TRIALING')
+		       AND (s.current_period_end IS NULL OR s.current_period_end > NOW()),
+		       COALESCE(u.is_blocked, FALSE)
+		FROM users u
+		LEFT JOIN subscriptions s ON u.id = s.user_id
+		WHERE u.google_id = $1
+	`
 	row := s.db.QueryRow(ctx, query, googleID)
 	var user auth.UserProfile
-	if err := row.Scan(&user.Id, &user.Email, &user.Name, &user.Picture, &user.IsAdmin); err != nil {
+	if err := row.Scan(&user.Id, &user.Email, &user.Name, &user.Picture, &user.IsAdmin, &user.IsPro, &user.IsBlocked); err != nil {
 		return nil, fmt.Errorf("failed to get user: %w", err)
 	}
 	return &user, nil
 }
 
 func (s *PostgresStore) GetUserByID(ctx context.Context, userID string) (*auth.UserProfile, error) {
-	query := `SELECT id, email, name, picture, COALESCE(is_admin, FALSE) FROM users WHERE id = $1`
+	query := `
+		SELECT u.id, u.email, u.name, u.picture, COALESCE(u.is_admin, FALSE),
+		       COALESCE(s.plan, 'PRO') = 'PRO' 
+		       AND COALESCE(s.status, 'ACTIVE') IN ('ACTIVE', 'TRIALING')
+		       AND (s.current_period_end IS NULL OR s.current_period_end > NOW()),
+		       COALESCE(u.is_blocked, FALSE)
+		FROM users u
+		LEFT JOIN subscriptions s ON u.id = s.user_id
+		WHERE u.id = $1
+	`
 	row := s.db.QueryRow(ctx, query, userID)
 	var user auth.UserProfile
-	if err := row.Scan(&user.Id, &user.Email, &user.Name, &user.Picture, &user.IsAdmin); err != nil {
+	if err := row.Scan(&user.Id, &user.Email, &user.Name, &user.Picture, &user.IsAdmin, &user.IsPro, &user.IsBlocked); err != nil {
 		return nil, fmt.Errorf("failed to get user: %w", err)
 	}
 	return &user, nil
@@ -73,6 +101,8 @@ type AdminUser struct {
 	Name          string
 	Picture       string
 	IsAdmin       bool
+	IsPro         bool
+	IsBlocked     bool
 	CreatedAt     time.Time
 	MaterialCount int
 }
@@ -88,12 +118,17 @@ func (s *PostgresStore) GetAllUsersForAdmin(ctx context.Context, page, pageSize 
 		return nil, 0, fmt.Errorf("failed to count users: %w", err)
 	}
 
-	// Get paginated users with material count
 	offset := (page - 1) * pageSize
 	query := `
-		SELECT u.id, u.email, u.name, u.picture, COALESCE(u.is_admin, FALSE), u.created_at,
+		SELECT u.id, u.email, u.name, u.picture, COALESCE(u.is_admin, FALSE),
+		       COALESCE(s.plan, 'FREE') = 'PRO' 
+		       AND COALESCE(s.status, 'ACTIVE') IN ('ACTIVE', 'TRIALING')
+		       AND (s.current_period_end IS NULL OR s.current_period_end > NOW()) as is_pro,
+		       COALESCE(u.is_blocked, FALSE),
+		       u.created_at,
 		       (SELECT COUNT(*) FROM materials m WHERE m.user_id = u.id AND (m.is_deleted = FALSE OR m.is_deleted IS NULL)) as material_count
 		FROM users u
+		LEFT JOIN subscriptions s ON u.id = s.user_id
 		ORDER BY u.created_at DESC
 		LIMIT $1 OFFSET $2
 	`
@@ -106,7 +141,7 @@ func (s *PostgresStore) GetAllUsersForAdmin(ctx context.Context, page, pageSize 
 	var users []*AdminUser
 	for rows.Next() {
 		var user AdminUser
-		if err := rows.Scan(&user.ID, &user.Email, &user.Name, &user.Picture, &user.IsAdmin, &user.CreatedAt, &user.MaterialCount); err != nil {
+		if err := rows.Scan(&user.ID, &user.Email, &user.Name, &user.Picture, &user.IsAdmin, &user.IsPro, &user.IsBlocked, &user.CreatedAt, &user.MaterialCount); err != nil {
 			return nil, 0, fmt.Errorf("failed to scan user: %w", err)
 		}
 		users = append(users, &user)
@@ -150,6 +185,51 @@ func (s *PostgresStore) SetUserAdminStatus(ctx context.Context, email string, is
 	}
 	log.Printf("[Store.SetUserAdminStatus] Admin status updated successfully")
 	return nil
+}
+
+// SetUserBlockStatus sets the blocked status for a user by email
+func (s *PostgresStore) SetUserBlockStatus(ctx context.Context, email string, isBlocked bool) error {
+	log.Printf("[Store.SetUserBlockStatus] Setting blocked=%v for email: %s", isBlocked, email)
+	query := `UPDATE users SET is_blocked = $1, updated_at = NOW() WHERE email = $2`
+	result, err := s.db.Exec(ctx, query, isBlocked, email)
+	if err != nil {
+		return fmt.Errorf("failed to update blocked status: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("user not found with email: %s", email)
+	}
+	log.Printf("[Store.SetUserBlockStatus] Blocked status updated successfully")
+	return nil
+}
+
+// SetUserProStatus sets the pro status for a user by ID
+func (s *PostgresStore) SetUserProStatus(ctx context.Context, userID string, isPro bool) error {
+	log.Printf("[Store.SetUserProStatus] Setting pro=%v for userID: %s", isPro, userID)
+
+	var plan SubscriptionPlan
+	var status SubscriptionStatus
+
+	if isPro {
+		plan = PlanPro
+		status = StatusActive
+	} else {
+		plan = PlanFree
+		status = StatusActive
+	}
+
+	// Set far future for manual pro assignments (e.g., 100 years)
+	periodEnd := time.Now().AddDate(100, 0, 0)
+
+	// Use UpsertSubscription
+	sub := &Subscription{
+		UserID:                 userID,
+		Plan:                   plan,
+		Status:                 status,
+		CurrentPeriodEnd:       &periodEnd,
+		RazorpaySubscriptionID: "manual_admin_set",
+	}
+
+	return s.UpsertSubscription(ctx, sub)
 }
 
 func (s *PostgresStore) CreateMaterial(ctx context.Context, userID, matType, content, title, sourceURL string) (string, error) {

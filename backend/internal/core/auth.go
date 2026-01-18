@@ -45,6 +45,10 @@ func (c *AuthCore) LoginUser(ctx context.Context, googleToken string) (*auth.Use
 		return nil, "", fmt.Errorf("create user: %w", err)
 	}
 
+	if user.IsBlocked {
+		return nil, "", fmt.Errorf("account blocked")
+	}
+
 	// 3. Generate Session Token
 	sessionToken, err := c.tokenManager.NewJWT(user.Id, 24*time.Hour*30)
 	if err != nil {

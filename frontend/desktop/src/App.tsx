@@ -10,6 +10,7 @@ import AdminUsers from './pages/AdminUsers.tsx';
 import UpgradePage from './pages/UpgradePage.tsx';
 import { TermsPage } from './pages/TermsPage.tsx';
 import { PrivacyPage } from './pages/PrivacyPage.tsx';
+
 import Layout from './components/Layout.tsx';
 
 const queryClient = new QueryClient();
@@ -45,6 +46,7 @@ function App() {
             <Route path="upgrade" element={<UpgradePage />} />
             <Route path="terms" element={<TermsPage />} />
             <Route path="privacy" element={<PrivacyPage />} />
+
           </Route>
         </Routes>
       </Router>

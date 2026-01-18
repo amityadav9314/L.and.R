@@ -23,7 +23,8 @@ const (
 
 type CreateSubscriptionOrderRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	PlanId        string                 `protobuf:"bytes,1,opt,name=plan_id,json=planId,proto3" json:"plan_id,omitempty"` // "PRO" or "FREE" (though free won't call this)
+	PlanId        string                 `protobuf:"bytes,1,opt,name=plan_id,json=planId,proto3" json:"plan_id,omitempty"`                // "PRO" or "FREE"
+	RedirectUrl   string                 `protobuf:"bytes,2,opt,name=redirect_url,json=redirectUrl,proto3" json:"redirect_url,omitempty"` // URL to redirect after payment success
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -61,6 +62,13 @@ func (*CreateSubscriptionOrderRequest) Descriptor() ([]byte, []int) {
 func (x *CreateSubscriptionOrderRequest) GetPlanId() string {
 	if x != nil {
 		return x.PlanId
+	}
+	return ""
+}
+
+func (x *CreateSubscriptionOrderRequest) GetRedirectUrl() string {
+	if x != nil {
+		return x.RedirectUrl
 	}
 	return ""
 }
@@ -145,9 +153,10 @@ var File_backend_proto_payment_payment_proto protoreflect.FileDescriptor
 
 const file_backend_proto_payment_payment_proto_rawDesc = "" +
 	"\n" +
-	"#backend/proto/payment/payment.proto\x12\apayment\"9\n" +
+	"#backend/proto/payment/payment.proto\x12\apayment\"\\\n" +
 	"\x1eCreateSubscriptionOrderRequest\x12\x17\n" +
-	"\aplan_id\x18\x01 \x01(\tR\x06planId\"\xaa\x01\n" +
+	"\aplan_id\x18\x01 \x01(\tR\x06planId\x12!\n" +
+	"\fredirect_url\x18\x02 \x01(\tR\vredirectUrl\"\xaa\x01\n" +
 	"\x1fCreateSubscriptionOrderResponse\x12\x19\n" +
 	"\border_id\x18\x01 \x01(\tR\aorderId\x12\x16\n" +
 	"\x06amount\x18\x02 \x01(\x02R\x06amount\x12\x1a\n" +

@@ -2,8 +2,11 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Form, Button, Card, Spinner, Alert } from 'react-bootstrap';
 import { Save, Bell, Newspaper, User } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { feedClient } from '../services/api.ts';
 import { useAuthStore } from '../store/authStore.ts';
+import { PageHeader } from '../components/PageHeader.tsx';
+import { Settings as SettingsIcon } from 'lucide-react';
 
 const Settings = () => {
     const queryClient = useQueryClient();
@@ -36,11 +39,12 @@ const Settings = () => {
     });
 
     return (
-        <div className="mx-auto" style={{ maxWidth: '800px' }}>
-            <div className="mb-4">
-                <h1 className="h3 fw-bold mb-1">Settings</h1>
-                <p className="text-muted">Manage your account and preferences</p>
-            </div>
+        <div>
+            <PageHeader
+                title="Settings"
+                subtitle="Manage your account and preferences"
+                icon={SettingsIcon}
+            />
 
             {isLoading ? (
                 <div className="d-flex justify-content-center py-5">
@@ -83,14 +87,33 @@ const Settings = () => {
                             <Form onSubmit={(e) => { e.preventDefault(); updateMutation.mutate(); }}>
                                 <Form.Group className="mb-4 d-flex align-items-center justify-content-between">
                                     <div>
-                                        <Form.Label className="fw-bold mb-0">Enable Daily Feed</Form.Label>
+                                        <div className="d-flex align-items-center gap-2 mb-1">
+                                            <Form.Label className="fw-bold mb-0">Enable Daily Feed</Form.Label>
+                                            {!user?.isPro && (
+                                                <Badge bg="warning" className="text-dark small">
+                                                    Pro Feature
+                                                </Badge>
+                                            )}
+                                        </div>
                                         <p className="small text-muted mb-0">Receive personalized articles every morning at 6 AM IST.</p>
+                                        {!user?.isPro && (
+                                            <Link to="/upgrade" className="small text-primary text-decoration-none">
+                                                Upgrade to enable
+                                            </Link>
+                                        )}
                                     </div>
                                     <Form.Check
                                         type="switch"
                                         id="feed-switch"
                                         checked={enabled}
-                                        onChange={(e) => setEnabled(e.target.checked)}
+                                        onChange={(e) => {
+                                            if (!user?.isPro) {
+                                                // Could show a toast or just redirect, but link is clear enough
+                                                return;
+                                            }
+                                            setEnabled(e.target.checked);
+                                        }}
+                                        disabled={!user?.isPro}
                                         className="fs-4"
                                     />
                                 </Form.Group>

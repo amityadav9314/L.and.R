@@ -9,7 +9,8 @@ service PaymentService {
 }
 
 message CreateSubscriptionOrderRequest {
-  string plan_id = 1; // "PRO" or "FREE" (though free won't call this)
+  string plan_id = 1; // "PRO" or "FREE"
+  string redirect_url = 2; // URL to redirect after payment success
 }
 
 message CreateSubscriptionOrderResponse {

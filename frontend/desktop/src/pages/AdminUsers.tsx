@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Navigate } from 'react-router-dom';
-import { Table, Card, Badge, Spinner, Alert, Button } from 'react-bootstrap';
-import { Users, Shield, ShieldOff, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Table, Card, Badge, Spinner, Alert, Button, Dropdown } from 'react-bootstrap';
+import { Users, Shield, ShieldOff, ChevronLeft, ChevronRight, MoreVertical, Ban, CheckCircle, Crown } from 'lucide-react';
 import { useAuthStore } from '../store/authStore.ts';
+
 import { API_URL } from '../utils/config.ts';
+import { PageHeader } from '../components/PageHeader.tsx';
 
 interface User {
     id: string;
@@ -11,6 +13,8 @@ interface User {
     name: string;
     picture: string;
     is_admin: boolean;
+    is_pro: boolean;
+    is_blocked: boolean;
     created_at: string;
     material_count: number;
 }
@@ -26,7 +30,7 @@ interface PaginatedResponse {
 const PAGE_SIZE = 10;
 
 const AdminUsers = () => {
-    const { user, token } = useAuthStore();
+    const { user: currentUser, token, login } = useAuthStore(); // Rename user to currentUser to avoid conflict
     const [users, setUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -82,8 +86,75 @@ const AdminUsers = () => {
         }
     };
 
+    // Action handler
+    const updateUserStatus = async (targetUser: User, action: 'pro' | 'block' | 'admin', value: boolean) => {
+        if (!token) return;
+
+        // Optimistic update
+        const originalUsers = [...users];
+        setUsers(users.map(u => {
+            if (u.id === targetUser.id) {
+                if (action === 'pro') return { ...u, is_pro: value };
+                if (action === 'block') return { ...u, is_blocked: value };
+                if (action === 'admin') return { ...u, is_admin: value };
+            }
+            return u;
+        }));
+
+        // If updating self, update global auth store
+        if (currentUser && targetUser.id === currentUser.id) {
+            const updatedProfile = { ...currentUser };
+            if (action === 'pro') updatedProfile.isPro = value;
+            if (action === 'admin') updatedProfile.isAdmin = value;
+            // Blocking self would logout, but let's handle prop update
+            if (action === 'block') updatedProfile.isBlocked = value;
+
+            login(updatedProfile, token);
+        }
+
+        let endpoint = '';
+        let queryParams = '';
+
+        if (action === 'pro') {
+            endpoint = '/api/admin/set-pro';
+            queryParams = `?user_id=${targetUser.id}&is_pro=${value}`;
+        } else if (action === 'block') {
+            endpoint = '/api/admin/set-block';
+            queryParams = `?email=${targetUser.email}&is_blocked=${value}`;
+        } else if (action === 'admin') {
+            endpoint = '/api/admin/set-admin';
+            queryParams = `?email=${targetUser.email}&is_admin=${value}`;
+        }
+
+        try {
+            const response = await fetch(`${API_URL}${endpoint}${queryParams}`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                },
+            });
+
+            if (!response.ok) {
+                throw new Error('Action failed');
+            }
+        } catch (err) {
+            // Revert on error
+            console.error(err);
+            setUsers(originalUsers);
+
+            // Revert auth store if it was self
+            if (currentUser && targetUser.id === currentUser.id) {
+                login(currentUser, token);
+            }
+
+            alert('Failed to update user status');
+        }
+    };
+
+
+
     // Redirect if not admin
-    if (!user?.isAdmin) {
+    if (!currentUser?.isAdmin) {
         return <Navigate to="/" replace />;
     }
 
@@ -96,17 +167,18 @@ const AdminUsers = () => {
         );
     }
 
-    return (
-        <div className="container-lg">
-            <div className="d-flex align-items-center gap-3 mb-4">
-                <Users size={32} className="text-primary" />
-                <div>
-                    <h2 className="mb-0 fw-bold">User Management</h2>
-                    <p className="text-muted mb-0">View and manage all registered users</p>
-                </div>
-            </div>
 
-            <Card className="shadow-sm border-0">
+
+    // ... (inside component)
+    return (
+        <div className="d-flex flex-column flex-grow-1">
+            <PageHeader
+                title="User Management"
+                subtitle="View and manage all registered users"
+                icon={Users}
+            />
+
+            <Card className="shadow-sm border-0 flex-grow-1" style={{ overflow: 'visible' }}>
                 <Card.Header className="bg-white border-bottom py-3">
                     <div className="d-flex justify-content-between align-items-center">
                         <span className="fw-semibold">All Users</span>
@@ -115,30 +187,37 @@ const AdminUsers = () => {
                         </Badge>
                     </div>
                 </Card.Header>
-                <Card.Body className="p-0">
+                <Card.Body className="p-0" style={{ overflow: 'visible' }}>
                     {loading ? (
                         <div className="d-flex justify-content-center align-items-center py-5">
                             <Spinner animation="border" variant="primary" />
                         </div>
                     ) : (
-                        <Table hover responsive className="mb-0">
+                        <Table hover className="mb-0">
                             <thead className="bg-light">
                                 <tr>
                                     <th className="border-0 py-3 ps-4">User</th>
                                     <th className="border-0 py-3">Email</th>
                                     <th className="border-0 py-3">Joined</th>
                                     <th className="border-0 py-3 text-center">Materials</th>
+                                    <th className="border-0 py-3 text-center">Plan</th>
                                     <th className="border-0 py-3 text-center">Role</th>
+                                    <th className="border-0 py-3 text-center">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {users.map((u) => (
-                                    <tr key={u.id}>
+                                    <tr key={u.id} className={u.is_blocked ? "table-danger" : ""}>
                                         <td className="py-3 ps-4">
                                             <div className="d-flex align-items-center gap-3">
                                                 <img
                                                     src={u.picture || 'https://via.placeholder.com/40'}
-                                                    alt={u.name}
+                                                    alt=""
+                                                    referrerPolicy="no-referrer"
+                                                    onError={(e) => {
+                                                        const target = e.target as HTMLImageElement;
+                                                        target.src = 'https://via.placeholder.com/40';
+                                                    }}
                                                     width="40"
                                                     height="40"
                                                     className="rounded-circle"
@@ -160,6 +239,17 @@ const AdminUsers = () => {
                                             </Badge>
                                         </td>
                                         <td className="py-3 text-center">
+                                            {u.is_pro ? (
+                                                <Badge bg="warning" text="dark" className="rounded-pill px-2 py-1">
+                                                    PRO
+                                                </Badge>
+                                            ) : (
+                                                <Badge bg="light" text="dark" className="border rounded-pill px-2 py-1">
+                                                    FREE
+                                                </Badge>
+                                            )}
+                                        </td>
+                                        <td className="py-3 text-center">
                                             {u.is_admin ? (
                                                 <Badge bg="success" className="d-inline-flex align-items-center gap-1 px-3 py-2">
                                                     <Shield size={14} />
@@ -171,6 +261,55 @@ const AdminUsers = () => {
                                                     User
                                                 </Badge>
                                             )}
+                                        </td>
+                                        <td className="py-3 text-center">
+                                            <Dropdown align="end">
+                                                <Dropdown.Toggle variant="link" className="text-dark p-0 border-0 no-caret">
+                                                    <MoreVertical size={20} />
+                                                </Dropdown.Toggle>
+
+                                                <Dropdown.Menu>
+                                                    <Dropdown.Header>Manage User</Dropdown.Header>
+
+                                                    {!u.is_pro ? (
+                                                        <Dropdown.Item onClick={() => updateUserStatus(u, 'pro', true)}>
+                                                            <Crown size={16} className="me-2 text-warning" />
+                                                            Mark as Pro
+                                                        </Dropdown.Item>
+                                                    ) : (
+                                                        <Dropdown.Item onClick={() => updateUserStatus(u, 'pro', false)}>
+                                                            <Crown size={16} className="me-2 text-muted" />
+                                                            Remove Pro Status
+                                                        </Dropdown.Item>
+                                                    )}
+
+                                                    {!u.is_blocked ? (
+                                                        <Dropdown.Item onClick={() => updateUserStatus(u, 'block', true)} className="text-danger">
+                                                            <Ban size={16} className="me-2" />
+                                                            Block User
+                                                        </Dropdown.Item>
+                                                    ) : (
+                                                        <Dropdown.Item onClick={() => updateUserStatus(u, 'block', false)} className="text-success">
+                                                            <CheckCircle size={16} className="me-2" />
+                                                            Unblock User
+                                                        </Dropdown.Item>
+                                                    )}
+
+                                                    <Dropdown.Divider />
+
+                                                    {!u.is_admin ? (
+                                                        <Dropdown.Item onClick={() => updateUserStatus(u, 'admin', true)}>
+                                                            <Shield size={16} className="me-2 text-success" />
+                                                            Make Admin
+                                                        </Dropdown.Item>
+                                                    ) : (
+                                                        <Dropdown.Item onClick={() => updateUserStatus(u, 'admin', false)}>
+                                                            <ShieldOff size={16} className="me-2" />
+                                                            Remove Admin
+                                                        </Dropdown.Item>
+                                                    )}
+                                                </Dropdown.Menu>
+                                            </Dropdown>
                                         </td>
                                     </tr>
                                 ))}
@@ -211,25 +350,9 @@ const AdminUsers = () => {
                 )}
             </Card>
 
-            <Card className="shadow-sm border-0 mt-4">
-                <Card.Header className="bg-white border-bottom py-3">
-                    <span className="fw-semibold">Admin Commands</span>
-                </Card.Header>
-                <Card.Body>
-                    <p className="text-muted mb-2">To toggle a user's admin status, use the following curl command:</p>
-                    <pre className="bg-dark text-light p-3 rounded" style={{ fontSize: '0.85rem' }}>
-                        {`# Make user an admin
-curl -X POST "${API_URL}/api/admin/set-admin?email=USER_EMAIL&is_admin=true" \\
-  -H "X-API-Key: YOUR_FEED_API_KEY"
-
-# Remove admin privileges
-curl -X POST "${API_URL}/api/admin/set-admin?email=USER_EMAIL&is_admin=false" \\
-  -H "X-API-Key: YOUR_FEED_API_KEY"`}
-                    </pre>
-                </Card.Body>
-            </Card>
         </div>
     );
 };
+
 
 export default AdminUsers;

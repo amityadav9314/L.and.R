@@ -4,6 +4,7 @@ import { Button, Card, Badge, Spinner, ButtonGroup } from 'react-bootstrap';
 import { ExternalLink, Check, BookOpen, Newspaper } from 'lucide-react';
 import { feedClient, learningClient } from '../services/api.ts';
 import { useNavigate } from 'react-router-dom';
+import { PageHeader } from '../components/PageHeader.tsx';
 
 const DailyFeed = () => {
     const navigate = useNavigate();
@@ -61,10 +62,14 @@ const DailyFeed = () => {
 
     return (
         <div>
-            {/* Header Row: Title | Calendar | Provider Toggle */}
+            <PageHeader
+                title="Daily AI Feed"
+                subtitle="Personalized articles curated just for you"
+                icon={Newspaper}
+            />
+
+            {/* Header Row: Calendar | Provider Toggle */}
             <div className="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
-                {/* Title */}
-                <h1 className="h3 fw-bold mb-0">Daily AI Feed</h1>
 
                 {/* Date Navigation - Last 7 Days */}
                 <div className="d-flex gap-2 overflow-auto hide-scrollbar flex-nowrap flex-grow-1 justify-content-center">

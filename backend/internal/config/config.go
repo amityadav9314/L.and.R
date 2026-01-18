@@ -24,7 +24,6 @@ type Config struct {
 	LimitFreeText         int
 	LimitProLink          int
 	LimitProText          int
-	FrontendURL           string
 }
 
 // Load loads configuration from environment variables
@@ -47,7 +46,6 @@ func Load() Config {
 		LimitFreeText:         getEnvIntOrPanic("LIMIT_FREE_TEXT"),
 		LimitProLink:          getEnvIntOrPanic("LIMIT_PRO_LINK"),
 		LimitProText:          getEnvIntOrPanic("LIMIT_PRO_TEXT"),
-		FrontendURL:           getEnvOrPanic("FRONTEND_URL"),
 	}
 }
 
@@ -64,4 +62,24 @@ func getEnvInt(key string, defaultValue int) int {
 		}
 	}
 	return defaultValue
+}
+
+func getEnvOrPanic(key string) string {
+	value := os.Getenv(key)
+	if value == "" {
+		panic("Missing required environment variable: " + key)
+	}
+	return value
+}
+
+func getEnvIntOrPanic(key string) int {
+	value := os.Getenv(key)
+	if value == "" {
+		panic("Missing required environment variable: " + key)
+	}
+	i, err := strconv.Atoi(value)
+	if err != nil {
+		panic("Invalid integer for environment variable " + key + ": " + value)
+	}
+	return i
 }

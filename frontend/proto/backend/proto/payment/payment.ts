@@ -11,8 +11,10 @@ import type { CallContext, CallOptions } from "nice-grpc-common";
 export const protobufPackage = "payment";
 
 export interface CreateSubscriptionOrderRequest {
-  /** "PRO" or "FREE" (though free won't call this) */
+  /** "PRO" or "FREE" */
   planId: string;
+  /** URL to redirect after payment success */
+  redirectUrl: string;
 }
 
 export interface CreateSubscriptionOrderResponse {
@@ -24,13 +26,16 @@ export interface CreateSubscriptionOrderResponse {
 }
 
 function createBaseCreateSubscriptionOrderRequest(): CreateSubscriptionOrderRequest {
-  return { planId: "" };
+  return { planId: "", redirectUrl: "" };
 }
 
 export const CreateSubscriptionOrderRequest: MessageFns<CreateSubscriptionOrderRequest> = {
   encode(message: CreateSubscriptionOrderRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.planId !== "") {
       writer.uint32(10).string(message.planId);
+    }
+    if (message.redirectUrl !== "") {
+      writer.uint32(18).string(message.redirectUrl);
     }
     return writer;
   },
@@ -50,6 +55,14 @@ export const CreateSubscriptionOrderRequest: MessageFns<CreateSubscriptionOrderR
           message.planId = reader.string();
           continue;
         }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.redirectUrl = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -60,13 +73,19 @@ export const CreateSubscriptionOrderRequest: MessageFns<CreateSubscriptionOrderR
   },
 
   fromJSON(object: any): CreateSubscriptionOrderRequest {
-    return { planId: isSet(object.planId) ? globalThis.String(object.planId) : "" };
+    return {
+      planId: isSet(object.planId) ? globalThis.String(object.planId) : "",
+      redirectUrl: isSet(object.redirectUrl) ? globalThis.String(object.redirectUrl) : "",
+    };
   },
 
   toJSON(message: CreateSubscriptionOrderRequest): unknown {
     const obj: any = {};
     if (message.planId !== "") {
       obj.planId = message.planId;
+    }
+    if (message.redirectUrl !== "") {
+      obj.redirectUrl = message.redirectUrl;
     }
     return obj;
   },
@@ -77,6 +96,7 @@ export const CreateSubscriptionOrderRequest: MessageFns<CreateSubscriptionOrderR
   fromPartial(object: DeepPartial<CreateSubscriptionOrderRequest>): CreateSubscriptionOrderRequest {
     const message = createBaseCreateSubscriptionOrderRequest();
     message.planId = object.planId ?? "";
+    message.redirectUrl = object.redirectUrl ?? "";
     return message;
   },
 };
