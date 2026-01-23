@@ -29,7 +29,21 @@ export const SettingsScreen = () => {
         const loadPreferences = async () => {
             try {
                 const prefs = await feedClient.getFeedPreferences();
-                setFeedEnabled(prefs.feedEnabled);
+
+                // Enforce Pro status: If enabled but user is not Pro, disable it
+                let enabled = prefs.feedEnabled;
+                if (enabled && !user?.isPro) {
+                    console.log('User not Pro but feed enabled. Auto-disabling...');
+                    enabled = false;
+                    // Auto-sync to backend
+                    await feedClient.updateFeedPreferences({
+                        feedEnabled: false,
+                        interestPrompt: prefs.interestPrompt,
+                        feedEvalPrompt: prefs.feedEvalPrompt,
+                    });
+                }
+
+                setFeedEnabled(enabled);
                 setInterestPrompt(prefs.interestPrompt);
                 setEvalPrompt(prefs.feedEvalPrompt);
             } catch (error) {
@@ -39,7 +53,7 @@ export const SettingsScreen = () => {
             }
         };
         loadPreferences();
-    }, []);
+    }, [user?.isPro]);
 
     // Save feed preferences
     const saveFeedPreferences = async () => {
@@ -115,6 +129,17 @@ export const SettingsScreen = () => {
                                     <Switch
                                         value={feedEnabled}
                                         onValueChange={async (value) => {
+                                            if (value && !user?.isPro) {
+                                                Alert.alert(
+                                                    'Pro Feature ⭐️',
+                                                    'Daily AI Feed is available only for Pro members.',
+                                                    [
+                                                        { text: 'Cancel', style: 'cancel' },
+                                                        { text: 'Upgrade', onPress: () => navigation.navigate('Upgrade') }
+                                                    ]
+                                                );
+                                                return;
+                                            }
                                             setFeedEnabled(value);
                                             // Auto-save when toggling
                                             try {

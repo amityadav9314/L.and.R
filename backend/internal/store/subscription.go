@@ -158,3 +158,23 @@ func (s *PostgresStore) GetUsage(ctx context.Context, userID, resource string) (
 
 	return count, nil
 }
+
+// DowngradeExpiredSubscriptions updates expired PRO subscriptions to FREE and disables feed
+func (s *PostgresStore) DowngradeExpiredSubscriptions(ctx context.Context) (int64, error) {
+	query := `
+		WITH expired_subs AS (
+			UPDATE subscriptions
+			SET plan = $1, status = $2, updated_at = NOW()
+			WHERE plan = $3 AND current_period_end < NOW()
+			RETURNING user_id
+		)
+		UPDATE users
+		SET feed_enabled = FALSE, updated_at = NOW()
+		WHERE id IN (SELECT user_id FROM expired_subs)
+	`
+	tag, err := s.db.Exec(ctx, query, PlanFree, StatusPastDue, PlanPro)
+	if err != nil {
+		return 0, fmt.Errorf("failed to downgrade expired subscriptions: %w", err)
+	}
+	return tag.RowsAffected(), nil
+}

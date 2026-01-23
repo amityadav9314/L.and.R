@@ -250,7 +250,20 @@ func (s *PostgresStore) SetUserProStatus(ctx context.Context, userID string, isP
 		RazorpaySubscriptionID: "manual_admin_set",
 	}
 
-	return s.UpsertSubscription(ctx, sub)
+	if err := s.UpsertSubscription(ctx, sub); err != nil {
+		return err
+	}
+
+	// Disable feed if downgrading to free
+	if !isPro {
+		log.Printf("[Store.SetUserProStatus] Disabling feed for user %s due to downgrade", userID)
+		query := `UPDATE users SET feed_enabled = FALSE, updated_at = NOW() WHERE id = $1`
+		if _, err := s.db.Exec(ctx, query, userID); err != nil {
+			return fmt.Errorf("failed to disable feed during downgrade: %w", err)
+		}
+	}
+
+	return nil
 }
 
 func (s *PostgresStore) CreateMaterial(ctx context.Context, userID, matType, content, title, sourceURL string) (string, error) {

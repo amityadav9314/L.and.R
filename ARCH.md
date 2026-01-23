@@ -216,11 +216,30 @@ Server-side push notifications for daily "due materials" reminders.
 - **Interactive Handlers**: Custom `NotificationHandler` in `App.tsx` captures notification clicks.
 - **Navigation**: Deep linking takes users directly to the **Home** (Revision List) screen from a notification click.
 
+## Monetization & Subscription Architecture
+
+### Pro Plan Model
+- **Duration**: Fixed 30-day access (no auto-renewal).
+- **Expiry**: Managed via `current_period_end` timestamp in `subscriptions` table.
+- **Downgrade**: Occurs immediately upon expiry.
+
+### Auto-Disable Mechanism
+Ensures users lose access to Pro features (Daily Feed) when subscription expires.
+
+1.  **Database Cleanup (5:50 AM IST)**:
+    - Dedicated cron job (`DowngradeExpiredSubscriptions`) runs daily.
+    - Updates rows with `current_period_end < NOW()` to `PLAN='FREE'`, `STATUS='PAST_DUE'`.
+
+2.  **Feature Enforcement**:
+    - **Backend Gate**: `GenerateDailyFeedForUser` checks Pro status. Auto-disables `feedEnabled` preference if expired.
+    - **Frontend Sync**: `SettingsScreen` checks Pro status on load. Auto-disables toggle if mismatch found.
+
 ## Daily Scheduled Jobs
 All jobs run in **IST timezone** managed by `notifications.Worker`.
 
 | Job | Schedule | Description |
 |-----|----------|-------------|
+| **Subscription Cleanup** | 5:50 AM IST | Downgrades expired Pro subscriptions to Free |
 | **Feed Generation** | 6:00 AM IST | Fetches articles via Tavily/SerpApi |
 | **Push Notifications** | 9:00 AM IST | Sends due material reminders via FCM |
 

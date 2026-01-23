@@ -42,6 +42,19 @@ func (w *Worker) SetFeedCore(feedCore *core.FeedCore) {
 func (w *Worker) Start() {
 	log.Println("[Worker] Starting daily schedulers...")
 
+	// Schedule subscription cleanup at 5:50 AM IST (before feed generation)
+	_, _ = w.cron.AddFunc("50 5 * * *", func() {
+		go func() {
+			log.Println("[Worker] Running daily subscription cleanup...")
+			ctx := context.Background()
+			if count, err := w.store.DowngradeExpiredSubscriptions(ctx); err != nil {
+				log.Printf("[Worker] Failed to downgrade subscriptions: %v", err)
+			} else {
+				log.Printf("[Worker] Downgraded %d expired subscriptions to FREE", count)
+			}
+		}()
+	})
+
 	// Schedule feed generation at 6 AM IST (before notifications)
 	if w.feedCore != nil {
 		_, err := w.cron.AddFunc("0 6 * * *", func() {

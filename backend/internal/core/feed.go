@@ -151,6 +151,23 @@ func (c *FeedCore) GenerateDailyFeedForUser(ctx context.Context, userID string) 
 		return nil
 	}
 
+	// 2. Check Subscription Status (Enforce Pro Requirement)
+	sub, err := c.store.GetSubscription(ctx, userID)
+	if err != nil {
+		log.Printf("[FeedCore.GenerateDailyFeedForUser] Failed to get subscription for user %s: %v", userID, err)
+		return nil // Fail safe
+	}
+
+	isPro := sub.Plan == store.PlanPro && (sub.CurrentPeriodEnd == nil || sub.CurrentPeriodEnd.After(time.Now()))
+	if !isPro {
+		log.Printf("[FeedCore.GenerateDailyFeedForUser] User %s is not Pro (Plan: %s). Disabling feed.", userID, sub.Plan)
+		// Disable feed in preferences so we don't check again
+		if err := c.store.UpdateFeedPreferences(ctx, userID, prefs.InterestPrompt, prefs.FeedEvalPrompt, false); err != nil {
+			log.Printf("[FeedCore.GenerateDailyFeedForUser] Failed to auto-disable feed for user %s: %v", userID, err)
+		}
+		return nil
+	}
+
 	log.Printf("[FeedCore.GenerateDailyFeedForUser] User interests: %s", prefs.InterestPrompt)
 
 	// Check existing articles
