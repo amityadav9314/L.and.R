@@ -49,10 +49,11 @@ export const AddMaterialScreen = () => {
             queryClient.invalidateQueries({ queryKey: ['notificationStatus'], refetchType: 'all' });
             navigation.goBack();
         },
-        onError: async (error) => {
+        onError: async (error: any) => {
             console.error('[ADD_MATERIAL] Error:', error);
             await stopProcessing(); // Clear processing state on error too
-            Alert.alert('Error', 'Failed to add material. Please try again.');
+            const errorMessage = error?.message || 'Failed to add material. Please try again.';
+            Alert.alert('Error', errorMessage);
         },
     });
 

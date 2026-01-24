@@ -41,6 +41,10 @@ const DailyFeed = () => {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['dailyFeed'] });
             queryClient.invalidateQueries({ queryKey: ['materials'] });
+        },
+        onError: (error: any) => {
+            const errorMessage = error?.message || 'Failed to add material';
+            alert(errorMessage);
         }
     });
 

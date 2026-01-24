@@ -24,6 +24,10 @@ type Config struct {
 	LimitFreeText         int
 	LimitProLink          int
 	LimitProText          int
+	LimitFreeImage        int
+	LimitFreeYoutube      int
+	LimitProImage         int
+	LimitProYoutube       int
 	ProAccessDays         int
 }
 
@@ -47,6 +51,10 @@ func Load() Config {
 		LimitFreeText:         getEnvIntOrPanic("LIMIT_FREE_TEXT"),
 		LimitProLink:          getEnvIntOrPanic("LIMIT_PRO_LINK"),
 		LimitProText:          getEnvIntOrPanic("LIMIT_PRO_TEXT"),
+		LimitFreeImage:        getEnvInt("LIMIT_FREE_IMAGE", 5),
+		LimitFreeYoutube:      getEnvInt("LIMIT_FREE_YOUTUBE", 3),
+		LimitProImage:         getEnvInt("LIMIT_PRO_IMAGE", 100),
+		LimitProYoutube:       getEnvInt("LIMIT_PRO_YOUTUBE", 50),
 		ProAccessDays:         getEnvInt("PRO_ACCESS_DAYS", 30),
 	}
 }

@@ -61,7 +61,9 @@ func (i *Interceptor) Unary() grpc.UnaryServerInterceptor {
 		}
 
 		if !allowed {
-			return nil, status.Errorf(codes.ResourceExhausted, "daily quota exceeded for %s. Upgrade to Pro for more.", resource)
+			return nil, status.Errorf(codes.ResourceExhausted,
+				"You've reached your daily limit of %d %s. Upgrade to Pro for more!",
+				limit, ResourceDisplayName(resource))
 		}
 
 		// 5. Execute Handler
@@ -88,17 +90,21 @@ func (i *Interceptor) getResourceForRequest(method string, req interface{}) stri
 	// Only checking AddMaterial for now
 	if method == "/learning.LearningService/AddMaterial" {
 		if r, ok := req.(*learning.AddMaterialRequest); ok {
-			// Check type
-			if r.Type == "LINK" {
+			switch r.Type {
+			case "LINK":
 				return ResourceLinkImport
+			case "IMAGE":
+				return ResourceImageImport
+			case "YOUTUBE":
+				return ResourceYoutubeImport
+			default:
+				return ResourceTextImport
 			}
-			return ResourceTextImport
 		}
 	}
 	return ""
 }
 
-// getLimit returns the limit for a resource based on the plan and config
 func (i *Interceptor) getLimit(plan store.SubscriptionPlan, resource string) int {
 	if plan == store.PlanPro {
 		switch resource {
@@ -106,6 +112,10 @@ func (i *Interceptor) getLimit(plan store.SubscriptionPlan, resource string) int
 			return i.config.LimitProLink
 		case ResourceTextImport:
 			return i.config.LimitProText
+		case ResourceImageImport:
+			return i.config.LimitProImage
+		case ResourceYoutubeImport:
+			return i.config.LimitProYoutube
 		}
 	} else {
 		// Default to Free
@@ -114,6 +124,10 @@ func (i *Interceptor) getLimit(plan store.SubscriptionPlan, resource string) int
 			return i.config.LimitFreeLink
 		case ResourceTextImport:
 			return i.config.LimitFreeText
+		case ResourceImageImport:
+			return i.config.LimitFreeImage
+		case ResourceYoutubeImport:
+			return i.config.LimitFreeYoutube
 		}
 	}
 	return 0

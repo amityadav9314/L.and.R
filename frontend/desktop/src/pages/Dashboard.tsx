@@ -317,6 +317,7 @@ const Dashboard = () => {
 
 const AddMaterialForm = ({ onSuccess }: { onSuccess: () => void }) => {
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
     const [contentType, setContentType] = useState<'TEXT' | 'LINK' | 'IMAGE' | 'YOUTUBE'>('TEXT');
     const [content, setContent] = useState('');
     const [tags, setTags] = useState('');
@@ -338,6 +339,7 @@ const AddMaterialForm = ({ onSuccess }: { onSuccess: () => void }) => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setError(null);
         if (contentType !== 'IMAGE' && !content.trim()) return;
         if (contentType === 'IMAGE' && !imageData) return;
 
@@ -353,9 +355,16 @@ const AddMaterialForm = ({ onSuccess }: { onSuccess: () => void }) => {
             });
 
             onSuccess();
-        } catch (error) {
-            console.error('Failed to add material:', error);
-            alert('Failed to add material');
+        } catch (err: any) {
+            console.error('Failed to add material:', err);
+            // Extract user-friendly message from gRPC error
+            let errorMessage = err?.message || 'Failed to add material';
+            // Remove gRPC path prefix if present (e.g., "/learning.LearningService/AddMaterial RESOURCE_EXHAUSTED: ")
+            const colonIndex = errorMessage.indexOf(': ');
+            if (colonIndex !== -1 && errorMessage.includes('/')) {
+                errorMessage = errorMessage.substring(colonIndex + 2);
+            }
+            setError(errorMessage);
         } finally {
             setLoading(false);
         }
@@ -363,6 +372,11 @@ const AddMaterialForm = ({ onSuccess }: { onSuccess: () => void }) => {
 
     return (
         <Form onSubmit={handleSubmit}>
+            {error && (
+                <div className="alert alert-danger mb-3 py-2 rounded-3" role="alert">
+                    {error}
+                </div>
+            )}
             <div className="mb-4">
                 <label className="small fw-semibold text-muted mb-2 d-block">Select Content Type</label>
                 <div className="d-flex gap-2">
