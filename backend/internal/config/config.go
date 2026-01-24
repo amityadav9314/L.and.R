@@ -28,7 +28,6 @@ type Config struct {
 	LimitFreeYoutube      int
 	LimitProImage         int
 	LimitProYoutube       int
-	ProAccessDays         int
 }
 
 // Load loads configuration from environment variables
@@ -47,15 +46,14 @@ func Load() Config {
 		RazorpayWebhookSecret: getEnv("RAZORPAY_WEBHOOK_SECRET", ""),
 		RazorpayPaymentFlow:   getEnv("RAZORPAY_PAYMENT_FLOW", "popup"),
 		FirebaseCredPath:      "firebase/service-account.json",
-		LimitFreeLink:         getEnvIntOrPanic("LIMIT_FREE_LINK"),
-		LimitFreeText:         getEnvIntOrPanic("LIMIT_FREE_TEXT"),
-		LimitProLink:          getEnvIntOrPanic("LIMIT_PRO_LINK"),
-		LimitProText:          getEnvIntOrPanic("LIMIT_PRO_TEXT"),
+		LimitFreeLink:         getEnvInt("LIMIT_FREE_LINK", 3),
+		LimitFreeText:         getEnvInt("LIMIT_FREE_TEXT", 10),
+		LimitProLink:          getEnvInt("LIMIT_PRO_LINK", 50),
+		LimitProText:          getEnvInt("LIMIT_PRO_TEXT", 100000),
 		LimitFreeImage:        getEnvInt("LIMIT_FREE_IMAGE", 5),
 		LimitFreeYoutube:      getEnvInt("LIMIT_FREE_YOUTUBE", 3),
 		LimitProImage:         getEnvInt("LIMIT_PRO_IMAGE", 100),
 		LimitProYoutube:       getEnvInt("LIMIT_PRO_YOUTUBE", 50),
-		ProAccessDays:         getEnvInt("PRO_ACCESS_DAYS", 30),
 	}
 }
 

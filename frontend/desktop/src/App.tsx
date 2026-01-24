@@ -6,7 +6,7 @@ import Login from './pages/Login.tsx';
 import Dashboard from './pages/Dashboard.tsx';
 import DailyFeed from './pages/DailyFeed.tsx';
 import Settings from './pages/Settings.tsx';
-import AdminUsers from './pages/AdminUsers.tsx';
+import Admin from './pages/Admin.tsx';
 import UpgradePage from './pages/UpgradePage.tsx';
 import { TermsPage } from './pages/TermsPage.tsx';
 import { PrivacyPage } from './pages/PrivacyPage.tsx';
@@ -48,7 +48,8 @@ function App() {
             <Route path="vault" element={<Dashboard />} />
             <Route path="feed" element={<DailyFeed />} />
             <Route path="settings" element={<Settings />} />
-            <Route path="admin/users" element={<AdminUsers />} />
+            <Route path="admin" element={<Admin />} />
+            <Route path="admin/users" element={<Navigate to="/admin" replace />} />
             <Route path="upgrade" element={<UpgradePage />} />
           </Route>
         </Routes>
@@ -58,3 +59,4 @@ function App() {
 }
 
 export default App;
+

@@ -13,6 +13,7 @@ import (
 	"github.com/amityadav/landr/internal/quota"
 	"github.com/amityadav/landr/internal/server"
 	"github.com/amityadav/landr/internal/service"
+	"github.com/amityadav/landr/internal/settings"
 	"github.com/amityadav/landr/internal/store"
 	"github.com/amityadav/landr/internal/token"
 	"github.com/amityadav/landr/pkg/pb/auth"
@@ -35,9 +36,9 @@ var ServerModule = fx.Module("server",
 )
 
 // NewGRPCServer creates configured gRPC server with auth interceptor
-func NewGRPCServer(tm *token.Manager, s *store.PostgresStore, cfg config.Config) *grpc.Server {
+func NewGRPCServer(tm *token.Manager, s *store.PostgresStore, settingsSvc *settings.Service) *grpc.Server {
 	authInterceptor := middleware.NewAuthInterceptor(tm, s)
-	quotaInterceptor := quota.NewInterceptor(s, cfg)
+	quotaInterceptor := quota.NewInterceptor(s, settingsSvc)
 
 	srv := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
@@ -91,6 +92,7 @@ type ServerParams struct {
 	NotifWorker     *notifications.Worker   `optional:"true"`
 	TokenManager    *token.Manager
 	Config          config.Config
+	SettingsService *settings.Service
 }
 
 // StartServers starts gRPC and HTTP servers with lifecycle management
@@ -124,6 +126,7 @@ func StartServers(p ServerParams) {
 				FeedCore:        p.FeedCore,
 				NotifWorker:     p.NotifWorker,
 				TokenManager:    p.TokenManager,
+				SettingsService: p.SettingsService,
 			}
 			restHandler := server.CreateRESTHandler(serverServices, p.Config)
 			combinedHandler := server.CreateCombinedHandler(httpHandler, restHandler)

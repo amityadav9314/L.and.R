@@ -15,6 +15,7 @@ import (
 	"github.com/amityadav/landr/internal/search"
 	"github.com/amityadav/landr/internal/serpapi"
 	"github.com/amityadav/landr/internal/service"
+	"github.com/amityadav/landr/internal/settings"
 	"github.com/amityadav/landr/internal/store"
 
 	"github.com/amityadav/landr/internal/payment"
@@ -35,6 +36,11 @@ var ConfigModule = fx.Module("config",
 // StoreModule provides database connectivity
 var StoreModule = fx.Module("store",
 	fx.Provide(NewPostgresStore),
+)
+
+// SettingsModule provides database-based settings service
+var SettingsModule = fx.Module("settings",
+	fx.Provide(NewSettingsService),
 )
 
 // TokenModule provides JWT token management
@@ -105,6 +111,21 @@ func NewPostgresStore(cfg config.Config) (*store.PostgresStore, error) {
 	}
 	log.Printf("[FX] PostgresStore initialized")
 	return st, nil
+}
+
+// NewSettingsService creates settings service with database-backed storage
+func NewSettingsService(st *store.PostgresStore) (*settings.Service, error) {
+	ctx := context.Background()
+	svc, err := settings.NewService(ctx, st)
+	if err != nil {
+		return nil, err
+	}
+	// Seed defaults if not present
+	if err := svc.Seed(ctx); err != nil {
+		log.Printf("[FX] Warning: Failed to seed settings: %v", err)
+	}
+	log.Printf("[FX] SettingsService initialized")
+	return svc, nil
 }
 
 // NewTokenManager creates JWT token manager

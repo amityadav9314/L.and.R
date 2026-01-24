@@ -24,6 +24,7 @@ func main() {
 		// Modules group related providers (like Spring @Configuration)
 		appfx.ConfigModule,       // Provides: config.Config
 		appfx.StoreModule,        // Provides: *store.PostgresStore
+		appfx.SettingsModule,     // Provides: *settings.Service (database-backed)
 		appfx.TokenModule,        // Provides: *token.Manager
 		appfx.ScraperModule,      // Provides: *scraper.Scraper
 		appfx.AIModule,           // Provides: ai.Provider (named: "learning", "feed")

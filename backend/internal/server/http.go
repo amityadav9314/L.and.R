@@ -57,6 +57,7 @@ func CreateCombinedHandler(httpHandler, restHandler http.HandlerFunc) http.Handl
 			r.URL.Path == "/api/admin/set-admin" ||
 			r.URL.Path == "/api/admin/set-pro" ||
 			r.URL.Path == "/api/admin/set-block" ||
+			r.URL.Path == "/api/admin/settings" ||
 			r.URL.Path == "/api/payment/webhook" {
 			restHandler.ServeHTTP(w, r)
 			return

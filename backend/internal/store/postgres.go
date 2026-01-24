@@ -918,3 +918,52 @@ func (s *PostgresStore) DeleteDeviceToken(ctx context.Context, userID, token str
 	_, err := s.db.Exec(ctx, query, userID, token)
 	return err
 }
+
+// =======================
+// Settings Methods
+// =======================
+
+// GetSetting retrieves a setting value by key
+func (s *PostgresStore) GetSetting(ctx context.Context, key string) ([]byte, error) {
+	query := `SELECT value FROM settings WHERE key = $1`
+	var value []byte
+	err := s.db.QueryRow(ctx, query, key).Scan(&value)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get setting '%s': %w", key, err)
+	}
+	return value, nil
+}
+
+// SetSetting creates or updates a setting
+func (s *PostgresStore) SetSetting(ctx context.Context, key string, value []byte, description string) error {
+	query := `
+		INSERT INTO settings (key, value, description)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (key) DO UPDATE SET value = $2, description = $3, updated_at = NOW()
+	`
+	_, err := s.db.Exec(ctx, query, key, value, description)
+	if err != nil {
+		return fmt.Errorf("failed to set setting '%s': %w", key, err)
+	}
+	return nil
+}
+
+// GetAllSettings retrieves all settings from the database
+func (s *PostgresStore) GetAllSettings(ctx context.Context) ([]SettingRow, error) {
+	query := `SELECT key, value, COALESCE(description, '') FROM settings ORDER BY key`
+	rows, err := s.db.Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get all settings: %w", err)
+	}
+	defer rows.Close()
+
+	var settings []SettingRow
+	for rows.Next() {
+		var row SettingRow
+		if err := rows.Scan(&row.Key, &row.Value, &row.Description); err != nil {
+			return nil, fmt.Errorf("failed to scan setting row: %w", err)
+		}
+		settings = append(settings, row)
+	}
+	return settings, nil
+}

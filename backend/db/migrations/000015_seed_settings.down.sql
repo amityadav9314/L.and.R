@@ -1,0 +1,2 @@
+-- No-op: Keep seeded data
+-- DELETE FROM settings WHERE key = 'quota_limits';

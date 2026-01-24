@@ -14,6 +14,7 @@ import (
 	"github.com/amityadav/landr/internal/core"
 	"github.com/amityadav/landr/internal/notifications"
 	"github.com/amityadav/landr/internal/service"
+	"github.com/amityadav/landr/internal/settings"
 	"github.com/amityadav/landr/internal/store"
 	"github.com/amityadav/landr/internal/token"
 )
@@ -28,6 +29,7 @@ type Services struct {
 	FeedCore        *core.FeedCore
 	NotifWorker     *notifications.Worker
 	TokenManager    *token.Manager
+	SettingsService *settings.Service
 }
 
 // CreateRESTHandler creates REST API endpoints
@@ -56,9 +58,11 @@ func CreateRESTHandler(services Services, cfg config.Config) http.HandlerFunc {
 		case "/api/admin/set-admin":
 			handleSetAdminStatus(w, r, services.Store, services.TokenManager, cfg.FeedAPIKey)
 		case "/api/admin/set-pro":
-			handleSetUserProStatus(w, r, services.Store, services.TokenManager, cfg.FeedAPIKey, cfg.ProAccessDays)
+			handleSetUserProStatus(w, r, services.Store, services.TokenManager, cfg.FeedAPIKey, services.SettingsService)
 		case "/api/admin/set-block":
 			handleSetUserBlockStatus(w, r, services.Store, services.TokenManager, cfg.FeedAPIKey)
+		case "/api/admin/settings":
+			handleAdminSettings(w, r, services.Store, services.TokenManager, services.SettingsService)
 		case "/api/payment/webhook":
 			handlePaymentWebhook(w, r, services.PaymentService, cfg.RazorpayWebhookSecret)
 		default:
@@ -426,7 +430,7 @@ func boolToString(b bool) string {
 	return "false"
 }
 
-func handleSetUserProStatus(w http.ResponseWriter, r *http.Request, st *store.PostgresStore, tm *token.Manager, feedAPIKey string, defaultDays int) {
+func handleSetUserProStatus(w http.ResponseWriter, r *http.Request, st *store.PostgresStore, tm *token.Manager, feedAPIKey string, settingsSvc *settings.Service) {
 	if r.Method != "POST" {
 		http.Error(w, `{"error": "method not allowed"}`, http.StatusMethodNotAllowed)
 		return
@@ -449,7 +453,13 @@ func handleSetUserProStatus(w http.ResponseWriter, r *http.Request, st *store.Po
 	isPro := isProStr == "true" || isProStr == "1"
 
 	// Determine days
-	days := defaultDays
+	var days int
+	if settingsSvc != nil {
+		days = settingsSvc.GetProAccessDays()
+	} else {
+		days = 30 // Fallback
+	}
+
 	if daysStr != "" {
 		if d, err := strconv.Atoi(daysStr); err == nil && d > 0 {
 			days = d
@@ -610,4 +620,120 @@ func handlePaymentWebhook(w http.ResponseWriter, r *http.Request, paymentService
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+// handleAdminSettings handles GET and POST for admin settings
+// GET: Returns all settings from database
+// POST: Updates a specific setting by key (admin only)
+func handleAdminSettings(w http.ResponseWriter, r *http.Request, st *store.PostgresStore, tm *token.Manager, settingsSvc *settings.Service) {
+	// Verify admin user
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		http.Error(w, `{"error": "unauthorized - missing Authorization header"}`, http.StatusUnauthorized)
+		return
+	}
+
+	tokenStr := authHeader
+	if len(authHeader) > 7 && authHeader[:7] == "Bearer " {
+		tokenStr = authHeader[7:]
+	}
+
+	userID, err := tm.Verify(tokenStr)
+	if err != nil {
+		http.Error(w, `{"error": "unauthorized - invalid token"}`, http.StatusUnauthorized)
+		return
+	}
+
+	user, err := st.GetUserByID(r.Context(), userID)
+	if err != nil {
+		http.Error(w, `{"error": "unauthorized - user not found"}`, http.StatusUnauthorized)
+		return
+	}
+
+	if !user.IsAdmin {
+		http.Error(w, `{"error": "forbidden - admin access required"}`, http.StatusForbidden)
+		return
+	}
+
+	switch r.Method {
+	case "GET":
+		// Return all settings
+		rows, err := st.GetAllSettings(r.Context())
+		if err != nil {
+			log.Printf("[REST] handleAdminSettings - failed to get settings: %v", err)
+			http.Error(w, `{"error": "failed to get settings"}`, http.StatusInternalServerError)
+			return
+		}
+
+		// Convert to JSON-friendly format
+		type settingResponse struct {
+			Key         string          `json:"key"`
+			Value       json.RawMessage `json:"value"`
+			Description string          `json:"description"`
+		}
+
+		var response []settingResponse
+		for _, row := range rows {
+			response = append(response, settingResponse{
+				Key:         row.Key,
+				Value:       json.RawMessage(row.Value),
+				Description: row.Description,
+			})
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(response)
+
+	case "POST":
+		// Update a specific setting
+		var req struct {
+			Key   string          `json:"key"`
+			Value json.RawMessage `json:"value"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, `{"error": "invalid JSON body"}`, http.StatusBadRequest)
+			return
+		}
+
+		if req.Key == "" {
+			http.Error(w, `{"error": "key is required"}`, http.StatusBadRequest)
+			return
+		}
+
+		// Get existing setting to preserve description
+		existingRows, _ := st.GetAllSettings(r.Context())
+		description := ""
+		for _, row := range existingRows {
+			if row.Key == req.Key {
+				description = row.Description
+				break
+			}
+		}
+
+		if err := st.SetSetting(r.Context(), req.Key, req.Value, description); err != nil {
+			log.Printf("[REST] handleAdminSettings - failed to save setting '%s': %v", req.Key, err)
+			http.Error(w, `{"error": "failed to save setting"}`, http.StatusInternalServerError)
+			return
+		}
+
+		// Refresh settings service cache
+		if settingsSvc != nil {
+			if err := settingsSvc.Refresh(r.Context()); err != nil {
+				log.Printf("[REST] handleAdminSettings - warning: failed to refresh cache: %v", err)
+			}
+		}
+
+		log.Printf("[REST] handleAdminSettings - setting '%s' updated by admin: %s", req.Key, user.Email)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":  "success",
+			"message": "Setting updated",
+			"key":     req.Key,
+		})
+
+	default:
+		http.Error(w, `{"error": "method not allowed"}`, http.StatusMethodNotAllowed)
+	}
 }

@@ -1,11 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Navigate } from 'react-router-dom';
 import { Table, Card, Badge, Spinner, Alert, Button, Dropdown, Modal, Form, InputGroup } from 'react-bootstrap';
-import { Users, Shield, ShieldOff, ChevronLeft, ChevronRight, MoreVertical, Ban, CheckCircle, Crown, Search, X } from 'lucide-react';
+import { Shield, ShieldOff, ChevronLeft, ChevronRight, MoreVertical, Ban, CheckCircle, Crown, Search, X } from 'lucide-react';
 import { useAuthStore } from '../store/authStore.ts';
 
 import { API_URL } from '../utils/config.ts';
-import { PageHeader } from '../components/PageHeader.tsx';
 
 interface User {
     id: string;
@@ -191,31 +189,10 @@ const AdminUsers = () => {
 
 
 
-    // Redirect if not admin
-    if (!currentUser?.isAdmin) {
-        return <Navigate to="/" replace />;
-    }
-
-    if (error) {
-        return (
-            <Alert variant="danger" className="m-4">
-                <Alert.Heading>Error</Alert.Heading>
-                <p>{error}</p>
-            </Alert>
-        );
-    }
-
-
-
     // ... (inside component)
     return (
-        <div className="d-flex flex-column flex-grow-1">
-            <PageHeader
-                title="User Management"
-                subtitle="View and manage all registered users"
-                icon={Users}
-            />
-
+        <>
+            {error && <Alert variant="danger" className="mb-3">{error}</Alert>}
             <Card className="shadow-sm border-0 flex-grow-1" style={{ overflow: 'visible' }}>
                 <Card.Header className="bg-white border-bottom py-3">
                     <div className="d-flex justify-content-between align-items-center">
@@ -455,7 +432,7 @@ const AdminUsers = () => {
                 </Modal.Footer>
             </Modal>
 
-        </div>
+        </>
     );
 };
 

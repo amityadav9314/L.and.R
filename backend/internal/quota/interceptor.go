@@ -4,8 +4,8 @@ import (
 	"context"
 	"log"
 
-	"github.com/amityadav/landr/internal/config"
 	"github.com/amityadav/landr/internal/middleware"
+	"github.com/amityadav/landr/internal/settings"
 	"github.com/amityadav/landr/internal/store"
 	"github.com/amityadav/landr/pkg/pb/learning"
 	"google.golang.org/grpc"
@@ -14,14 +14,14 @@ import (
 )
 
 type Interceptor struct {
-	store  store.Store
-	config config.Config
+	store    store.Store
+	settings *settings.Service
 }
 
-func NewInterceptor(s store.Store, cfg config.Config) *Interceptor {
+func NewInterceptor(s store.Store, settingsSvc *settings.Service) *Interceptor {
 	return &Interceptor{
-		store:  s,
-		config: cfg,
+		store:    s,
+		settings: settingsSvc,
 	}
 }
 
@@ -71,14 +71,8 @@ func (i *Interceptor) Unary() grpc.UnaryServerInterceptor {
 
 		// 6. If successful, increment quota
 		if err == nil {
-			// We increment in background?
-			// No, better to be consistent.
-			// But note: CheckQuota didn't increment, it just checked usage < limit.
-			// Actually my CheckQuota implementation resets if needed but doesn't increment.
-			// So I MUST increment here.
 			if incErr := i.store.IncrementQuota(ctx, userID, resource); incErr != nil {
 				log.Printf("Failed to increment quota for user %s: %v", userID, incErr)
-				// We don't fail the request if increment fails, but we should log it
 			}
 		}
 
@@ -106,29 +100,9 @@ func (i *Interceptor) getResourceForRequest(method string, req interface{}) stri
 }
 
 func (i *Interceptor) getLimit(plan store.SubscriptionPlan, resource string) int {
+	planStr := "free"
 	if plan == store.PlanPro {
-		switch resource {
-		case ResourceLinkImport:
-			return i.config.LimitProLink
-		case ResourceTextImport:
-			return i.config.LimitProText
-		case ResourceImageImport:
-			return i.config.LimitProImage
-		case ResourceYoutubeImport:
-			return i.config.LimitProYoutube
-		}
-	} else {
-		// Default to Free
-		switch resource {
-		case ResourceLinkImport:
-			return i.config.LimitFreeLink
-		case ResourceTextImport:
-			return i.config.LimitFreeText
-		case ResourceImageImport:
-			return i.config.LimitFreeImage
-		case ResourceYoutubeImport:
-			return i.config.LimitFreeYoutube
-		}
+		planStr = "pro"
 	}
-	return 0
+	return i.settings.GetQuotaLimit(planStr, resource)
 }

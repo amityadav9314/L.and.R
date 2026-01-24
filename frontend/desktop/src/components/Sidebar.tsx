@@ -23,7 +23,7 @@ const Sidebar = () => {
         ...(!user?.isPro ? [{ name: 'Upgrade to Pro', path: '/upgrade', icon: Sparkles }] : []),
         { name: 'Settings', path: '/settings', icon: Settings },
         // Admin menu item - only shown if user is admin
-        ...(user?.isAdmin ? [{ name: 'Admin', path: '/admin/users', icon: Shield }] : []),
+        ...(user?.isAdmin ? [{ name: 'Admin', path: '/admin', icon: Shield }] : []),
     ];
 
     return (

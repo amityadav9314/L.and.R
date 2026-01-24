@@ -56,6 +56,18 @@ type Store interface {
 	IncrementQuota(ctx context.Context, userID, resource string) error
 	GetUsage(ctx context.Context, userID, resource string) (int, error)
 
+	// Settings
+	GetSetting(ctx context.Context, key string) ([]byte, error)
+	GetAllSettings(ctx context.Context) ([]SettingRow, error)
+	SetSetting(ctx context.Context, key string, value []byte, description string) error
+
 	// General
 	Close()
+}
+
+// SettingRow represents a row from the settings table
+type SettingRow struct {
+	Key         string
+	Value       []byte
+	Description string
 }

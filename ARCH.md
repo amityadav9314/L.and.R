@@ -67,15 +67,22 @@ LandR is a SaaS application for learning and revision, allowing users to convert
 
 8.  **`usage_quotas`**
     *   `user_id` (FK -> `users.id`)
-    *   `resource` (e.g., "generated_cards_daily")
+    *   `resource` (e.g., `"link_import"`, `"text_import"`, `"image_import"`, `"youtube_import"`)
     *   `count`, `last_reset_at`
     *   Tracks daily usage for rate limiting and plan enforcement.
+
+9.  **`settings`**
+    *   `key` (TEXT, PK) - Setting identifier (e.g., `"quota_limits"`)
+    *   `value` (JSONB) - Setting value as JSON
+    *   `description` (TEXT) - Human-readable description
+    *   Stores application-wide configuration (quota limits, feature flags, etc.)
 
 ### Relationships
 -   **User -> Materials**: One-to-Many (Cascade Delete)
 -   **Material -> Flashcards**: One-to-Many (Cascade Delete)
 -   **User -> Tags**: One-to-Many
 -   **Material <-> Tags**: Many-to-Many (via `material_tags`)
+
 
 
 ## Backend Architecture
@@ -468,6 +475,86 @@ All AI prompts are externalized as text files and embedded at compile time:
 | `tool_*.txt` | Tool descriptions for agent |
 
 Loaded via `go:embed` in `prompts/loader.go` for zero-runtime file I/O.
+
+## Type-Safe Settings System
+
+### Overview
+Application settings are stored in the database (`settings` table) with type-safe Go structs. This allows:
+- Dynamic configuration changes without redeployment
+- Type-safe access with compile-time guarantees
+- Centralized settings management
+
+### Architecture
+
+```
+internal/settings/
+├── keys.go          # SettingKey constants (single source of truth)
+├── types.go         # Go structs for each setting value
+├── defaults.go      # Default values for seeding/fallback
+└── service.go       # Type-safe service with in-memory cache
+```
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `internal/settings/keys.go` | `SettingKey` type and constants (e.g., `KeyQuotaLimits`) |
+| `internal/settings/types.go` | `QuotaLimits`, `TypeLimits` structs |
+| `internal/settings/defaults.go` | `DefaultQuotaLimits` values |
+| `internal/settings/service.go` | `Service` with `GetQuotaLimit()`, `Refresh()`, `Seed()` |
+
+### Quota Limits Configuration
+
+Stored as JSON in `settings` table with key `quota_limits`:
+
+```json
+{
+  "free": {"link": 3, "text": 10, "image": 5, "youtube": 3},
+  "pro": {"link": 50, "text": 100000, "image": 100, "youtube": 50}
+}
+```
+
+**Go struct representation:**
+```go
+type TypeLimits struct {
+    Link    int `json:"link"`
+    Text    int `json:"text"`
+    Image   int `json:"image"`
+    YouTube int `json:"youtube"`
+}
+
+type QuotaLimits struct {
+    Free TypeLimits `json:"free"`
+    Pro  TypeLimits `json:"pro"`
+}
+```
+
+### Usage in Quota Interceptor
+
+```go
+// Settings service replaces config.Config for quota limits
+limit := settingsService.GetQuotaLimit("free", "text_import")  // Returns 10
+```
+
+### Adding New Settings
+
+1. Add key constant to `keys.go`:
+   ```go
+   const KeyNewSetting SettingKey = "new_setting"
+   ```
+
+2. Add struct to `types.go`:
+   ```go
+   type NewSettingValue struct { ... }
+   ```
+
+3. Add default to `defaults.go`:
+   ```go
+   var DefaultNewSetting = NewSettingValue{ ... }
+   ```
+
+4. Add getter to `service.go` with caching
+
 ## Code Organization
 
 ### Backend Structure
